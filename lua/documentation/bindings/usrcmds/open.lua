@@ -17,13 +17,28 @@ local M = {}
 ---@param cfg Documentation.Opts
 ---@param notify table
 ---@param command_name string
+---@param generate? fun()  makes the map; given, a missing map is offered to be made (and then opened)
 ---@return fun(hash: string?): boolean
-function M.opener(cfg, notify, command_name)
+function M.opener(cfg, notify, command_name, generate)
   ---@param hash string? Fragment including the leading "#", or nil for the default view.
+  ---@param made? boolean  the map was made for this call: do not offer it again
   ---@return boolean opened
-  return function(hash)
+  local function open(hash, made)
     local target = cfg.root .. "/" .. (cfg.out_dir or "docs/map") .. "/index.html"
     if vim.uv.fs_stat(target) == nil then
+      if generate and not made then
+        require("documentation.ask").yesno(
+          ("No map generated yet. Generate it now (:%s) and open it?"):format(command_name),
+          "generate and open",
+          function(accepted)
+            if accepted then
+              generate()
+              open(hash, true)
+            end
+          end
+        )
+        return false
+      end
       notify.warn("No map generated yet — run :" .. command_name .. " first.")
       return false
     end
@@ -46,6 +61,9 @@ function M.opener(cfg, notify, command_name)
     local url = hash and (vim.uri_from_fname(target) .. hash) or target
     require("lib.nvim.cross.open_default")(url)
     return true
+  end
+  return function(hash)
+    return open(hash)
   end
 end
 

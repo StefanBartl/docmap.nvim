@@ -272,21 +272,27 @@ function M.setup(opts)
     local cfg = require("documentation.config").build(root, opts)
     local handle = registry.get(cfg.root) or registry.install(cfg)
     ---@type Documentation.Bindings.Ctx
-    return {
+    local ctx
+    ctx = {
       cfg = cfg,
       handle = handle,
       notify = notify,
       command_name = cfg.command_name or "DocMap",
+      -- a missing map is offered to be made, then opened: the generate action needs this very context
       open_map = require("documentation.bindings.usrcmds.open").opener(
         cfg,
         notify,
-        cfg.command_name or "DocMap"
+        cfg.command_name or "DocMap",
+        function()
+          require("documentation.bindings.usrcmds.generate").run(ctx)
+        end
       ),
       find_node = function(ir, name, lua_root)
         return require("documentation.core.find").node(ir, name, lua_root)
       end,
       generate_all = opts and opts.generate_all,
     }
+    return ctx
   end
 
   ---Module names for completion, from the current root — but **only if that

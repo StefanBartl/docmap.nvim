@@ -868,12 +868,33 @@ end
 ---existing opener — and it answers "actually, I want to see that as a
 ---picture" without hunting for the place again.
 ---@param st table
-local function open_in_browser(st)
+---@param made? boolean  the page was made for this call: do not offer it again
+local function open_in_browser(st, made)
   local target = source.norm_root(st.opts.root)
     .. "/"
     .. (st.opts.out_dir or "docs/map")
     .. "/index.html"
   if not vim.uv.fs_stat(target) then
+    local handle = not made and require("documentation.registry").get(st.opts.root) or nil
+    if handle then
+      -- the page is offered to be made, then handed the position as asked
+      require("documentation.ask").yesno(
+        "No generated page yet. Generate it now and open it?",
+        "generate and open",
+        function(accepted)
+          if not accepted then
+            return
+          end
+          require("documentation.bindings.usrcmds.generate").run({
+            cfg = st.opts,
+            handle = handle,
+            notify = notify,
+          })
+          open_in_browser(st, true)
+        end
+      )
+      return
+    end
     notify.warn("no generated page yet — run :DocMap first")
     return
   end
