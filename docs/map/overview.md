@@ -294,11 +294,10 @@ flowchart LR
 
 ## Drift
 
-0 errors · 1 warnings · 30 info
+0 errors · 0 warnings · 30 info
 
-| Severity | Check | Message |
-|---|---|---|
-| warn | `require-not-declared` | requires "documentation.registry" (line 878), which no file in this tree declares |
+No errors or warnings.
+
 
 <details>
 <summary>30 informational findings</summary>
