@@ -3,7 +3,7 @@
 > **Generated** by `documentation`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
-**6 modules** · 7 namespaces · 135 helper files
+**6 modules** · 7 namespaces · 136 helper files
 
 The [interactive map](index.html) has filtering, full descriptions and
 source links; this page is the version the code host renders directly.
@@ -231,6 +231,7 @@ flowchart LR
   nlua_documentation_core_tools_lua --> nlua_documentation_core_soft_require_lua
   nlua_documentation_core_traffic_join_lua --> nlua_documentation_core_soft_require_lua
   nlua_documentation_editor_browse --> nlua_documentation_bindings_keymaps_lua
+  nlua_documentation_editor_browse --> nlua_documentation_bindings_usrcmds
   nlua_documentation_editor_browse --> nlua_documentation_core_artifact_lua
   nlua_documentation_editor_browse --> nlua_documentation_core_check_lua
   nlua_documentation_editor_browse --> nlua_documentation_core_deps_lua
@@ -293,10 +294,11 @@ flowchart LR
 
 ## Drift
 
-0 errors · 0 warnings · 30 info
+0 errors · 1 warnings · 30 info
 
-No errors or warnings.
-
+| Severity | Check | Message |
+|---|---|---|
+| warn | `require-not-declared` | requires "documentation.registry" (line 878), which no file in this tree declares |
 
 <details>
 <summary>30 informational findings</summary>
