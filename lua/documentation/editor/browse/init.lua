@@ -875,7 +875,7 @@ local function open_in_browser(st, made)
     .. (st.opts.out_dir or "docs/map")
     .. "/index.html"
   if not vim.uv.fs_stat(target) then
-    local handle = not made and require("documentation.registry").get(st.opts.root) or nil
+    local handle = not made and require("documentation.editor.registry").get(st.opts.root) or nil
     if handle then
       -- the page is offered to be made, then handed the position as asked
       require("documentation.ask").yesno(
