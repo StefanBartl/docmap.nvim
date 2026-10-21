@@ -393,9 +393,22 @@ function M.build(root, overrides, notify)
   -- only thing the reader needs to know to fix it.
   require("documentation.core.check_policy").validate(from_file.checks, notify)
 
-  ---A copy per call, never `DEFAULTS` itself: the merge below writes into this
-  ---table, and mutating the shared defaults would leak one caller's options
-  ---into every later `build()` in the process.
+  ---A deep copy per call (`lib.lua.config.copy`), never `DEFAULTS` or one of its
+  ---sub-tables: the merge below writes into this table, and a table shared with
+  ---the defaults would leak one caller's changes into every later `build()` in
+  ---the process. (`vim.tbl_extend` copies the top level only; `DEFAULTS` has
+  ---scalars today, and the day it gets a list the sharing would be real.)
+  ---
+  ---**Why this is not a `lib.lua.config.new` object** (decided 2026-10-22,
+  ---measured): `build(root, overrides)` is a function of a root, not a store.
+  ---An object per call costs 64 us against 1 us for the copy plus the two
+  ---passes, which is nothing next to the 12 ms of `detect_source` -- but the
+  ---object checks every layer against a schema inferred from `DEFAULTS`, which
+  ---has 10 keys while `Documentation.Opts` has 63 (the rest have no default,
+  ---`KNOWN_OPTS_KEYS`), so it would reject all of them as unknown; and its
+  ---layers merge deep, where a repository's `checks` or `layers` replace the
+  ---defaults' whole by design (see `config/file.lua`). Layering stays shallow
+  ---and by key, in the order the two loops below give.
   ---@type Documentation.Opts
   -- Read out of `overrides`/the file rather than off the merged table,
   -- because the merge has not happened yet and detection needs the answer
@@ -403,11 +416,10 @@ function M.build(root, overrides, notify)
   -- backend must not get to name the directory the walk starts in.
   local languages = (overrides and overrides.languages) or from_file.languages
 
-  local opts = vim.tbl_extend("force", {}, DEFAULTS, {
-    root = root,
-    source = M.detect_source(root, languages),
-    title = vim.fn.fnamemodify(root, ":t"),
-  })
+  local opts = require("lib.lua.config").copy(DEFAULTS)
+  opts.root = root
+  opts.source = M.detect_source(root, languages)
+  opts.title = vim.fn.fnamemodify(root, ":t")
 
   -- Two shallow passes in precedence order rather than one merge of a
   -- pre-combined table: the host's explicit `opts` must win key by key, and
