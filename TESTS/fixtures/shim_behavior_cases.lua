@@ -977,6 +977,10 @@ M.cases = {
   { id = "fn.strchars/invalid-lead", path = "fn.strchars", args = { "\255\255" } },
   { id = "fn.strchars/overlong-lead", path = "fn.strchars", args = { "\192\128" } },
   { id = "fn.strchars/composing", path = "fn.strchars", args = { "e\204\129" } },
+  { id = "fn.strchars/lead-f5", path = "fn.strchars", args = { "a\245\128\128\128b" } },
+  { id = "fn.strchars/five-byte", path = "fn.strchars", args = { "a\248\128\128\128\128b" } },
+  { id = "fn.strchars/six-byte", path = "fn.strchars", args = { "a\252\128\128\128\128\128b" } },
+  { id = "fn.strchars/truncated-six-byte", path = "fn.strchars", args = { "a\252\128\128b" } },
 
   -- ------------------------------------------------------- fn.filereadable
   { id = "fn.filereadable/file", path = "fn.filereadable", args = { "<ROOT>/a.txt" } },

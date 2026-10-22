@@ -13,6 +13,10 @@
 --- Not covered, on purpose: `verdicts.encode` and `verdicts.accept` and the answer cache (they write, through `lib.nvim.json.canonical` and `lib.nvim.fs.write.atomic`,
 --- which the shim has no `uv` for) and `:Rules agent` itself (the editor's glue). Both are in `rules.nvim`'s own specs.
 ---
+--- The fixture project (`TESTS/fixtures/rules_agent/project`) holds a `.env`, a `server.pem` and a `secrets/` folder on
+--- purpose: they are what the planner's deny list must keep out of a request. Their contents are one harmless word each.
+--- `TESTS/fixtures/rules_agent/expected.txt` is what both hosts must print.
+---
 --- Dependencies are found the way `standalone/rules_results.lua` finds them: `RULES_NVIM_DIR` / `LIB_NVIM_DIR`, then
 --- `.deps/<name>`, then a sibling directory of this repository.
 

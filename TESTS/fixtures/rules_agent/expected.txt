@@ -1,0 +1,21 @@
+GLOB	lua/**/*.lua	lua/a.lua	true
+GLOB	lua/*.lua	lua/x/a.lua	false
+GLOB	./lua//a.lua	lua/a.lua	true
+GLOB	**/*.PEM	keys/s.pem	false
+PLAN	batches=1	skipped=1	denied=.env,lua/server.pem,secrets/k.txt
+BATCH	b1	lua/a.lua,lua/b.lua,lua/image.bin	DEP-01:family,DEP-02:family
+SKIP	ERR-01	manual	no scope to look in
+REQUEST	sent=lua/a.lua,lua/b.lua	unreadable=lua/image.bin
+REQUEST	numbered=true
+VALIDATE	1	violation	findings=1	dropped=0	unchecked=lua/b.lua	-
+VALIDATE	2	unclear	findings=0	dropped=1	unchecked=lua/b.lua	a violation was proposed but no finding holds up against the tree
+VALIDATE	3	compliant	findings=0	dropped=0	unchecked=lua/a.lua	-
+VALIDATE	4	unclear	findings=0	dropped=0	unchecked=lua/a.lua,lua/b.lua	the answer does not mention this rule
+VALIDATE	5	unclear	findings=0	dropped=0	unchecked=lua/a.lua,lua/b.lua	the answer is not JSON
+VALIDATE	6	unclear	findings=0	dropped=0	unchecked=lua/a.lua,lua/b.lua	needs more
+VALIDATE	7	unclear	findings=0	dropped=0	unchecked=lua/a.lua,lua/b.lua	`checked` and `findings` must be lists
+VERDICTS	parsed=true	-
+STALE	DEP-01	file lua/a.lua changed 2026-10-11
+STALE	GONE-01	rule changed 2026-10-20
+ORPHANED	GONE-01
+VERDICTS	refused=doc: verdict for DEP-01 must be compliant or violation

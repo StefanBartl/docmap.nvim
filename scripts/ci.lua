@@ -700,7 +700,22 @@ function GATES.standalone()
     fail("rules agent pipeline differs between Neovim and the shim:\n" .. table.concat(shown, "\n"))
     return
   end
-  say("  ok: rules agent pipeline: identical on both hosts")
+  -- Identical is necessary and not sufficient: two hosts can break the same way. The fixture's author wrote down
+  -- what the pipeline must say (`expected.txt`: which files are denied, which answers hold, which do not).
+  local want = table.concat(
+    vim.fn.readfile(root .. "/TESTS/fixtures/rules_agent/expected.txt"),
+    "\n"
+  ) .. "\n"
+  if agent_nvim ~= want then
+    fail(
+      ("rules agent pipeline does not say what expected.txt says it should:\n--- got\n%s--- want\n%s"):format(
+        agent_nvim,
+        want
+      )
+    )
+    return
+  end
+  say("  ok: rules agent pipeline: identical on both hosts and as expected")
 end
 
 -- The order is not cosmetic. A formatting failure is the cheapest one to find

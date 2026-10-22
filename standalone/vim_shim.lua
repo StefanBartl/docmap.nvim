@@ -754,7 +754,8 @@ end
 
 ---The length of a text in characters, the way the editor counts (`strchars(text)`, composing characters counted on
 ---their own): a well-formed UTF-8 sequence is one character, and so is every byte that starts none (a stray
----continuation byte, a truncated sequence, 0xF5 to 0xFF; 0xC0 and 0xC1 lead a two-byte sequence, as in the editor).
+---continuation byte, a truncated sequence, 0xFE, 0xFF). The leads 0xC0 to 0xFD start sequences of 2 to 6 bytes, as
+---in the editor.
 ---@param text string
 ---@return integer
 function vim.fn.strchars(text)
@@ -762,12 +763,17 @@ function vim.fn.strchars(text)
   while i <= len do
     local byte = text:byte(i)
     local size = 1
+    -- the editor's length table: the leads 0xC0 to 0xFD start sequences of 2 to 6 bytes, 0xFE and 0xFF none
     if byte >= 0xC0 and byte <= 0xDF then
       size = 2
     elseif byte >= 0xE0 and byte <= 0xEF then
       size = 3
-    elseif byte >= 0xF0 and byte <= 0xF4 then
+    elseif byte >= 0xF0 and byte <= 0xF7 then
       size = 4
+    elseif byte >= 0xF8 and byte <= 0xFB then
+      size = 5
+    elseif byte >= 0xFC and byte <= 0xFD then
+      size = 6
     end
     if size > 1 then
       local whole = i + size - 1 <= len
