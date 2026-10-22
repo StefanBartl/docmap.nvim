@@ -957,6 +957,27 @@ M.cases = {
   -- ----------------------------------------------------------- fn.getcwd
   { id = "fn.getcwd/cwd", path = "fn.getcwd", args = {}, normalize = "slashes", local_only = true },
 
+  -- --------------------------------------------------------- fn.strchars
+  { id = "fn.strchars/ascii", path = "fn.strchars", args = { "abc" } },
+  { id = "fn.strchars/empty", path = "fn.strchars", args = { "" } },
+  { id = "fn.strchars/two-byte", path = "fn.strchars", args = { "a\195\169b" } },
+  {
+    id = "fn.strchars/three-byte",
+    path = "fn.strchars",
+    args = { "\230\151\165\230\156\172\232\170\158" },
+  },
+  { id = "fn.strchars/four-byte", path = "fn.strchars", args = { "x\240\159\152\128y" } },
+  {
+    id = "fn.strchars/stray-continuation",
+    path = "fn.strchars",
+    args = { "a\128b" },
+    why = "a byte that starts no sequence counts one, like the editor does",
+  },
+  { id = "fn.strchars/truncated", path = "fn.strchars", args = { "ab\226\130" } },
+  { id = "fn.strchars/invalid-lead", path = "fn.strchars", args = { "\255\255" } },
+  { id = "fn.strchars/overlong-lead", path = "fn.strchars", args = { "\192\128" } },
+  { id = "fn.strchars/composing", path = "fn.strchars", args = { "e\204\129" } },
+
   -- ------------------------------------------------------- fn.filereadable
   { id = "fn.filereadable/file", path = "fn.filereadable", args = { "<ROOT>/a.txt" } },
   {

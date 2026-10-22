@@ -94,6 +94,11 @@ shim, match the editor's whole signature, options table included, rather than
 only the part this tree happens to call today; a case in the corpus is what
 keeps that honest.
 
+The gate also runs the agent pipeline of `rules.nvim` (planner, request writer, check of a model's answer, verdict
+reading) over a small fixture project on both hosts and demands identical output
+([`standalone/rules_agent_smoke.lua`](../standalone/rules_agent_smoke.lua),
+[`TESTS/fixtures/rules_agent/project`](../TESTS/fixtures/rules_agent/project)); writing is not part of it.
+
 The gate also makes real links with the real rock — `docs/map` as a link out of
 the project, and a link out of the source tree — and checks that the build
 refuses to write through the first and does not read behind the second. On

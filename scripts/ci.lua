@@ -653,6 +653,54 @@ function GATES.standalone()
     end
     say(("  ok: rules engine, %s: identical on both hosts and as expected"):format(mode.label))
   end
+
+  -- ------------------------------------------------------------------
+  -- The agent pipeline of rules.nvim (planner, request, check of an answer,
+  -- verdict reading) on both hosts, over a small fixture project: the same
+  -- script once here and once under PUC Lua with the shim, the outputs
+  -- identical. It found `unpack` (PUC has only `table.unpack`), a JSON null
+  -- that is a table under the shim and a userdata in the editor, and a file
+  -- read that needs libuv; none of it shows up in either host alone.
+  local agent_project = root .. "/TESTS/fixtures/rules_agent/project"
+  ---@param host string[]
+  ---@return string stdout
+  local function agent_output(host)
+    local cmd =
+      vim.list_extend(vim.deepcopy(host), { "standalone/rules_agent_smoke.lua", agent_project })
+    local proc = vim.system(cmd, { cwd = root, text = true }):wait()
+    if proc.code ~= 0 then
+      fail(
+        ("rules agent run failed (exit %d): %s\n%s"):format(
+          proc.code,
+          table.concat(cmd, " "),
+          proc.stderr or ""
+        )
+      )
+    end
+    local out = (proc.stdout or ""):gsub("\r\n", "\n")
+    return out
+  end
+  local agent_nvim = agent_output({ vim.v.progpath, "-n", "--headless", "-u", "NONE", "-l" })
+  local agent_shim = agent_output({ lua })
+  if agent_nvim ~= agent_shim then
+    local a_lines, b_lines =
+      vim.split(agent_nvim, "\n", { plain = true }), vim.split(agent_shim, "\n", { plain = true })
+    local shown = {}
+    for i = 1, math.max(#a_lines, #b_lines) do
+      if a_lines[i] ~= b_lines[i] then
+        shown[#shown + 1] = ("    neovim: %s\n    shim:   %s"):format(
+          a_lines[i] or "<none>",
+          b_lines[i] or "<none>"
+        )
+        if #shown == 5 then
+          break
+        end
+      end
+    end
+    fail("rules agent pipeline differs between Neovim and the shim:\n" .. table.concat(shown, "\n"))
+    return
+  end
+  say("  ok: rules agent pipeline: identical on both hosts")
 end
 
 -- The order is not cosmetic. A formatting failure is the cheapest one to find

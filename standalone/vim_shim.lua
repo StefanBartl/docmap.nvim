@@ -31,6 +31,9 @@
 --- and vim.fn.stdpath ("cache", "data", "config", "state", "log"), which
 --- `runtime-analysis.nvim`'s telemetry store asks at load time (see there).
 ---
+--- and vim.fn.strchars (a text's length in characters, an invalid byte counting one), which `rules.nvim`'s waiver
+--- and verdict validation ask for the limits they tell in characters.
+---
 --- `TESTS/shim_contract_spec.lua` holds this list to the file: a `vim.fn`,
 --- `vim.fs` or `vim.uv` function defined below and missing here fails it.
 ---
@@ -747,6 +750,41 @@ end
 ---@return string
 function vim.fn.getcwd()
   return (lfs.currentdir())
+end
+
+---The length of a text in characters, the way the editor counts (`strchars(text)`, composing characters counted on
+---their own): a well-formed UTF-8 sequence is one character, and so is every byte that starts none (a stray
+---continuation byte, a truncated sequence, 0xF5 to 0xFF; 0xC0 and 0xC1 lead a two-byte sequence, as in the editor).
+---@param text string
+---@return integer
+function vim.fn.strchars(text)
+  local count, i, len = 0, 1, #text
+  while i <= len do
+    local byte = text:byte(i)
+    local size = 1
+    if byte >= 0xC0 and byte <= 0xDF then
+      size = 2
+    elseif byte >= 0xE0 and byte <= 0xEF then
+      size = 3
+    elseif byte >= 0xF0 and byte <= 0xF4 then
+      size = 4
+    end
+    if size > 1 then
+      local whole = i + size - 1 <= len
+      for k = i + 1, math.min(i + size - 1, len) do
+        local cont = text:byte(k)
+        if cont < 0x80 or cont > 0xBF then
+          whole = false
+        end
+      end
+      if not whole then
+        size = 1
+      end
+    end
+    count = count + 1
+    i = i + size
+  end
+  return count
 end
 
 ---Whether this host's filesystem ignores case by default, which is what
