@@ -279,6 +279,12 @@ return function(H)
     "shim refuses a glob pattern ending in a separator"
   )
   ok(raises(shim.fn.glob, fixture .. "/*", true, true), "shim refuses glob's nosuf")
+  ok(
+    raises(shim.fn.strchars, "abc", 1),
+    "shim refuses strchars' skipcc (composing characters need a table)"
+  )
+  ok(raises(shim.fn.strchars, "abc", true), "shim refuses a true skipcc")
+  ok(not raises(shim.fn.strchars, "abc", 0), "shim accepts skipcc = 0, the editor's default")
   ok(raises(shim.fn.fnamemodify, "~/x", ":p"), 'shim refuses ":p" on a "~" path')
   ok(
     raises(shim.fn.fnamemodify, "a", ":h"),

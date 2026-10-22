@@ -756,9 +756,20 @@ end
 ---their own): a well-formed UTF-8 sequence is one character, and so is every byte that starts none (a stray
 ---continuation byte, a truncated sequence, 0xFE, 0xFF). The leads 0xC0 to 0xFD start sequences of 2 to 6 bytes, as
 ---in the editor.
+---
+---The editor's second argument, `skipcc`, asks to leave composing characters out. Counting those needs the Unicode
+---combining table, which the shim does not carry, so a true `skipcc` raises: refused, not guessed.
 ---@param text string
+---@param skipcc? boolean|integer
 ---@return integer
-function vim.fn.strchars(text)
+function vim.fn.strchars(text, skipcc)
+  if skipcc ~= nil and skipcc ~= 0 and skipcc ~= false then
+    error("vim.fn.strchars: skipcc is not supported by the standalone shim", 2)
+  end
+  -- plain ASCII: one byte, one character
+  if not text:find("[\128-\255]") then
+    return #text
+  end
   local count, i, len = 0, 1, #text
   while i <= len do
     local byte = text:byte(i)
