@@ -136,16 +136,21 @@ end
 ---(`M` in `function M.foo()`), which is how a same-file `M.foo()` call is
 ---told apart from a call through a require alias that happens to be named M.
 ---@param node Documentation.Node
+---@param methods_need_receiver boolean? The node's backend declares it.
 ---@return table<string, string> by_name
 ---@return table<string, boolean> self_prefixes
-local function index_functions(node)
+local function index_functions(node, methods_need_receiver)
   local by_name, prefixes = {}, {}
   for _, fn in ipairs(node.functions) do
     by_name[fn.name] = fn.name
     -- Declared name wins over bare name on collision: `M.read` and a
     -- file-local `read` in the same file are two functions, and the qualified
     -- call site is the unambiguous one.
-    if by_name[bare(fn.name)] == nil then
+    --
+    -- A method stays out of the bare half where the language says a bare
+    -- `go()` can never reach `Thing.go` (`methods_need_receiver`): indexing
+    -- it there turns every unrelated bare call of that name into a wrong edge.
+    if by_name[bare(fn.name)] == nil and not (methods_need_receiver and fn.owner) then
       by_name[bare(fn.name)] = fn.name
     end
     local prefix = fn.name:match("^([%w_]+)%.")
@@ -179,17 +184,25 @@ end
 ---that needs it is one field on that backend and nothing in this file. Cached
 ---per call to `build`, because the answer cannot change inside one scan and
 ---the lookup would otherwise run per node.
+---@param pred fun(backend: Documentation.LangBackend): boolean
 ---@return table<string, boolean>
-local function package_scoped_languages()
+local function languages_where(pred)
   local out = {}
   local registry = require("documentation.core.lang_registry")
   for _, entry in ipairs(registry.report()) do
     local backend = registry.get(entry.name)
-    if backend and backend.call_scope == "package" then
+    if backend and pred(backend) then
       out[entry.name] = true
     end
   end
   return out
+end
+
+---@return table<string, boolean>
+local function package_scoped_languages()
+  return languages_where(function(backend)
+    return backend.call_scope == "package"
+  end)
 end
 
 ---For every node whose language resolves calls in package scope, the names
@@ -279,9 +292,13 @@ function M.build(ir, opts)
   -- Lua and JavaScript repository — so this costs one `next()` there.
   local packages = package_index(ir)
 
+  local receiver_only = languages_where(function(backend)
+    return backend.methods_need_receiver == true
+  end)
   local index = {} ---@type table<string, { by_name: table<string, string>, prefixes: table<string, boolean> }>
   for _, id in ipairs(ir.order) do
-    local by_name, prefixes = index_functions(ir.nodes[id])
+    local node = ir.nodes[id]
+    local by_name, prefixes = index_functions(node, node.language and receiver_only[node.language])
     index[id] = { by_name = by_name, prefixes = prefixes }
   end
 
@@ -331,7 +348,11 @@ function M.build(ir, opts)
       -- or the call graph would disagree with the require graph about which
       -- module a specifier names.
       local target = by_module[req.module]
-        or require("documentation.core.deps").resolve_relative(by_path, node.path, req.module)
+        or require("documentation.core.deps").resolve_relative(
+          by_path,
+          node.source or node.path,
+          req.module
+        )
 
       if req.alias then
         if target then

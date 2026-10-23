@@ -49,6 +49,36 @@
 --- since Lua's `init.lua`, and the reason that field exists at all rather
 --- than being a Lua special case. A directory without one is a namespace,
 --- exactly as everywhere else.
+---
+--- ## What a scope is, for the call graph
+---
+--- Asked before the query was written, because Go showed that the answer
+--- decides the resolver, not the extractor:
+---
+---   - **The module is the file.** An unqualified `double(n)` names a
+---     module-level `def` of this file or a name an import bound into it —
+---     never a sibling file, so `call_scope` stays absent (file scope), unlike
+---     Go's package directory.
+---   - **A class body is not a scope a method can see.** Inside `def run(self)`
+---     a bare `go()` cannot reach the method `go` declared beside it; Python
+---     looks it up in the function, then the module, then builtins. So a
+---     method is reachable only through a receiver, which is what
+---     `methods_need_receiver` tells `core/calls.lua`.
+---   - **`self.go()` and `cls.go()` name the enclosing class**, and since
+---     every method here records its `owner`, the extractor rewrites the
+---     callee to `Thing.go` — the declared name — instead of leaving the
+---     resolver to guess what `self` is. Only one segment: `self.attr.go()`
+---     goes through an attribute whose type nothing here knows, and is kept
+---     verbatim so it resolves to nothing rather than to the wrong `go`.
+---   - **Imports bind names.** `from .helper import double` binds `double`,
+---     `from . import helper` and `import os` bind a module, and those are the
+---     `names` and `alias` of `Documentation.RawRequire` the ECMA backend
+---     already fills. `import a.b` without `as` binds `a`, not the module it
+---     loads, so it binds nothing here rather than a wrong alias.
+---
+--- Not resolved, on purpose: `super().go()` and any call on an inherited
+--- method (that needs the class hierarchy), `Thing()` as a call to
+--- `Thing.__init__`, and calls through an attribute of unknown type.
 
 local M = {}
 
@@ -68,6 +98,11 @@ M.module_tag = false
 ---A directory owning a module, the Lua `init.lua` shape. `.pyi` is a stub
 ---file rather than a package marker, so only the real one counts.
 M.module_file = "__init__.py"
+
+---An import in `__init__.py` is the package's export, not dead weight:
+---`from . import sub` is what makes `pkg.sub` reachable after `import pkg`.
+---See `Documentation.LangBackend.module_file_reexports`.
+M.module_file_reexports = true
 
 ---`#` and nothing else. **Python has no block comment** — a triple-quoted
 ---string used as one is a string the interpreter evaluates and throws away,
@@ -649,7 +684,35 @@ function M.parse_header(path)
   }
 end
 
----The require target of an import statement, or `nil`.
+---The names an import list binds: `double` and `triple as t` give
+---`{ double = "double", t = "triple" }`. `nil` for `*`, which binds names
+---nothing here can enumerate without reading the other module.
+---@param node TSNode `import_from_statement`
+---@param src string
+---@return table<string, string>?
+local function bound_names(node, src)
+  local out = nil
+  for _, item in ipairs(node:field("name")) do
+    local localname, exported
+    if item:type() == "aliased_import" then
+      local name, alias = item:field("name")[1], item:field("alias")[1]
+      exported = name and text_of(name, src)
+      localname = alias and text_of(alias, src)
+    else
+      exported = text_of(item, src)
+      localname = exported
+    end
+    -- `from x import a.b` is not Python; a dotted name here would be one no
+    -- call site can write as a bare callee, so it binds nothing.
+    if localname and exported and not exported:find(".", 1, true) then
+      out = out or {}
+      out[localname] = exported
+    end
+  end
+  return out
+end
+
+---The requires an import statement makes, with what each one binds.
 ---
 ---**Only the relative forms resolve, and that is Python's own doing.** An
 ---absolute `import a.b` is looked up along `sys.path`, which depends on how
@@ -657,22 +720,28 @@ end
 ---against this tree would be a guess dressed as an edge. A relative import
 ---is defined against the file's own package, so `from . import x` really is
 ---`./x` and `from ..pkg import y` really is `../pkg`, which is the
----vocabulary `deps.resolve_relative` already speaks.
+---vocabulary `deps.resolve_relative` already speaks. An absolute import is
+---still recorded with its bindings: `core/calls.lua` turns a call through it
+---into a `calls_external` entry, which is the honest answer for `os.path`.
 ---@param node TSNode
 ---@param src string
----@return string[]
-local function import_targets(node, src)
+---@return { module: string, alias: string?, names: table<string, string>? }[]
+local function import_entries(node, src)
   local kind = node:type()
   local out = {}
 
   if kind == "import_statement" then
     for child in node:iter_children() do
       if child:type() == "dotted_name" then
-        out[#out + 1] = text_of(child, src)
+        local module = text_of(child, src)
+        -- `import a.b` binds `a`, the top package, not the module it loads;
+        -- an alias to `a.b` would credit `a.c()` to the wrong module.
+        out[#out + 1] =
+          { module = module, alias = (not module:find(".", 1, true)) and module or nil }
       elseif child:type() == "aliased_import" then
-        local name = child_of(child, "dotted_name")
+        local name, alias = child:field("name")[1], child:field("alias")[1]
         if name then
-          out[#out + 1] = text_of(name, src)
+          out[#out + 1] = { module = text_of(name, src), alias = alias and text_of(alias, src) }
         end
       end
     end
@@ -687,7 +756,7 @@ local function import_targets(node, src)
   if not relative then
     local name = child_of(node, "dotted_name")
     if name then
-      out[#out + 1] = text_of(name, src)
+      out[#out + 1] = { module = text_of(name, src), names = bound_names(node, src) }
     end
     return out
   end
@@ -699,19 +768,78 @@ local function import_targets(node, src)
   local base = dots <= 1 and "./" or ("../"):rep(dots - 1)
   local pkg = child_of(relative, "dotted_name")
   if pkg then
-    out[#out + 1] = base .. (text_of(pkg, src):gsub("%.", "/"))
+    out[#out + 1] = {
+      module = base .. (text_of(pkg, src):gsub("%.", "/")),
+      names = bound_names(node, src),
+    }
     return out
   end
 
   -- `from . import a, b` names the *modules*, not a package, so each one is
-  -- its own edge.
-  for child in node:iter_children() do
-    if child:type() == "dotted_name" and child ~= pkg then
-      out[#out + 1] = base .. (text_of(child, src):gsub("%.", "/"))
-    elseif child:type() == "aliased_import" then
-      local name = child_of(child, "dotted_name")
-      if name then
-        out[#out + 1] = base .. (text_of(name, src):gsub("%.", "/"))
+  -- its own edge, and each binds its module under its own (or its `as`) name.
+  for _, item in ipairs(node:field("name")) do
+    local name, alias = item, nil
+    if item:type() == "aliased_import" then
+      name, alias = item:field("name")[1], item:field("alias")[1]
+    end
+    if name then
+      local text = text_of(name, src)
+      out[#out + 1] = {
+        module = base .. (text:gsub("%.", "/")),
+        alias = alias and text_of(alias, src) or text,
+      }
+    end
+  end
+  return out
+end
+
+---This backend returns call sites. See `Documentation.LangBackend.emits_calls`.
+M.emits_calls = true
+
+---A bare `go()` inside a method cannot name the method `go` of its class —
+---see the header's scope section. See `Documentation.LangBackend.methods_need_receiver`.
+M.methods_need_receiver = true
+
+---Every call site, attributed to the function whose span contains it, with
+---`self.x` / `cls.x` rewritten to the owning class's `Thing.x`.
+---
+---Verified against a real parse rather than assumed by analogy: a call's
+---`function` field is an `identifier` (`double(n)`) or an `attribute`
+---(`helper.go`, `self.go`, `super().go`), and the attribute's text
+---reconstructs as the dotted name the language-agnostic resolver reads.
+---
+---The ranges never nest: `scan_file` records module-level functions and the
+---direct methods of module-level classes, so a nested `def` or a lambda is
+---part of the function around it, and its calls are that function's calls.
+---@param root TSNode
+---@param src string
+---@param ranges { name: string, owner: string?, srow: integer, erow: integer }[] 0-based rows.
+---@return Documentation.RawCall[]
+local function extract_calls(root, src, ranges)
+  local out = {}
+  local ok, query = pcall(vim.treesitter.query.parse, "python", "(call function: (_) @callee)")
+  if not ok then
+    return out
+  end
+  for id, node in query:iter_captures(root, src) do
+    if query.captures[id] == "callee" then
+      local srow = node:range()
+      local callee = text_of(node, src)
+      -- A multi-line callee carries a newline that matches no resolver
+      -- pattern — skipped here, exactly as the other extractors do.
+      if not callee:find("\n") then
+        local enclosing
+        for _, r in ipairs(ranges) do
+          if srow >= r.srow and srow <= r.erow then
+            enclosing = r
+            break
+          end
+        end
+        local member = callee:match("^self%.([%w_]+)$") or callee:match("^cls%.([%w_]+)$")
+        if member and enclosing and enclosing.owner then
+          callee = enclosing.owner .. "." .. member
+        end
+        out[#out + 1] = { callee = callee, from_fn = enclosing and enclosing.name, line = srow + 1 }
       end
     end
   end
@@ -817,8 +945,13 @@ function M.scan_file(path)
     local kind = node:type()
 
     if kind == "import_statement" or kind == "import_from_statement" then
-      for _, target in ipairs(import_targets(node, src)) do
-        requires[#requires + 1] = { module = target, line = node:start() + 1 }
+      for _, entry in ipairs(import_entries(node, src)) do
+        requires[#requires + 1] = {
+          module = entry.module,
+          alias = entry.alias,
+          names = entry.names,
+          line = node:start() + 1,
+        }
       end
     elseif kind == "function_definition" then
       record_function(node, nil)
@@ -889,7 +1022,15 @@ function M.scan_file(path)
     end
   end
 
-  return fns, {}, requires, symbols, {}, {}, lines, {}
+  -- Ranges from the functions just produced, as `go.lua` does: they already
+  -- carry the span and the owner the `self.` rewrite needs.
+  local ranges = {}
+  for _, fn in ipairs(fns) do
+    ranges[#ranges + 1] =
+      { name = fn.name, owner = fn.owner, srow = fn.line - 1, erow = fn.line_end - 1 }
+  end
+
+  return fns, extract_calls(root, src, ranges), requires, symbols, {}, {}, lines, {}
 end
 
 require("documentation.core.lang_registry").register(M.name, M)

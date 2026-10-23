@@ -1357,12 +1357,27 @@ end
 ---none unreferenced. A check that fires on a healthy tree is a check people
 ---turn off, so knowing the floor is zero here mattered more than knowing it
 ---works on a fixture.
+---
+---**A package file whose imports are its exports is skipped**
+---(`Documentation.LangBackend.module_file_reexports`): `from . import sub` in
+---a Python `__init__.py` is how `pkg.sub` becomes reachable, a use no name
+---search can see.
 ---@param ir Documentation.IR
 ---@param findings Documentation.Finding[]
 ---@param opts Documentation.Opts
 local function check_unused_requires(ir, findings, opts)
   local read = require("lib.nvim.fs.read")
+  local registry = require("documentation.core.lang_registry")
   local root = (tostring(opts.root):gsub("\\", "/"):gsub("/+$", ""))
+
+  ---@param node Documentation.Node
+  ---@return boolean
+  local function reexports(node)
+    local backend = node.language and registry.get(node.language)
+    return backend ~= nil
+      and backend.module_file_reexports == true
+      and node.source:match("([^/]+)$") == backend.module_file
+  end
 
   for _, id in ipairs(ir.order) do
     local node = ir.nodes[id]
@@ -1370,7 +1385,7 @@ local function check_unused_requires(ir, findings, opts)
     -- (see `to_json`'s own note on why it is not serialised), so this check
     -- runs on a live scan and quietly does nothing on anything else rather
     -- than reporting every require in a loaded map as unused.
-    if node.source and node.requires_raw and #node.requires_raw > 0 then
+    if node.source and node.requires_raw and #node.requires_raw > 0 and not reexports(node) then
       local content = read(root .. "/" .. node.source)
       if content then
         local lines = vim.split(content, "\n", { plain = true })

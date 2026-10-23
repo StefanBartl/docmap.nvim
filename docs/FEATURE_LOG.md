@@ -3632,3 +3632,33 @@ checkout (2598 directories), 41.3 s before, 11.7 s after. What remains is
   missing segment), `shim_links` (a canned tree through the shim's Windows
   branch, and on a Windows host a real tree with real junctions and the number
   of processes)
+
+## Call edges for Python (2026-10-23)
+
+The sixth backend with call sites. The extractor is the usual one query
+(`(call function: (_) @callee)`); the work was in deciding what a scope is.
+The module is the file (no package scope, unlike Go), a class body is not a
+scope a method can see, `self.`/`cls.` name the enclosing class, and imports
+bind names. Two backend fields carry that to the shared code:
+`methods_need_receiver` (a method is indexed by its declared name only, so a
+bare `go()` never becomes an edge to `Thing.go`) and `module_file_reexports`
+(`unused-require`, which now sees Python's import aliases, skips
+`__init__.py`, where an import is the package's export).
+
+**Two relative-import bugs fell out, and they were not Python's.** A
+root-layout project (`source = "."`) gives every id a `./` prefix that
+`resolve_relative` normalised away, so no relative import there resolved;
+and a package file (`__init__.py`, `index.js`) was resolved against the
+directory *above* the package, because the caller passed the node's path
+(the directory) instead of its file.
+
+Measured against `psf/requests`: 171 call edges; hand counts of `api.py`
+(7 of 7) and the `self.` calls of `sessions.py` (17 of 18, the missing one
+inherited), no wrong edge; require edges 53 before the import fix, 61 after.
+
+- **Modules:** `core/lang/python.lua` (`import_entries`, `bound_names`,
+  `extract_calls`), `core/calls.lua` (`index_functions`, `languages_where`),
+  `core/deps.lua` (`resolve_relative`), `core/check.lua` (`unused-require`)
+- **Tests:** `python_calls_spec` (the `TESTS/fixtures/pycalls/` tree, eleven
+  edges counted by hand, the negatives, the re-export), `resolve_relative`
+  (root layout, package file); CI now builds the Python grammar

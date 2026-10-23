@@ -334,7 +334,18 @@ end
 ---(`exports` maps, `node_modules` walking), which are a package manager's job
 ---and not this map's.
 ---@param by_path table<string, string> From `M.path_index`.
----@param from_path string Repo-relative path of the *importing* node.
+---
+---**`from_path` is the importing *file*, not the node.** A package node
+---(`pkg/__init__.py`, `deep/index.ts`) has its directory as `path`, and a
+---base taken from that is the directory *above* the package — so every
+---relative import of a package file resolved one level too high. Callers
+---pass `node.source or node.path`.
+---
+---**The `./` a root-layout id carries is kept.** With `source = "."` every
+---id and path starts `./`, which `normalise` drops along with every other
+---`.` segment; without putting it back, `./pkg/helper.py` was looked up as
+---`pkg/helper.py` and no relative import of a root-layout project resolved.
+---@param from_path string Repo-relative path of the *importing* file.
 ---@param spec string The specifier as written.
 ---@return string? id
 function M.resolve_relative(by_path, from_path, spec)
@@ -342,12 +353,15 @@ function M.resolve_relative(by_path, from_path, spec)
     return nil
   end
 
-  -- The importing node's directory. A file node's own path includes the
-  -- filename, which is not part of the base.
+  -- The importing file's directory: its own path includes the filename,
+  -- which is not part of the base.
   local base = from_path:match("^(.*)/[^/]*$") or ""
   local joined = normalise((base == "" and "" or base .. "/") .. spec)
   if joined == "" then
     return nil
+  end
+  if from_path:sub(1, 2) == "./" then
+    joined = "./" .. joined
   end
 
   if by_path[joined] then
@@ -392,7 +406,8 @@ function M.build(ir)
       -- Declared module path first, then the relative-specifier fallback: a
       -- Lua `require("a.b")` is never relative, and a JS `./util.js` is never
       -- a declared module, so the two never compete for the same string.
-      local target = by_module[req.module] or M.resolve_relative(by_path, node.path, req.module)
+      local target = by_module[req.module]
+        or M.resolve_relative(by_path, node.source or node.path, req.module)
 
       -- Requires that resolve to nothing in this tree are still facts about
       -- the module: `fidget.progress` is a real dependency, it just is not

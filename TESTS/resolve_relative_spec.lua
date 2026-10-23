@@ -60,4 +60,29 @@ return function(H)
     nil,
     "resolve: climbing past the root finds nothing"
   )
+
+  -- A root layout (`source = "."`) gives every id a `./` prefix, which the
+  -- `.`-segment normalisation used to drop: `./pkg/helper.py` was looked up as
+  -- `pkg/helper.py` and no relative import of such a project resolved.
+  local rooted = {
+    ["./pkg/helper.py"] = "./pkg/helper.py",
+    ["./pkg/sub/deep.py"] = "./pkg/sub/deep.py",
+  }
+  eq(
+    deps.resolve_relative(rooted, "./pkg/widget.py", "./helper"),
+    "./pkg/helper.py",
+    "resolve: a root-layout id keeps its ./ prefix"
+  )
+  eq(
+    deps.resolve_relative(rooted, "./pkg/sub/deep.py", "../helper"),
+    "./pkg/helper.py",
+    "resolve: ...climbing out of a subpackage too"
+  )
+  -- The base is the importing *file*: from a package's own `__init__.py`,
+  -- `./helper` is beside it, not beside the package directory.
+  eq(
+    deps.resolve_relative(rooted, "./pkg/__init__.py", "./helper"),
+    "./pkg/helper.py",
+    "resolve: relative to the package file, not the directory above it"
+  )
 end

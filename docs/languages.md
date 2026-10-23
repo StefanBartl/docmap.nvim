@@ -275,7 +275,7 @@ trusting a build, and it reports **three** states rather than two:
 | `nil` | This backend needs no parser. Full fidelity, not a degradation. |
 
 The same report also carries **`calls`** per backend — whether that backend
-produces call sites at all. Five of the twenty-three do. It is there so a
+produces call sites at all. Six of the twenty-three do. It is there so a
 host can say *why* a Calls panel is empty: "this project has no calls" and
 "this build has no call extraction for this language" look identical on
 screen and are not the same fact. Unlike `grammar_loaded` it is a plain
@@ -320,7 +320,7 @@ DOCMAP_TS_DIR=C:/tools/docmap-grammars nvim --headless -u NONE -l scripts/parity
 | `c` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
 | `cpp` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
 | `asm` | ✓ | — | ✓ | — | — | ✓ | ✓ | — | ✓ | ✓ | — |
-| `python` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
+| `python` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | `csharp` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
 | `go` | ✓ | — | ✓ | — | — | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | `rust` | ✓ | ✓ | ✓ | — | — | ✓ | ✓ | — | ✓ | ✓ | — |
@@ -394,8 +394,9 @@ These are the failure the parity pass was looking for, and it found them.
 They are simply not built, they had no sentence anywhere before this pass, and
 saying so is the point:
 
-- **Call edges: five backends of twenty-three**, and `go` is the fifth as of
-  2026-08-20. The other eighteen return `{}` from `scan_file`'s second slot,
+- **Call edges: six backends of twenty-three**: `go` became the fifth on
+  2026-08-20 and `python` the sixth on 2026-10-23. The other seventeen return
+  `{}` from `scan_file`'s second slot,
   so the Hierarchy tab's Calls and Module Calls views, `:DocMap why`, the
   call-hierarchy LSP integration and `dead-function`'s call-edge tier are
   still empty there. This remains the largest single gap in the tool; it was
@@ -424,6 +425,25 @@ saying so is the point:
   `parse_header` already takes that position for the require edge. The callee
   text is emitted regardless, so the day the module line is read, nothing in
   the backend changes.
+
+  **What Python cost**: its module is the file, so there is no package scope,
+  but two other resolver facts. **A method is reachable only through a
+  receiver** — inside `def run(self)` a bare `go()` never names the method
+  `go` beside it — so `LangBackend.methods_need_receiver` keeps methods out
+  of the bare-name index, and the extractor rewrites `self.go()` / `cls.go()`
+  to the owning class's `Thing.go` (one segment only; `self.attr.go()` has a
+  receiver of unknown type and stays unresolved). **Imports bind names**:
+  `from .helper import double`, `triple as t`, `from . import helper` and
+  `import os` fill `RawRequire.names` and `alias`, so a call through them is
+  an exact edge, or a `calls_external` entry for an absolute import. Not
+  resolved, on purpose: inherited methods and `super()`, `Thing()` as a call
+  to `__init__`. Measured against `psf/requests` (`611c616`): 171 call edges
+  over 20 modules; a hand count of `api.py` found 7 of 7, and of the `self.`
+  calls in `sessions.py` 17 of 18 with no wrong edge — the missing one is
+  an inherited method. Building it also fixed relative imports for every
+  language: a root-layout id's `./` was normalised away, and a package file
+  (`__init__.py`, `index.js`) resolved relative to the directory above it
+  (`requests`: 53 require edges before, 61 after).
 - ~~**Symbols: the four oldest non-Lua backends.**~~ **Closed 2026-08-20.**
   `zig`, `java`, `c` and `cpp` returned no module-scope symbols; every
   backend written from Python onward did. Nothing had decided it — the
