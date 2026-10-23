@@ -164,7 +164,9 @@ flowchart LR
   nlua_documentation_core_check_lua --> nlua_documentation_core_telemetry_join_lua
   nlua_documentation_core_checklist_lua --> nlua_documentation_core_safe_fs_lua
   nlua_documentation_core_churn_lua --> nlua_documentation_core_telemetry_join_lua
+  nlua_documentation_core_cli_lua --> nlua_documentation_core_artifact_lua
   nlua_documentation_core_cli_lua --> nlua_documentation_core_coverage_lua
+  nlua_documentation_core_cli_lua --> nlua_documentation_core_diff_lua
   nlua_documentation_core_cli_lua --> nlua_documentation_core_doccoverage_lua
   nlua_documentation_core_cli_lua --> nlua_documentation_core_findings_lua
   nlua_documentation_core_cli_lua --> nlua_documentation_core_lang_registry_lua
