@@ -20,11 +20,18 @@
 --   widget/mod.rs   Widget::new -> Widget::with (Self::),
 --                   Widget::new -> parts::base, Widget::size -> scaled    3
 --   widget/parts.rs base -> helper double (super::super::)                1
+--   lib.rs (review) scoped's S::m -> helper triple (the inline module's
+--                   own `use`), tests::through_the_glob -> by_use
+--                   (`use super::*`; the call inside `assert_eq!` is not),
+--                   tests::local_beats_glob -> tests::same (shadows it),
+--                   tests::a_path_through_the_glob -> inner::deep        4
+--   bin/tool/main.rs main -> bin/tool/helper.rs double (a bin's crate::)  1
 --                                                                        --
---                                                                        15
+--                                                                        20
 --
 -- Not edges, on purpose: `.size()` on `Widget::new()`'s result (receiver of
--- unknown type), `String::from` (outside the crate), `println!` (a macro).
+-- unknown type), `String::from` (std's, twice: in `outside` and in `label`,
+-- although the file has `impl From<MyErr> for String`), `println!` (a macro).
 
 return function(H)
   local eq, ok = H.eq, H.ok
@@ -52,14 +59,17 @@ return function(H)
       }
     end
     local ir = {
-      order = { "src/lib.rs", "src/w/mod.rs", "src/w/x.rs" },
+      order = { "src/lib.rs", "src/w/mod.rs", "src/w/x.rs", "loose.rs" },
       nodes = {
         ["src/lib.rs"] = node("src/lib.rs", "k", { { name = "a" }, { name = "go" } }, {
           { callee = "k::w::Widget::new", from_fn = "a", line = 1 },
           { callee = "k::w::x::f", from_fn = "a", line = 2 },
           { callee = "k::w::missing", from_fn = "a", line = 3 },
           { callee = "std::mem::swap", from_fn = "a", line = 4 },
-          { callee = "Local::m", from_fn = "go", line = 5 },
+          -- Unanchored in a node that has a module path: another crate's
+          -- `String::from`, even though this file declares one (`impl
+          -- From<E> for String`).
+          { callee = "String::from", from_fn = "go", line = 5 },
         }),
         ["src/w/mod.rs"] = node(
           "src/w/mod.rs",
@@ -67,21 +77,37 @@ return function(H)
           { { name = "Widget::new", owner = "Widget" } }
         ),
         ["src/w/x.rs"] = node("src/w/x.rs", "k::w::x", { { name = "f" } }),
+        -- No module path (no `src/`): a relative path is this file's own.
+        ["loose.rs"] = node(
+          "loose.rs",
+          nil,
+          { { name = "go" }, { name = "Local::m", owner = "Local" } },
+          {
+            { callee = "Local::m", from_fn = "go", line = 1 },
+          }
+        ),
       },
       edges = {},
     }
-    table.insert(ir.nodes["src/lib.rs"].functions, { name = "Local::m", owner = "Local" })
+    table.insert(ir.nodes["src/lib.rs"].functions, { name = "String::from", owner = "String" })
     local got = {}
     for _, e in ipairs(require("documentation.core.calls").build(ir, {})) do
-      got[e.from_fn .. ">" .. e.to .. "#" .. e.to_fn] = true
+      got[e.from .. ":" .. e.from_fn .. ">" .. e.to .. "#" .. e.to_fn] = true
     end
     ok(
-      got["a>src/w/mod.rs#Widget::new"],
+      got["src/lib.rs:a>src/w/mod.rs#Widget::new"],
       "rust: the longest module prefix, the rest a method's declared name"
     )
-    ok(got["a>src/w/x.rs#f"], "rust: ...a deeper module wins over its parent")
-    ok(got["go>src/lib.rs#Local::m"], "rust: an unanchored relative path is this file's own")
-    eq(vim.tbl_count(got), 3, "rust: a missing member and another crate are no edges")
+    ok(got["src/lib.rs:a>src/w/x.rs#f"], "rust: ...a deeper module wins over its parent")
+    ok(
+      got["loose.rs:go>loose.rs#Local::m"],
+      "rust: with no module path, a relative path is this file's own"
+    )
+    eq(
+      vim.tbl_count(got),
+      3,
+      "rust: a missing member, another crate and an unanchored path in a module are no edges"
+    )
   end
 
   local explicit = os.getenv("DOCMAP_RUST_PARSER")
@@ -115,7 +141,7 @@ return function(H)
     return calls[from .. "#" .. from_fn .. ">" .. to .. "#" .. to_fn]
   end
 
-  eq(n, 15, "rust_calls: exactly the fifteen edges counted by hand")
+  eq(n, 20, "rust_calls: exactly the twenty edges counted by hand")
 
   ok(edge(lib, "by_use", helper, "double"), "rust_calls: use crate::helper::double")
   ok(edge(lib, "by_alias", helper, "triple"), "rust_calls: use ...::{triple as t}")
@@ -141,6 +167,32 @@ return function(H)
   ok(edge(widget, "Widget::new", parts, "base"), "rust_calls: a child module of mod.rs")
   ok(edge(widget, "Widget::size", widget, "Widget::scaled"), "rust_calls: self.scaled()")
   ok(edge(parts, "base", helper, "double"), "rust_calls: super::super::")
+  ok(
+    edge(lib, "S::m", helper, "triple"),
+    "rust_calls: a method in an inline module sees that module's `use`, not the file's"
+  )
+  ok(
+    edge(lib, "tests::through_the_glob", lib, "by_use"),
+    "rust_calls: use super::* brings the parent's functions into a module"
+  )
+  ok(
+    edge(lib, "tests::local_beats_glob", lib, "tests::same"),
+    "rust_calls: a module's own function shadows what its glob import brings"
+  )
+  ok(
+    edge(lib, "tests::a_path_through_the_glob", lib, "inner::deep"),
+    "rust_calls: a path whose first segment the glob import brings"
+  )
+  ok(
+    edge("src/bin/tool/main.rs", "main", "src/bin/tool/helper.rs", "double"),
+    "rust_calls: crate:: in a bin is the bin, not the library"
+  )
+  for key in pairs(calls) do
+    ok(
+      not key:find("#label>", 1, true),
+      "rust_calls: impl From<E> for String does not own String::from"
+    )
+  end
 
   -- The owner of a trait impl's method is the type, not the trait.
   local names = {}

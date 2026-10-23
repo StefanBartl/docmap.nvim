@@ -244,6 +244,20 @@ local function module_path_of(path)
   -- what another crate would call it anyway.
   local crate = before:match("([^/]+)$") or "crate"
 
+  -- **A binary target is a crate of its own.** `src/bin/tool.rs` (or
+  -- `src/bin/tool/main.rs`) is a crate root, so `crate::` in it means the bin,
+  -- not the library beside it; the module path stays `crate::bin::tool` so
+  -- two bins never share a name.
+  local bin, below = after:match("^bin/([^/]+)(.*)$")
+  if bin then
+    local root = crate .. "::bin::" .. (bin:gsub("%.rs$", ""))
+    below = (below:gsub("^/", ""):gsub("%.rs$", ""):gsub("/mod$", ""))
+    if below == "" or below == "main" then
+      return root, root
+    end
+    return root .. "::" .. (below:gsub("/", "::")), root
+  end
+
   after = after:gsub("%.rs$", "")
   if after == "lib" or after == "main" then
     return crate, crate
@@ -442,12 +456,17 @@ function M.scan_file(path)
   -- What the call extractor needs to anchor a path, per scope key (`""` for
   -- the file, the inline module path otherwise): the `use` declarations
   -- (bound after the walk), the modules declared (`mod x;` and `mod x {}`),
-  -- the types this file declares or implements at file level, and the names
-  -- each `use` bound.
+  -- the types this file *declares* at file level (not the ones it only
+  -- implements: `impl From<E> for String` does not make `String::from` this
+  -- file's), the names each `use` bound, and the inline module each
+  -- function sits in (a method's owner is its type, which loses that).
   local uses = {} ---@type { node: TSNode, scope: string? }[]
   local mods = {} ---@type table<string, table<string, boolean>>
   local local_types = {} ---@type table<string, boolean>
   local bindings = {} ---@type table<string, table<string, string>>
+  local fn_scope = {} ---@type table<Documentation.FunctionInfo, string>
+  local globs = {} ---@type table<string, string[]>
+  local root_depth = self_crate and #vim.split(self_crate, "::", { plain = true }) or 1
 
   ---The module path of `scope` (an inline module path or nil), as segments.
   ---@param scope string?
@@ -489,8 +508,9 @@ function M.scan_file(path)
     elseif first == "super" then
       base, i = module_segments(scope), 1
       while segs[i] == "super" do
-        -- Above the crate root is not a module; `self_crate` is one segment.
-        if #base <= 1 then
+        -- Above the crate root is not a module. The root is one segment for a
+        -- library, three for a bin (`app::bin::tool`).
+        if #base <= root_depth then
           return nil
         end
         table.remove(base)
@@ -500,6 +520,10 @@ function M.scan_file(path)
       base, i = { bindings[key][first] }, 2
     elseif (mods[key] and mods[key][first]) or (not scope and local_types[first]) then
       base, i = module_segments(scope), 1
+    elseif globs[key] and #globs[key] == 1 then
+      -- `mod tests { use super::*; … AppError::new(…) }`: the one glob
+      -- import is where an otherwise unexplained first segment comes from.
+      base, i = { globs[key][1] }, 1
     else
       return nil
     end
@@ -540,6 +564,15 @@ function M.scan_file(path)
         if full then
           record(text_of(alias, src), full)
         end
+      end
+    elseif kind == "use_wildcard" then
+      -- `use super::*` binds every public name of a module: kept as that
+      -- module, for a bare name nothing else explains.
+      local text = text_of(node, src):gsub("::%*$", "")
+      local full = text == "*" and prefix or join(text)
+      if full then
+        globs[key] = globs[key] or {}
+        table.insert(globs[key], anchor(full, scope) or full)
       end
     elseif kind == "scoped_use_list" or kind == "use_list" then
       local p = node:field("path")[1]
@@ -582,25 +615,41 @@ function M.scan_file(path)
             break
           end
         end
-        local scope = enclosing and enclosing.owner_kind == "module" and enclosing.owner or nil
+        local scope = enclosing and fn_scope[enclosing]
         local owner = enclosing and enclosing.owner_kind ~= "module" and enclosing.owner or nil
         local member = callee:match("^self%.([%w_]+)$") or callee:match("^Self::([%w_]+)$")
         local anchored
         if member then
-          -- `self.go()` and `Self::go()` are the owner's `Widget::go`, left
-          -- relative: the method is declared in this impl, so in this node,
-          -- and the resolver tries this node's own names first.
+          -- `self.go()` and `Self::go()` are the owner's `Widget::go`, which
+          -- this impl declares, so this file's module holds it — whatever
+          -- inline module the impl sits in, since a method's name carries
+          -- its type and not that module.
           if owner then
-            anchored = owner .. "::" .. member
+            anchored = self_module and (self_module .. "::" .. owner .. "::" .. member)
+              or (owner .. "::" .. member)
           end
         elseif callee:match("^[%w_]+$") then
-          if scope and fn_names[scope .. "::" .. callee] then
+          -- A bare name: this module's own function, then a name a `use`
+          -- bound, then the one glob import (`use super::*`) if there is
+          -- exactly one. Inside an inline module, a name none of those
+          -- explains is left anchored there, where it resolves to nothing:
+          -- the file's own functions are not visible in it.
+          local key = scope or ""
+          local bound = bindings[key] and bindings[key][callee]
+          local glob = globs[key] and #globs[key] == 1 and globs[key][1] or nil
+          local own = scope and (scope .. "::" .. callee) or callee
+          if fn_names[own] then
+            anchored = scope
+                and (self_module and (table.concat(module_segments(scope), "::") .. "::" .. callee) or own)
+              or nil
+          elseif bound and bound:find("::", 1, true) then
+            anchored = bound
+          elseif glob then
+            anchored = glob .. "::" .. callee
+          elseif scope then
             anchored = self_module
                 and (table.concat(module_segments(scope), "::") .. "::" .. callee)
-              or (scope .. "::" .. callee)
-          else
-            local bound = bindings[scope or ""] and bindings[scope or ""][callee]
-            anchored = bound and bound:find("::", 1, true) and bound or nil
+              or own
           end
         elseif callee:find("::", 1, true) then
           anchored = anchor(callee, scope)
@@ -692,7 +741,8 @@ function M.scan_file(path)
   ---@param scope string? Enclosing inline module or type, for a qualified name.
   ---@param inherited boolean? The enclosing trait's visibility, when inside one.
   ---@param kind Documentation.ScopeKind? What `scope` is, when there is one. Rust is the language that most needs the distinction kept: `x::helper`, `Widget::new` and `Doer::go` are written identically and are an inline module's function, an inherent method and a trait method.
-  local function record_function(node, scope, inherited, kind)
+  ---@param module_scope string? The inline module the function sits in, which a method's `scope` (its type) does not say.
+  local function record_function(node, scope, inherited, kind, module_scope)
     local name_node = child_of(node, "identifier")
     if not name_node then
       return
@@ -719,6 +769,7 @@ function M.scan_file(path)
       bug = {},
       test = {},
     }
+    fn_scope[fns[#fns]] = module_scope
   end
 
   ---@param node TSNode
@@ -744,7 +795,7 @@ function M.scan_file(path)
       local trait_internal = is_internal(node, src)
       for member in body:iter_children() do
         if member:type() == "function_signature_item" or member:type() == "function_item" then
-          record_function(member, bare, trait_internal, "trait")
+          record_function(member, bare, trait_internal, "trait", scope)
         end
       end
     end
@@ -775,7 +826,7 @@ function M.scan_file(path)
         -- At file top level `scope` is nil and this is a free function; inside
         -- `mod x { … }` it is the inline module path, which is the one owning
         -- scope in this language that is not a type.
-        record_function(child, scope, nil, scope and "module" or nil)
+        record_function(child, scope, nil, scope and "module" or nil, scope)
       elseif
         kind == "struct_item"
         or kind == "enum_item"
@@ -806,16 +857,13 @@ function M.scan_file(path)
           ty = ty:field("name")[1]
         end
         local owner = ty and ty:type() == "type_identifier" and text_of(ty, src) or scope
-        if owner and not scope then
-          local_types[owner] = true
-        end
         local body = child_of(child, "declaration_list")
         if body then
           for member in body:iter_children() do
             if member:type() == "function_item" then
               -- `impl` rather than the type's own `struct`/`enum` kind: the
               -- block is what groups these, and one type can have several.
-              record_function(member, owner, nil, "impl")
+              record_function(member, owner, nil, "impl", scope)
             end
           end
         end

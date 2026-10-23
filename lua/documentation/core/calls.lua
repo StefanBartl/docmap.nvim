@@ -439,12 +439,15 @@ function M.build(ir, opts)
           to_id = to_fn and id or nil
           confidence = "exact"
         elseif call.callee:find("::", 1, true) and not call.callee:find("[^%w_%-:]") then
-          -- A `::` path (Rust): this node's own declared name first — a
-          -- relative `Widget::new` the backend could not anchor — then the
-          -- longest prefix that is a module of the map, the rest being the
-          -- function's declared name there. The backend anchors the path
-          -- (`crate::`, `super::`, `use`) because only it knows its module.
-          to_fn = index[id].by_name[call.callee]
+          -- A `::` path (Rust): the longest prefix that is a module of the
+          -- map, the rest being the function's declared name there. The
+          -- backend anchors the path (`crate::`, `super::`, `use`) because
+          -- only it knows its module. This node's own declared name is tried
+          -- first only for a node with no module path, where nothing could
+          -- be anchored: where one exists, an unanchored `String::from` is
+          -- another crate's, even when this file has `impl From<E> for
+          -- String` and so declares a `String::from` of its own.
+          to_fn = not node.module and index[id].by_name[call.callee] or nil
           if to_fn then
             to_id, confidence = id, "exact"
           else
