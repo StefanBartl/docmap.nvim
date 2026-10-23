@@ -204,6 +204,298 @@ function M.compare(before, after)
   return diff
 end
 
+---Split a LuaCATS type into its top-level union members, ignoring `|` inside
+---brackets, braces and parentheses. A trailing `?` is the member `nil`.
+---@param text string?
+---@return table<string, boolean> members
+local function type_members(text)
+  local members = {}
+  local depth, current = 0, {}
+  local function flush()
+    local member = table.concat(current):gsub("%s+", "")
+    current = {}
+    if member:sub(-1) == "?" then
+      members["nil"] = true
+      member = member:sub(1, -2)
+    end
+    if member ~= "" then
+      members[member] = true
+    end
+  end
+  for ch in (text or ""):gmatch(".") do
+    if ch == "<" or ch == "(" or ch == "{" or ch == "[" then
+      depth = depth + 1
+    elseif ch == ">" or ch == ")" or ch == "}" or ch == "]" then
+      depth = depth - 1
+    end
+    if ch == "|" and depth == 0 then
+      flush()
+    else
+      current[#current + 1] = ch
+    end
+  end
+  flush()
+  return members
+end
+
+---True when every member of `a` is also a member of `b`.
+---@param a table<string, boolean>
+---@param b table<string, boolean>
+---@return boolean
+local function subset(a, b)
+  for member in pairs(a) do
+    if not b[member] then
+      return false
+    end
+  end
+  return true
+end
+
+---True when a type is too loose to say anything about a change to or from it.
+---@param members table<string, boolean>
+---@return boolean
+local function is_open(members)
+  return members["any"] == true or members["unknown"] == true or next(members) == nil
+end
+
+---Whether a function belongs to the published surface of its module, and
+---whether that answer was read from the map or guessed.
+---
+---`fn.internal` is authoritative where the backend filled it. An older map
+---carries no such field, so the shape of the declared name decides: a
+---qualified name (`M.compare`) is surface, a bare one (`node_set`) is a
+---file-local helper. That guess is the honest limit of the rule — a table
+---returned from a factory (`local api = {}; function api.x() end; return api`)
+---has qualified names too, and so does a method on a table that is never
+---exported, so both read as surface here.
+---@param fn Documentation.FunctionInfo
+---@return boolean public
+---@return boolean guessed
+local function is_public(fn)
+  if fn.internal ~= nil then
+    return not fn.internal, false
+  end
+  return (fn.name or ""):find(".", 1, true) ~= nil, true
+end
+
+---`"<node id>#<declared name>"` → function, for every documented function.
+---@param ir Documentation.IR
+---@return table<string, Documentation.FunctionInfo>
+local function function_index(ir)
+  local index = {}
+  for _, id in ipairs(ir.order or {}) do
+    for _, fn in ipairs((ir.nodes[id] or {}).functions or {}) do
+      index[id .. "#" .. fn.name] = fn
+    end
+  end
+  return index
+end
+
+---Classify what changed about the published surface between two maps.
+---
+---Pure, like `compare`. A removed published function is breaking, and so is
+---one that is still there but became `@internal`. For a function present on
+---both sides: a parameter removed or a required one added, an optional
+---parameter that became required, a parameter type that lost a union member
+---(a caller that passed it is now rejected), fewer return values, or a return
+---type that gained one (a caller that handled every value now meets a new one)
+---are breaking. An optional parameter appended at the end, a parameter type
+---that gained a member and a new published function are additive.
+---
+---Types are compared as the text the doc block carries, split on top-level
+---`|` — names are opaque, so `Child` becoming `Parent` is read as a change of
+---member, not as a widening. A side typed `any`, `unknown` or not at all says
+---nothing, so a change to or from one is listed as unclassified instead of
+---guessed at; so is every function whose visibility had to be guessed.
+---@param before Documentation.IR
+---@param after Documentation.IR
+---@return Documentation.Surface
+function M.surface(before, after)
+  ---@type Documentation.Surface
+  local out = { breaking = {}, additive = {}, unclassified = {}, guessed_visibility = 0 }
+  local was, now = function_index(before), function_index(after)
+
+  local function add(list, key, kind, detail)
+    list[#list + 1] = { key = key, kind = kind, detail = detail }
+  end
+
+  for _, key in ipairs(sorted_keys(was)) do
+    local old = was[key]
+    local public, guessed = is_public(old)
+    if public then
+      if guessed then
+        out.guessed_visibility = out.guessed_visibility + 1
+      end
+      local new = now[key]
+      if not new then
+        add(out.breaking, key, "removed", "published function removed")
+      elseif not is_public(new) then
+        add(out.breaking, key, "internalised", "now @internal: no longer part of the surface")
+      else
+        M._compare_signature(out, key, old, new, add)
+      end
+    end
+  end
+
+  for _, key in ipairs(sorted_keys(now)) do
+    if not was[key] and is_public(now[key]) then
+      add(out.additive, key, "added", "new published function")
+    end
+  end
+
+  return out
+end
+
+---Compare the parameters and returns of one published function present on
+---both sides, adding to `out`. Split from `surface` only to keep that readable.
+---@private
+---@param out Documentation.Surface
+---@param key string
+---@param old Documentation.FunctionInfo
+---@param new Documentation.FunctionInfo
+---@param add fun(list: table, key: string, kind: string, detail: string)
+function M._compare_signature(out, key, old, new, add)
+  local op, np = old.params or {}, new.params or {}
+
+  for i = 1, math.min(#op, #np) do
+    local o, n = op[i], np[i]
+    if o.optional and not n.optional then
+      add(out.breaking, key, "narrowed", ("parameter %d (%s) became required"):format(i, n.name))
+    end
+    local om, nm = type_members(o.type), type_members(n.type)
+    om["nil"], nm["nil"] = nil, nil
+    if not subset(om, nm) or not subset(nm, om) then
+      if is_open(om) or is_open(nm) then
+        add(
+          out.unclassified,
+          key,
+          "type",
+          ("parameter %d (%s): type changed from or to an untyped side"):format(i, n.name)
+        )
+      elseif not subset(om, nm) then
+        add(
+          out.breaking,
+          key,
+          "narrowed",
+          ("parameter %d (%s): %s -> %s drops a type callers could pass"):format(
+            i,
+            n.name,
+            o.type,
+            n.type
+          )
+        )
+      else
+        add(
+          out.additive,
+          key,
+          "widened",
+          ("parameter %d (%s): %s -> %s accepts more"):format(i, n.name, o.type, n.type)
+        )
+      end
+    end
+  end
+
+  if #np < #op then
+    add(out.breaking, key, "params", ("%d -> %d parameters"):format(#op, #np))
+  elseif #np > #op then
+    local required = false
+    for i = #op + 1, #np do
+      required = required or not np[i].optional
+    end
+    if required then
+      add(
+        out.breaking,
+        key,
+        "params",
+        ("%d -> %d parameters, a new one is required"):format(#op, #np)
+      )
+    else
+      add(
+        out.additive,
+        key,
+        "params",
+        ("%d -> %d parameters, the new ones are optional"):format(#op, #np)
+      )
+    end
+  end
+
+  local orets, nrets = old.returns or {}, new.returns or {}
+  if #nrets < #orets then
+    add(out.breaking, key, "returns", ("%d -> %d return values"):format(#orets, #nrets))
+  elseif #nrets > #orets then
+    add(out.additive, key, "returns", ("%d -> %d return values"):format(#orets, #nrets))
+  end
+  for i = 1, math.min(#orets, #nrets) do
+    local om, nm = type_members(orets[i].type), type_members(nrets[i].type)
+    if not subset(nm, om) or not subset(om, nm) then
+      if is_open(om) or is_open(nm) then
+        add(
+          out.unclassified,
+          key,
+          "type",
+          ("return %d: type changed from or to an untyped side"):format(i)
+        )
+      elseif not subset(nm, om) then
+        add(
+          out.breaking,
+          key,
+          "returns",
+          ("return %d: %s -> %s can yield a value callers did not handle"):format(
+            i,
+            orets[i].type,
+            nrets[i].type
+          )
+        )
+      else
+        add(
+          out.additive,
+          key,
+          "returns",
+          ("return %d: %s -> %s yields fewer kinds of value"):format(
+            i,
+            orets[i].type,
+            nrets[i].type
+          )
+        )
+      end
+    end
+  end
+end
+
+---Render a surface classification as plain lines; empty when nothing changed.
+---@param surface Documentation.Surface
+---@param before Documentation.IR
+---@param after Documentation.IR
+---@return string[]
+function M.render_surface(surface, before, after)
+  local function label(key)
+    local id, fn = key:match("^(.*)#([^#]*)$")
+    local node = (after.nodes or {})[id or ""] or (before.nodes or {})[id or ""]
+    return ("%s  %s"):format((node and (node.module or node.path)) or id or key, fn or "?")
+  end
+  local out = {}
+  local function section(title, items, prefix)
+    if #items == 0 then
+      return
+    end
+    out[#out + 1] = ("%s (%d)"):format(title, #items)
+    for _, item in ipairs(items) do
+      out[#out + 1] = ("  %s %s: %s"):format(prefix, label(item.key), item.detail)
+    end
+    out[#out + 1] = ""
+  end
+  section("Breaking changes", surface.breaking, "!")
+  section("Additive changes", surface.additive, "+")
+  section("Could not be classified", surface.unclassified, "?")
+  if surface.guessed_visibility > 0 and #out > 0 then
+    out[#out + 1] = ("Visibility of %d function(s) was guessed from the name (the older map has no @internal field)."):format(
+      surface.guessed_visibility
+    )
+    out[#out + 1] = ""
+  end
+  return out
+end
+
 ---True when nothing structural changed.
 ---@param diff Documentation.Diff
 ---@return boolean

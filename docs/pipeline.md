@@ -430,6 +430,23 @@ separate future step, deliberately kept out of this one: confirmed with
 the user to ship the simpler, `bindings/`-only version first rather than
 bundle a `core/` change into the same pass.
 
+### Breaking-change gate (`--breaking=<ref>`)
+
+Fails a branch that removes or changes a published function:
+
+```
+nvim --headless -l scripts/gen_map.lua --breaking=origin/main
+```
+
+The old side is the committed map at `<ref>` (`git show
+<ref>:<out_dir>/module_map.json`, so the base revision must be fetched); the new
+side is a fresh scan of the working tree. The classification is the one
+`:DocMap diff` prints (see [`commands.md`](commands.md#docmap-diff-ref)).
+Exit `0`: no breaking change. Exit `1`: at least one, listed on stdout. Exit
+`2`: no verdict, because `<ref>` is not a revision (a value starting with `-`
+is refused), the map is absent there or unreadable, or `out_dir` is unsafe.
+It runs instead of the map check, not alongside it: use `--check` in its own step.
+
 ### SARIF for CI (`--sarif=<path>`)
 
 The same findings in the format GitHub code scanning ingests, so every drift

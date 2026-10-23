@@ -167,6 +167,7 @@ local specs = {
   "binding_conflict_spec.lua",
   "unused_require_spec.lua",
   "sarif_spec.lua",
+  "diff_surface_spec.lua",
   "example_parse_spec.lua",
   "docs_spec.lua",
   "quicks_spec.lua",

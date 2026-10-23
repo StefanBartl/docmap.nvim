@@ -43,6 +43,10 @@ function M.run(ctx, arg)
   local diff_mod = require("documentation.core.diff")
   local result = diff_mod.compare(before, ctx.handle.ir())
   local lines = diff_mod.render(result, before, ctx.handle.ir(), ref)
+  vim.list_extend(
+    lines,
+    diff_mod.render_surface(diff_mod.surface(before, ctx.handle.ir()), before, ctx.handle.ir())
+  )
 
   vim.cmd("enew")
   local buf = vim.api.nvim_get_current_buf()

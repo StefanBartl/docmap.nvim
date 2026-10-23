@@ -526,6 +526,19 @@
 ---@field cycles_removed string[]
 ---@field impact_changed { id: string, before: integer, after: integer }[] Sorted by how much the blast radius moved.
 
+---One classified change to a published function, from `documentation.core.diff.surface`.
+---@class Documentation.SurfaceChange
+---@field key string `"<node id>#<declared name>"`.
+---@field kind string `removed`, `internalised`, `params`, `returns`, `narrowed`, `widened`, `added` or `type`.
+---@field detail string What changed, as a short sentence.
+
+---What a revision did to the published surface, from `documentation.core.diff.surface`.
+---@class Documentation.Surface
+---@field breaking Documentation.SurfaceChange[] Changes that can break a caller; what a CI gate fails on.
+---@field additive Documentation.SurfaceChange[] Changes that cannot.
+---@field unclassified Documentation.SurfaceChange[] Changes that could not be judged (a side typed `any` or not at all).
+---@field guessed_visibility integer Published functions of the older map whose visibility came from the shape of the name, not from `@internal`.
+
 ---A drift finding.
 ---A finding travels as data and becomes a sentence at the edge that shows
 ---it — see `core/findings.lua` for why (in one line: a sentence assembled

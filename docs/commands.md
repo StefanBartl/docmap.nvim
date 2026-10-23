@@ -223,6 +223,19 @@ Comparing against an **older schema** suppresses the dependency, cycle and
 impact sections with the reason stated, rather than reporting every dependency
 in the tree as "added".
 
+The same window ends with the published surface classified: **breaking**
+(a published function removed or turned `@internal`; a parameter removed, a
+required one added, an optional one made required, or a type that lost a union
+member; fewer return values, or a return type that gained a possibility),
+**additive** (a new published function, an optional parameter appended, a
+wider parameter type) and **could not be classified** (a side typed `any`,
+`unknown` or not at all). "Published" is `fn.internal == false`; a map without
+that field is judged by the name (`M.compare` is surface, `node_set` is not),
+and the output says how many functions were judged that way. A table returned
+from a factory has qualified names too, so its methods read as surface. Types
+are compared as text split on top-level `|`: `Child` becoming `Parent` is a
+changed member, not a widening. For CI, see [`--breaking`](pipeline.md#breaking-change-gate---breakingref).
+
 ### `:DocMap impact [ref]`
 
 Where those changed lines **radiate to** → quickfix list. Each touched function

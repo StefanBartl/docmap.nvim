@@ -271,8 +271,74 @@ local function write_refusal(err)
   return nil
 end
 
+---`--breaking=<ref>`: compare the published surface of the tree with the
+---committed map at `<ref>` and fail on a change that can break a caller.
+---
+---The old side is `git show <ref>:<out_dir>/module_map.json`, the same
+---retrieval `:DocMap diff` uses, so a CI job needs the base revision fetched
+---and nothing generated for it. The new side is a fresh scan, not the
+---committed map: the gate judges the code, and `--check` is what keeps the
+---committed map honest. Exit `0` for no breaking change, `1` for at least one,
+---`2` when there is no verdict: `<ref>` unknown, the map absent there or not a
+---readable artifact, or an `out_dir` that is not a plain relative path.
+---@param opts Documentation.Opts
+---@param root string
+---@param ref string
+---@return integer exit_code
+local function run_breaking(opts, root, ref)
+  local out_dir = require("documentation.core.safe_out_dir")(opts.out_dir)
+  if not out_dir then
+    io.stderr:write(
+      ("docmap: opts.out_dir is not a safe relative path: %s\n"):format(tostring(opts.out_dir))
+    )
+    return REFUSED
+  end
+  -- `git show <ref>:<path>` is one argv element: a ref that starts with `-`
+  -- would be read as an option (`--output=<file>` writes one), not a revision.
+  if ref == "" or ref:sub(1, 1) == "-" then
+    io.stderr:write(("docmap: refusing to compare: %q is not a revision\n"):format(ref))
+    return REFUSED
+  end
+  local rel = out_dir .. "/module_map.json"
+  -- `vim.fn.system`, not `vim.system`: the standalone build runs this under
+  -- plain Lua, where only the former exists. It merges stderr into the output,
+  -- which on a failure is the message and on success is empty.
+  local shown = vim.fn.system({ "git", "-C", root, "show", ("%s:%s"):format(ref, rel) })
+  if vim.v.shell_error ~= 0 then
+    io.stderr:write(
+      ("docmap: refusing to compare: cannot read %s at %s: %s\n"):format(rel, ref, vim.trim(shown))
+    )
+    return REFUSED
+  end
+  local decoded, doc = pcall(vim.json.decode, shown, {
+    luanil = { object = true, array = true },
+  })
+  if not decoded or type(doc) ~= "table" or type(doc.nodes) ~= "table" then
+    io.stderr:write(
+      ("docmap: refusing to compare: the map at %s is not a readable artifact\n"):format(ref)
+    )
+    return REFUSED
+  end
+
+  local before = require("documentation.core.artifact").rehydrate(doc)
+  local ir = require("documentation").scan_full(opts)
+  local diff = require("documentation.core.diff")
+  local surface = diff.surface(before, ir)
+  for _, line in ipairs(diff.render_surface(surface, before, ir)) do
+    io.stdout:write(line .. "\n")
+  end
+  if #surface.breaking > 0 then
+    io.stderr:write(
+      ("%d breaking change(s) to the published surface since %s.\n"):format(#surface.breaking, ref)
+    )
+    return 1
+  end
+  io.stdout:write(("No breaking change to the published surface since %s.\n"):format(ref))
+  return 0
+end
+
 ---Run the CLI over `opts` with `argv` (`_G.arg`-shaped: `--check`, `--lenient`,
----`--full`, `--exclude=<path>`, `--languages=<a,b>`). Writes to stdout/stderr
+---`--full`, `--breaking=<ref>`, `--exclude=<path>`, `--languages=<a,b>`). Writes to stdout/stderr
 ---as a side effect; returns the process exit code rather than calling
 ---`os.exit`/`vim.cmd("cq ...")`, so the caller decides how to actually exit.
 ---
@@ -291,6 +357,8 @@ function M.run(opts, argv)
   local check_only, strict = false, true
   ---@type string?
   local sarif_path = nil
+  ---@type string?
+  local breaking_ref = nil
   ---@type string[]
   local cli_exclude = {}
   ---@type string[]
@@ -300,6 +368,8 @@ function M.run(opts, argv)
       check_only = true
     elseif a == "--lenient" then
       strict = false
+    elseif a:match("^%-%-breaking=") then
+      breaking_ref = a:sub(#"--breaking=" + 1)
     elseif a == "--full" then
       opts.luals = true
     elseif a:match("^%-%-sarif=") then
@@ -380,6 +450,10 @@ function M.run(opts, argv)
         table.concat(known_language_names(), ", ")
       )
     )
+  end
+
+  if breaking_ref then
+    return run_breaking(opts, root, breaking_ref)
   end
 
   if check_only then
