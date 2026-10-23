@@ -77,9 +77,12 @@ return function(H)
         -- Loud rather than nil: the shim asks for `"mode"` and nothing else,
         -- and a silently-nil answer to some future third argument would look
         -- exactly like "file not found".
-        assert(what == "mode", "lfs adapter: only the `mode` attribute is implemented")
+        assert(
+          what == "mode" or what == "ino" or what == "dev",
+          "lfs adapter: only the `mode`, `ino` and `dev` attributes are implemented"
+        )
         local st = vim.uv.fs_stat(path)
-        return st and st.type or nil
+        return st and (what == "mode" and st.type or st[what]) or nil
       end,
       -- `lstat`: what the shim's `**` asks so that a link is not entered, and
       -- (`target`) what `uv.fs_readlink` asks to read where a link points.

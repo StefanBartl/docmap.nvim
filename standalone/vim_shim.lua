@@ -1811,14 +1811,16 @@ end
 
 local uv = {}
 
+---`type`, and `ino` and `dev` where the platform has them: `core/safe_fs.lua` tells two spellings of a root apart by
+---them (does the disk fold case?), and without the numbers two sibling roots that differ only in case would read as one.
 ---@param path string
----@return { type: string }|nil
+---@return { type: string, ino: integer?, dev: integer? }|nil
 function uv.fs_stat(path)
   local mode = lfs.attributes(path, "mode")
   if not mode then
     return nil
   end
-  return { type = mode }
+  return { type = mode, ino = lfs.attributes(path, "ino"), dev = lfs.attributes(path, "dev") }
 end
 
 ---@param dir string

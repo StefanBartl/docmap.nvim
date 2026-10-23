@@ -80,9 +80,9 @@ return function(H)
   -- ---------------------------------------------------------------------
   local real_lfs = {
     attributes = function(path, what)
-      assert(what == "mode", "adapter: only `mode`")
+      assert(what == "mode" or what == "ino" or what == "dev", "adapter: only `mode`, `ino`, `dev`")
       local st = vim.uv.fs_stat(path)
-      return st and st.type or nil
+      return st and (what == "mode" and st.type or st[what]) or nil
     end,
     symlinkattributes = function(path, what)
       if what == "target" then
@@ -174,6 +174,16 @@ return function(H)
       eq(lstat_type(shim, name), lstat_type(vim, name), "A: uv.fs_lstat(" .. name .. ")")
     end
     eq(lstat_type(shim, "link_dir"), "link", "A: ...and a link is a link")
+
+    -- `ino` and `dev` are what `safe_fs.folds_case` compares: the shim must answer the numbers the host does
+    if not is_windows then
+      for _, name in ipairs({ "dir", "file.txt" }) do
+        local mine, theirs =
+          shim.uv.fs_stat(base .. "/" .. name), vim.uv.fs_stat(base .. "/" .. name)
+        eq(mine.ino, theirs.ino, "A: uv.fs_stat(" .. name .. ").ino")
+        eq(mine.dev, theirs.dev, "A: uv.fs_stat(" .. name .. ").dev")
+      end
+    end
 
     local function norm(target)
       if target == nil then
@@ -539,7 +549,9 @@ return function(H)
         return true
       end,
       attributes = function(path, what)
-        assert(what == "mode", "fake lfs: only `mode`")
+        if what ~= "mode" then
+          return nil -- the fake disk has no inode numbers
+        end
         world.stats[#world.stats + 1] = path
         path = resolve(path)
         local entry = DISK[path:gsub("/+$", "")] or DISK[path]

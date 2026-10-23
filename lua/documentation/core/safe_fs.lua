@@ -583,9 +583,9 @@ end
 ---host, so the disk is asked: if it folds, `root` spelled with the last letter
 ---of its path in the other case leads to the same directory. A root with no
 ---letter to change (`.`, `..`), as the standalone build is given, is asked
----through a name in it. A host that cannot say which directory it found (the
----standalone build's `stat` answers `type` only) has no numbers to tell two
----apart, and is taken at its word that the other spelling is there.
+---through a name in it. The standalone build's `stat` answers `ino` and `dev` as well (from LuaFileSystem). A host
+---that cannot say which directory it found has no numbers to tell two apart, and is taken at its word that the
+---other spelling is there.
 ---@param root string
 ---@return boolean
 function M.folds_case(root)
