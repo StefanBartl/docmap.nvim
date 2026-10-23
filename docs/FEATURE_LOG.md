@@ -3662,3 +3662,29 @@ inherited), no wrong edge; require edges 53 before the import fix, 61 after.
 - **Tests:** `python_calls_spec` (the `TESTS/fixtures/pycalls/` tree, eleven
   edges counted by hand, the negatives, the re-export), `resolve_relative`
   (root layout, package file); CI now builds the Python grammar
+
+## Call edges for Rust (2026-10-23)
+
+The seventh backend with call sites. Rust's scope is the crate's module
+tree, which only the file can walk: it knows its own module path, its `use`
+bindings (per module, so a `use` inside `mod inner {}` binds there only), its
+`mod` declarations and its file-level types. So the extractor **anchors**
+each path to an absolute one (`crate::`, `super::`, `self::`, a bound name, a
+child module, a local type) and `core/calls.lua` gained one generic branch:
+an absolute `::` path resolves by its longest prefix that is a module of the
+map, the rest being the function's declared name (`Widget::new`) there.
+`self.go()` / `Self::go()` stay relative as the owner's `Widget::go`, and
+`methods_need_receiver` holds as in Python.
+
+**Two owner bugs fell out.** `impl Doer for Widget` read the first type name
+and recorded the methods as the trait's `Doer::go`; `impl<T> Foo<T>` had a
+`generic_type` there and recorded no owner. The `type` field fixes both.
+
+Measured on `docmap-desktop/src-tauri`: 957 call edges from 5140 call sites;
+the non-test functions of `freshness.rs` by hand, 12 of 12, no wrong edge.
+
+- **Modules:** `core/lang/rust.lua` (`anchor`, `bind`, `extract_calls`),
+  `core/calls.lua` (`module_prefix`)
+- **Tests:** `rust_calls_spec` (the `TESTS/fixtures/rscalls/` crate,
+  `cargo check` clean, fifteen edges counted by hand, the trait-impl owner,
+  and the `::` resolver on a hand-built IR); CI now builds the Rust grammar

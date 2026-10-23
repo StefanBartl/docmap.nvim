@@ -41,6 +41,36 @@
 --- **The module path is derived from the file path**, so `use crate::a::b`
 --- resolves to a real node. See `module_path_of` for how, and for the two
 --- shapes that defeat it.
+---
+--- ## What a scope is, for the call graph
+---
+--- Asked before the query was written. **The scope is the crate's module
+--- tree, not the file and not the directory**: a module is declared by its
+--- parent (`mod x;`), and a path names a function by walking that tree —
+--- `crate::a::f`, `super::f`, `self::x::f`, a child `x::f`, or a name a `use`
+--- bound into *this* module (a `use` in `mod inner { … }` binds in `inner`
+--- only). Go's `call_scope = "package"` does not fit: siblings in one
+--- directory are different modules and see nothing of each other unqualified.
+---
+--- So the extractor does the walking, because only this file knows its own
+--- module path, its `use` bindings, its `mod` declarations and its inline
+--- modules: every callee it can anchor is rewritten to an **absolute path**
+--- (`crate_name::helper::double`, `crate_name::widget::Widget::new`), and
+--- `core/calls.lua` resolves an absolute path by its longest prefix that is a
+--- module of the map, the rest being the function's declared name there.
+---
+---   - `self.go()` in an `impl Widget` method is `Widget::go`, and `Self::new()`
+---     is `Widget::new` — the owner every method already records.
+---   - A bare `go()` never reaches a method (`methods_need_receiver`): Rust
+---     needs `self.`, `Self::` or the type.
+---   - A bare name inside `mod inner { … }` is that inline module's function
+---     first, then a name a `use` in that module bound.
+---
+--- Not resolved, on purpose: calls on a receiver of unknown type
+--- (`w.size()`, `Widget::new().size()`), trait dispatch, `<T as Tr>::m()`, any
+--- path into another crate (`std::`, a dependency), and calls inside a macro
+--- invocation (`assert_eq!(f(x), 1)`), whose arguments are a token tree, not
+--- an expression the grammar parses.
 
 local M = {}
 
@@ -382,6 +412,13 @@ function M.parse_header(path)
   }
 end
 
+---This backend returns call sites. See `Documentation.LangBackend.emits_calls`.
+M.emits_calls = true
+
+---A method or associated function needs `self.`, `Self::` or its type; a
+---bare name never reaches one. See `Documentation.LangBackend.methods_need_receiver`.
+M.methods_need_receiver = true
+
 ---@param path string
 ---@return Documentation.FunctionInfo[], Documentation.RawCall[], Documentation.RawRequire[], Documentation.SymbolInfo[], table[], Documentation.EndpointSpec[], integer, Documentation.BindingSpec[]
 function M.scan_file(path)
@@ -401,6 +438,179 @@ function M.scan_file(path)
   local split = require("documentation.core.scan").split_summary
   local self_module, self_crate = module_path_of(path)
   local fns, requires, symbols = {}, {}, {}
+
+  -- What the call extractor needs to anchor a path, per scope key (`""` for
+  -- the file, the inline module path otherwise): the `use` declarations
+  -- (bound after the walk), the modules declared (`mod x;` and `mod x {}`),
+  -- the types this file declares or implements at file level, and the names
+  -- each `use` bound.
+  local uses = {} ---@type { node: TSNode, scope: string? }[]
+  local mods = {} ---@type table<string, table<string, boolean>>
+  local local_types = {} ---@type table<string, boolean>
+  local bindings = {} ---@type table<string, table<string, string>>
+
+  ---The module path of `scope` (an inline module path or nil), as segments.
+  ---@param scope string?
+  ---@return string[]
+  local function module_segments(scope)
+    local out = vim.split(self_module, "::", { plain = true })
+    if scope then
+      vim.list_extend(out, vim.split(scope, "::", { plain = true }))
+    end
+    return out
+  end
+
+  ---A path as written, made absolute: `crate::`, `super::`, `self::`, a name
+  ---a `use` bound, a declared module or a file-level type as its first
+  ---segment. `nil` when the first segment is none of those (another crate, a
+  ---prelude type, a local variable) or when this file has no module path to
+  ---anchor to. `Self::` is not anchored here: see `extract_calls`.
+  ---@param text string
+  ---@param scope string? Inline module the path is written in.
+  ---@return string?
+  local function anchor(text, scope)
+    if not self_module then
+      return nil
+    end
+    -- `Vec::<u8>::new` names `Vec::new`; anything else that is not a plain
+    -- path (`<T as Tr>::m`, a call result) is not one this can anchor.
+    text = text:gsub("::%b<>", "")
+    if text:find("[^%w_:]") then
+      return nil
+    end
+    local segs = vim.split(text, "::", { plain = true })
+    local key = scope or ""
+    local first = segs[1]
+    local base, i
+    if first == "crate" then
+      base, i = { self_crate }, 2
+    elseif first == "self" then
+      base, i = module_segments(scope), 2
+    elseif first == "super" then
+      base, i = module_segments(scope), 1
+      while segs[i] == "super" do
+        -- Above the crate root is not a module; `self_crate` is one segment.
+        if #base <= 1 then
+          return nil
+        end
+        table.remove(base)
+        i = i + 1
+      end
+    elseif bindings[key] and bindings[key][first] then
+      base, i = { bindings[key][first] }, 2
+    elseif (mods[key] and mods[key][first]) or (not scope and local_types[first]) then
+      base, i = module_segments(scope), 1
+    else
+      return nil
+    end
+    for j = i, #segs do
+      base[#base + 1] = segs[j]
+    end
+    return table.concat(base, "::")
+  end
+
+  ---Record what one `use` tree binds in `scope`: `a::b::c` binds `c`,
+  ---`a::b as d` binds `d`, `a::{self, c as e}` binds `a` and `e`; `*` binds
+  ---nothing this can name. The bound value is the anchored path, or the
+  ---path as written when it leaves the crate (`std::mem::swap`).
+  ---@param node TSNode
+  ---@param prefix string? The path of the enclosing `a::{…}` list.
+  ---@param scope string?
+  local function bind(node, prefix, scope)
+    local key = scope or ""
+    local function record(name, full)
+      bindings[key] = bindings[key] or {}
+      bindings[key][name] = anchor(full, scope) or full
+    end
+    local function join(text)
+      return prefix and (prefix .. "::" .. text) or text
+    end
+    local kind = node:type()
+    if kind == "identifier" or kind == "scoped_identifier" then
+      local full = join(text_of(node, src))
+      record(full:match("([^:]+)$"), full)
+    elseif kind == "self" then
+      if prefix then
+        record(prefix:match("([^:]+)$"), prefix)
+      end
+    elseif kind == "use_as_clause" then
+      local p, alias = node:field("path")[1], node:field("alias")[1]
+      if p and alias then
+        local full = p:type() == "self" and prefix or join(text_of(p, src))
+        if full then
+          record(text_of(alias, src), full)
+        end
+      end
+    elseif kind == "scoped_use_list" or kind == "use_list" then
+      local p = node:field("path")[1]
+      local sub = p and join(text_of(p, src)) or prefix
+      local list = kind == "use_list" and node or node:field("list")[1]
+      if list then
+        -- The `{`, `,` and `}` tokens are children too, and fall through
+        -- every branch above; no `named()` check, which the standalone
+        -- shim's node does not have.
+        for child in list:iter_children() do
+          bind(child, sub, scope)
+        end
+      end
+    end
+  end
+
+  ---Every call site, attributed to the function whose span contains it, its
+  ---callee anchored to an absolute path where this file can do that. See the
+  ---header's scope section.
+  ---@return Documentation.RawCall[]
+  local function extract_calls()
+    local out = {}
+    local ok, query =
+      pcall(vim.treesitter.query.parse, "rust", "(call_expression function: (_) @callee)")
+    if not ok then
+      return out
+    end
+    local fn_names = {}
+    for _, fn in ipairs(fns) do
+      fn_names[fn.name] = true
+    end
+    for _, node in query:iter_captures(root, src) do
+      local srow = node:range()
+      local callee = text_of(node, src)
+      if not callee:find("\n") then
+        local enclosing
+        for _, fn in ipairs(fns) do
+          if srow >= fn.line - 1 and srow <= fn.line_end - 1 then
+            enclosing = fn
+            break
+          end
+        end
+        local scope = enclosing and enclosing.owner_kind == "module" and enclosing.owner or nil
+        local owner = enclosing and enclosing.owner_kind ~= "module" and enclosing.owner or nil
+        local member = callee:match("^self%.([%w_]+)$") or callee:match("^Self::([%w_]+)$")
+        local anchored
+        if member then
+          -- `self.go()` and `Self::go()` are the owner's `Widget::go`, left
+          -- relative: the method is declared in this impl, so in this node,
+          -- and the resolver tries this node's own names first.
+          if owner then
+            anchored = owner .. "::" .. member
+          end
+        elseif callee:match("^[%w_]+$") then
+          if scope and fn_names[scope .. "::" .. callee] then
+            anchored = self_module
+                and (table.concat(module_segments(scope), "::") .. "::" .. callee)
+              or (scope .. "::" .. callee)
+          else
+            local bound = bindings[scope or ""] and bindings[scope or ""][callee]
+            anchored = bound and bound:find("::", 1, true) and bound or nil
+          end
+        elseif callee:find("::", 1, true) then
+          anchored = anchor(callee, scope)
+        end
+        out[#out + 1] =
+          { callee = anchored or callee, from_fn = enclosing and enclosing.name, line = srow + 1 }
+      end
+    end
+    return out
+  end
 
   -- Attribute rows, so `doc_above` can step over `#[derive(…)]` between a
   -- doc comment and the item it documents.
@@ -557,6 +767,10 @@ function M.scan_file(path)
             requires[#requires + 1] = { module = target, line = child:start() + 1 }
           end
         end
+        local argument = child:field("argument")[1]
+        if argument then
+          uses[#uses + 1] = { node = argument, scope = scope }
+        end
       elseif kind == "function_item" then
         -- At file top level `scope` is nil and this is a free function; inside
         -- `mod x { … }` it is the inline module path, which is the one owning
@@ -570,12 +784,31 @@ function M.scan_file(path)
         or kind == "type_item"
       then
         record_type(child, scope)
+        local name_node = child_of(child, "type_identifier")
+        if name_node and not scope then
+          local_types[text_of(name_node, src)] = true
+        end
       elseif kind == "impl_item" then
         -- The methods belong to the type, not to the file: `Widget::new`.
         -- This is the owning-scope shape Phase 0 named, answered by
         -- qualifying rather than by an IR field.
-        local ty = child_of(child, "type_identifier")
-        local owner = ty and text_of(ty, src) or scope
+        --
+        -- **The `type` field, not the first type name.** `impl Doer for
+        -- Widget` names the trait first, and reading that recorded every
+        -- trait impl's methods as `Doer::go` — the trait declaration's own
+        -- name, once more per impl. `impl<T> Foo<T>` has a `generic_type`
+        -- there, which hid the owner entirely.
+        local ty = child:field("type")[1]
+        if ty and ty:type() == "generic_type" then
+          ty = ty:field("type")[1]
+        end
+        if ty and ty:type() == "scoped_type_identifier" then
+          ty = ty:field("name")[1]
+        end
+        local owner = ty and ty:type() == "type_identifier" and text_of(ty, src) or scope
+        if owner and not scope then
+          local_types[owner] = true
+        end
         local body = child_of(child, "declaration_list")
         if body then
           for member in body:iter_children() do
@@ -592,6 +825,8 @@ function M.scan_file(path)
         if name_node then
           local bare = text_of(name_node, src)
           local inner_scope = scope and (scope .. "::" .. bare) or bare
+          mods[scope or ""] = mods[scope or ""] or {}
+          mods[scope or ""][bare] = true
           if body then
             -- `mod x { … }`: an inline module, the "one file, many modules"
             -- case. Its contents are recorded under `x::`, which is what a
@@ -634,7 +869,13 @@ function M.scan_file(path)
   end
   walk(root, nil)
 
-  return fns, {}, requires, symbols, {}, {}, lines, {}
+  -- Bindings after the walk, so a `use helper::x` above its `mod helper;`
+  -- still finds the child module it names.
+  for _, use in ipairs(uses) do
+    bind(use.node, nil, use.scope)
+  end
+
+  return fns, extract_calls(), requires, symbols, {}, {}, lines, {}
 end
 
 require("documentation.core.lang_registry").register(M.name, M)

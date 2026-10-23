@@ -134,8 +134,9 @@ jobs:
       #
       # **Python is here for `python_calls_spec.lua`** for the same reason: it
       # is the only gate on `methods_need_receiver`, on what a Python import
-      # binds, and on relative imports resolving in a root layout.
-      - name: Build JS/TS/TSX/Go/Python treesitter parsers
+      # binds, and on relative imports resolving in a root layout. **Rust**
+      # for `rust_calls_spec.lua`, the only gate on anchored `::` paths.
+      - name: Build JS/TS/TSX/Go/Python/Rust treesitter parsers
         run: |
           npm install -g tree-sitter-cli
           mkdir -p .deps/ts-parsers/parser
@@ -148,6 +149,8 @@ jobs:
           tree-sitter build --output .deps/ts-parsers/parser/tsx.so /tmp/tree-sitter-typescript/tsx
           tree-sitter build --output .deps/ts-parsers/parser/go.so /tmp/tree-sitter-go
           tree-sitter build --output .deps/ts-parsers/parser/python.so /tmp/tree-sitter-python
+          git clone --depth 1 https://github.com/tree-sitter/tree-sitter-rust.git /tmp/tree-sitter-rust
+          tree-sitter build --output .deps/ts-parsers/parser/rust.so /tmp/tree-sitter-rust
           echo "DOCUMENTATION_TS_PARSERS_DIR=$(pwd)/.deps/ts-parsers" >> "$GITHUB_ENV"
       # Directly, not through `scripts/ci.sh tests`, so the JSON result (the
       # IR) can be written next to the log. `scripts/ci.sh tests` runs the same

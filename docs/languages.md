@@ -275,7 +275,7 @@ trusting a build, and it reports **three** states rather than two:
 | `nil` | This backend needs no parser. Full fidelity, not a degradation. |
 
 The same report also carries **`calls`** per backend — whether that backend
-produces call sites at all. Six of the twenty-three do. It is there so a
+produces call sites at all. Seven of the twenty-three do. It is there so a
 host can say *why* a Calls panel is empty: "this project has no calls" and
 "this build has no call extraction for this language" look identical on
 screen and are not the same fact. Unlike `grammar_loaded` it is a plain
@@ -323,7 +323,7 @@ DOCMAP_TS_DIR=C:/tools/docmap-grammars nvim --headless -u NONE -l scripts/parity
 | `python` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | `csharp` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
 | `go` | ✓ | — | ✓ | — | — | ✓ | ✓ | ✓ | ✓ | ✓ | — |
-| `rust` | ✓ | ✓ | ✓ | — | — | ✓ | ✓ | — | ✓ | ✓ | — |
+| `rust` | ✓ | ✓ | ✓ | — | — | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | `php` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
 | `ruby` | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
 | `kotlin` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — |
@@ -394,9 +394,9 @@ These are the failure the parity pass was looking for, and it found them.
 They are simply not built, they had no sentence anywhere before this pass, and
 saying so is the point:
 
-- **Call edges: six backends of twenty-three**: `go` became the fifth on
-  2026-08-20 and `python` the sixth on 2026-10-23. The other seventeen return
-  `{}` from `scan_file`'s second slot,
+- **Call edges: seven backends of twenty-three**: `go` became the fifth on
+  2026-08-20, `python` and `rust` the sixth and seventh on 2026-10-23. The
+  other sixteen return `{}` from `scan_file`'s second slot,
   so the Hierarchy tab's Calls and Module Calls views, `:DocMap why`, the
   call-hierarchy LSP integration and `dead-function`'s call-edge tier are
   still empty there. This remains the largest single gap in the tool; it was
@@ -444,6 +444,25 @@ saying so is the point:
   language: a root-layout id's `./` was normalised away, and a package file
   (`__init__.py`, `index.js`) resolved relative to the directory above it
   (`requests`: 53 require edges before, 61 after).
+
+  **What Rust cost**: the scope is the crate's module tree — a module is
+  declared by its parent (`mod x;`), a path walks the tree (`crate::`,
+  `super::`, `self::`, a child, a name a `use` bound into this module), and
+  directory siblings are different modules, so Go's package scope does not
+  fit. Only the file knows its own module path, `use` bindings and `mod`
+  declarations, so the **extractor anchors** every path it can to an absolute
+  one (`app::widget::Widget::new`), and the resolver takes an absolute `::`
+  path by its longest prefix that is a module of the map, the rest being the
+  declared name there. `self.go()` / `Self::go()` are the owner's
+  `Widget::go`, a bare name inside `mod inner { … }` is that module's own,
+  and `methods_need_receiver` holds here as in Python. Building it fixed the
+  owner of `impl Trait for Type` (recorded as the trait, `Doer::go`) and of
+  `impl<T> Foo<T>` (no owner). Not resolved, on purpose: receivers of unknown
+  type, trait dispatch, `<T as Tr>::m()`, other crates, and calls inside a
+  macro's token tree (`assert_eq!(f(x), 1)`). Measured on
+  `docmap-desktop/src-tauri` (`7b69b42`): 957 call edges over 19 modules from
+  5140 call sites; a hand count of the non-test functions of `freshness.rs`
+  found 12 of 12, no wrong edge.
 - ~~**Symbols: the four oldest non-Lua backends.**~~ **Closed 2026-08-20.**
   `zig`, `java`, `c` and `cpp` returned no module-scope symbols; every
   backend written from Python onward did. Nothing had decided it — the

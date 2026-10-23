@@ -178,6 +178,29 @@ local function record_external_call(acc, module, member)
   by_member[key] = (by_member[key] or 0) + 1
 end
 
+---The longest `::`-prefix of `path` that is a module of the map, and the rest.
+---`crate::widget::Widget::new` with a module `crate::widget` gives that node
+---and `Widget::new` — a method's declared name, which is why the search
+---starts from the right rather than taking the first segment that matches.
+---@param by_module table<string, string>
+---@param path string
+---@return string? id
+---@return string? rest
+local function module_prefix(by_module, path)
+  local cut = #path
+  while true do
+    local pos = path:sub(1, cut):match("^.*()::")
+    if not pos then
+      return nil, nil
+    end
+    local head = path:sub(1, pos - 1)
+    if by_module[head] then
+      return by_module[head], path:sub(pos + 2)
+    end
+    cut = pos - 1
+  end
+end
+
 ---Which languages resolve an unqualified call in *package* scope.
 ---
 ---Asked of the registry rather than listed here, so a twenty-fourth backend
@@ -415,6 +438,23 @@ function M.build(ir, opts)
             or (not index[id].receiver_only and index[id].by_name[bare(rest)] or nil)
           to_id = to_fn and id or nil
           confidence = "exact"
+        elseif call.callee:find("::", 1, true) and not call.callee:find("[^%w_%-:]") then
+          -- A `::` path (Rust): this node's own declared name first — a
+          -- relative `Widget::new` the backend could not anchor — then the
+          -- longest prefix that is a module of the map, the rest being the
+          -- function's declared name there. The backend anchors the path
+          -- (`crate::`, `super::`, `use`) because only it knows its module.
+          to_fn = index[id].by_name[call.callee]
+          if to_fn then
+            to_id, confidence = id, "exact"
+          else
+            local target, declared = module_prefix(by_module, call.callee)
+            if target then
+              to_fn = index[target].by_name[declared]
+              to_id = to_fn and target or nil
+              confidence = "exact"
+            end
+          end
         elseif call.callee:match("^[%w_]+$") then
           -- A bare name is a file-local function first, then a named import,
           -- and only then the heuristic. That order is the point: a file that
