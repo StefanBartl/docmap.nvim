@@ -182,6 +182,11 @@ return function(H)
           shim.uv.fs_stat(base .. "/" .. name), vim.uv.fs_stat(base .. "/" .. name)
         eq(mine.ino, theirs.ino, "A: uv.fs_stat(" .. name .. ").ino")
         eq(mine.dev, theirs.dev, "A: uv.fs_stat(" .. name .. ").dev")
+        eq(
+          rawget(shim.uv.fs_stat(base .. "/" .. name), "ino"),
+          nil,
+          "A: ino is asked for on first use, not by every stat"
+        )
       end
     end
 

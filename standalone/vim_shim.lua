@@ -1820,7 +1820,16 @@ function uv.fs_stat(path)
   if not mode then
     return nil
   end
-  return { type = mode, ino = lfs.attributes(path, "ino"), dev = lfs.attributes(path, "dev") }
+  -- `ino` and `dev` cost one more stat each and almost nobody reads them: asked for on first use, then kept
+  return setmetatable({ type = mode }, {
+    __index = function(stat, key)
+      if key == "ino" or key == "dev" then
+        local value = lfs.attributes(path, key)
+        rawset(stat, key, value)
+        return value
+      end
+    end,
+  })
 end
 
 ---@param dir string
