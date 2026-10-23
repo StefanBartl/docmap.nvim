@@ -52,11 +52,17 @@ return function(H)
             { name = "Box.go", owner = "Box" },
             { name = "caller" },
             { name = "other" },
+            { name = "callback" },
           },
           requires_raw = {},
           calls_raw = {
             { callee = "go", from_fn = "caller", line = 1 },
             { callee = "Box.go", from_fn = "other", line = 2 },
+            -- `self.callback()` on an attribute holding a function, rewritten
+            -- to `Box.callback`: no such method, and the module-level
+            -- `callback` is not it either.
+            { callee = "Box.callback", from_fn = "Box.go", line = 3 },
+            { callee = "Box.attr.callback", from_fn = "Box.go", line = 4 },
           },
         },
       },

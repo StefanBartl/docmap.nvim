@@ -289,12 +289,19 @@ function M.path_index(ir)
 end
 
 ---Normalise a joined path, resolving `.` and `..` textually.
+---
+---A `..` with nothing left to climb out of is `nil`, not the root: the
+---import names something above the tree, and dropping the `..` silently
+---resolved `../../b` from `./pkg/a.py` to a root-level `./b.py`.
 ---@param path string
----@return string
+---@return string?
 local function normalise(path)
   local parts = {}
   for seg in path:gmatch("[^/]+") do
     if seg == ".." then
+      if #parts == 0 then
+        return nil
+      end
       table.remove(parts)
     elseif seg ~= "." then
       parts[#parts + 1] = seg
@@ -357,7 +364,7 @@ function M.resolve_relative(by_path, from_path, spec)
   -- which is not part of the base.
   local base = from_path:match("^(.*)/[^/]*$") or ""
   local joined = normalise((base == "" and "" or base .. "/") .. spec)
-  if joined == "" then
+  if not joined or joined == "" then
     return nil
   end
   if from_path:sub(1, 2) == "./" then

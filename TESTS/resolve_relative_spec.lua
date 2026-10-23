@@ -85,4 +85,12 @@ return function(H)
     "./pkg/helper.py",
     "resolve: relative to the package file, not the directory above it"
   )
+  -- One `..` more than there are directories names something above the
+  -- tree; with the `./` re-prefix it used to land on a root-level file.
+  rooted["./b.py"] = "./b.py"
+  eq(
+    deps.resolve_relative(rooted, "./pkg/a.py", "../../b"),
+    nil,
+    "resolve: climbing past a root layout's top finds nothing"
+  )
 end

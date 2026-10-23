@@ -295,11 +295,12 @@ function M.build(ir, opts)
   local receiver_only = languages_where(function(backend)
     return backend.methods_need_receiver == true
   end)
-  local index = {} ---@type table<string, { by_name: table<string, string>, prefixes: table<string, boolean> }>
+  local index = {} ---@type table<string, { by_name: table<string, string>, prefixes: table<string, boolean>, receiver_only: boolean }>
   for _, id in ipairs(ir.order) do
     local node = ir.nodes[id]
-    local by_name, prefixes = index_functions(node, node.language and receiver_only[node.language])
-    index[id] = { by_name = by_name, prefixes = prefixes }
+    local receiver = node.language and receiver_only[node.language] or false
+    local by_name, prefixes = index_functions(node, receiver)
+    index[id] = { by_name = by_name, prefixes = prefixes, receiver_only = receiver }
   end
 
   -- Only built when the heuristic is on: a bare name is a usable hint exactly
@@ -406,7 +407,12 @@ function M.build(ir, opts)
         elseif head and external_aliases[head] then
           record_external_call(calls_external_acc, external_aliases[head], rest)
         elseif head and index[id].prefixes[head] then
-          to_fn = index[id].by_name[call.callee] or index[id].by_name[bare(rest)]
+          -- The bare fallback is for `M.foo` naming a file-local `foo`. Where
+          -- a method needs a receiver, `Box.callback` (from `self.callback()`
+          -- on an attribute holding a function) names no method, and falling
+          -- back to a module-level `callback` would be a wrong exact edge.
+          to_fn = index[id].by_name[call.callee]
+            or (not index[id].receiver_only and index[id].by_name[bare(rest)] or nil)
           to_id = to_fn and id or nil
           confidence = "exact"
         elseif call.callee:match("^[%w_]+$") then
