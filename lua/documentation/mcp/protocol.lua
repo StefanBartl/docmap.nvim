@@ -187,6 +187,21 @@ function M.request(server, msg)
   return fail(id, ERR_METHOD_NOT_FOUND, "unknown method: " .. method)
 end
 
+---Encode a response. A value `vim.json` cannot write (a request `id` of `1e999` decodes to infinity) must not
+---raise out of `dispatch`: the stdio loop has no handler, and the server would die on one hostile line. The answer
+---is then an invalid-request error with a null id, which is what JSON-RPC says about an id it cannot echo.
+---@param response table
+---@return string
+local function encode(response)
+  local encoded, text = pcall(vim.json.encode, response)
+  if encoded then
+    return text
+  end
+  return vim.json.encode(
+    fail(nil, ERR_INVALID_REQUEST, "the response could not be encoded (invalid id?)")
+  )
+end
+
 ---Decode one line, dispatch it, and encode the response.
 ---
 ---The seam the stdio loop sits on, and the only place a malformed line is
@@ -202,7 +217,7 @@ function M.dispatch(server, line)
 
   local decoded_ok, msg = pcall(vim.json.decode, line, { luanil = { object = true, array = true } })
   if not decoded_ok then
-    return vim.json.encode(fail(nil, ERR_PARSE, "invalid JSON"))
+    return encode(fail(nil, ERR_PARSE, "invalid JSON"))
   end
 
   -- A crash inside dispatch must not take the process down: an MCP server is
@@ -211,14 +226,12 @@ function M.dispatch(server, line)
   -- than as one failed call. Returning -32603 keeps the session alive.
   local handled_ok, response = pcall(M.request, server, msg)
   if not handled_ok then
-    return vim.json.encode(
-      fail(type(msg) == "table" and msg.id or nil, ERR_INTERNAL, tostring(response))
-    )
+    return encode(fail(type(msg) == "table" and msg.id or nil, ERR_INTERNAL, tostring(response)))
   end
   if response == nil then
     return nil
   end
-  return vim.json.encode(response)
+  return encode(response)
 end
 
 return M

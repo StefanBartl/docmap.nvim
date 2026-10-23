@@ -322,6 +322,19 @@ return function(H)
   end
 
   do
+    -- an id that decodes to infinity cannot be encoded back: an error with a null id, not a raise (the stdio loop
+    -- has no handler and would end the process)
+    local line
+    local survived = pcall(function()
+      line = protocol.dispatch(server, '{"jsonrpc":"2.0","id":1e999,"method":"ping"}')
+    end)
+    ok(survived, "id 1e999: dispatch does not raise")
+    local res = vim.json.decode(line)
+    eq(res.error.code, -32600, "id 1e999: -32600 invalid request")
+    eq(res.id, vim.NIL, "id 1e999: a null id")
+  end
+
+  do
     eq(protocol.dispatch(server, ""), nil, "blank line: ignored, not answered")
     eq(protocol.dispatch(server, "   "), nil, "whitespace line: ignored, not answered")
   end

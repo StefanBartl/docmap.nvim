@@ -249,6 +249,7 @@ local specs = {
   "diagnostics_spec.lua",
   "mdview_spec.lua",
   "mcp_spec.lua",
+  "mcp_stdio_spec.lua",
   "checklist_spec.lua",
   "api_spec.lua",
   "generate_all_spec.lua",
