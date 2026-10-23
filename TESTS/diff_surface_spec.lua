@@ -97,6 +97,15 @@ return function(H)
     s = one({ p("a", "string", true) }, { p("a", "string") })
     eq(kinds(s.breaking), "narrowed", "optional -> required is breaking")
 
+    s = one({ p("a", "string|nil") }, { p("a", "string") })
+    eq(kinds(s.breaking), "narrowed", "`T|nil` -> `T` rejects a caller that passed nil")
+
+    s = one({ p("a", "string?") }, { p("a", "string") })
+    eq(kinds(s.breaking), "narrowed", "`T?` -> `T` rejects a caller that passed nil")
+
+    s = one({ p("a", "string") }, { p("a", "string|nil") })
+    eq(#s.breaking, 0, "accepting nil where it was not accepted is not breaking")
+
     s = one({ p("a", "string|number") }, { p("a", "string") })
     eq(kinds(s.breaking), "narrowed", "a union member dropped from a parameter is breaking")
 
@@ -268,6 +277,7 @@ return function(H)
     return cli.run(opts(), { "--breaking=no-such-ref" })
   end)
   eq(code, 2, "gate: an unknown ref is a refusal, exit 2")
+  eq(out, "", "gate: ...with nothing on stdout")
   ok(err:find("refusing to compare", 1, true), "gate: ...said as one line")
 
   -- A ref that is an option is refused before git sees it: `--output=` would
@@ -277,6 +287,7 @@ return function(H)
     return cli.run(opts(), { "--breaking=--output=" .. victim })
   end)
   eq(code, 2, "gate: a ref that starts with `-` is a refusal")
+  eq(out, "", "gate: ...with nothing on stdout")
   ok(err:find("is not a revision", 1, true), "gate: ...and says why")
   eq(vim.uv.fs_stat(victim), nil, "gate: ...and git never ran with it")
 

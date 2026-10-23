@@ -359,10 +359,18 @@ function M._compare_signature(out, key, old, new, add)
 
   for i = 1, math.min(#op, #np) do
     local o, n = op[i], np[i]
-    if o.optional and not n.optional then
-      add(out.breaking, key, "narrowed", ("parameter %d (%s) became required"):format(i, n.name))
-    end
     local om, nm = type_members(o.type), type_members(n.type)
+    -- `nil` is how a caller omits an argument: `name?` and `T|nil` both
+    -- accept it, so losing either way of accepting it narrows the parameter.
+    local old_nil, new_nil = o.optional or om["nil"], n.optional or nm["nil"]
+    if old_nil and not new_nil then
+      add(
+        out.breaking,
+        key,
+        "narrowed",
+        ("parameter %d (%s) no longer accepts nil"):format(i, n.name)
+      )
+    end
     om["nil"], nm["nil"] = nil, nil
     if not subset(om, nm) or not subset(nm, om) then
       if is_open(om) or is_open(nm) then
