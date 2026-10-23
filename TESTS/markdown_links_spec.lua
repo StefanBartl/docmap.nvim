@@ -74,6 +74,12 @@ return function(H)
     "local M = {}",
     "return M",
   })
+  dwrite("lua/t/schemes/init.lua", {
+    "---@module 't.schemes'",
+    "--- [mail](mailto:x@y.z) [call](tel:+49123) [ssh](ssh:host)",
+    "local M = {}",
+    "return M",
+  })
   dwrite("lua/t/angled/init.lua", {
     "---@module 't.angled'",
     '--- See [the defaults](<../cfg/DEFAULTS.lua> "the table") for the values.',
@@ -118,6 +124,13 @@ return function(H)
     "markdown links: an absolute URL is left exactly as written"
   )
   ok(md:find("](#anchor)", 1, true) ~= nil, "markdown links: a bare anchor is left alone")
+  -- A scheme without `//` names no file either: `mailto:`, `tel:` and the like stay as written
+  for _, dest in ipairs({ "mailto:x@y.z", "tel:+49123", "ssh:host" }) do
+    ok(
+      md:find("](" .. dest .. ")", 1, true) ~= nil,
+      "markdown links: `" .. dest .. "` is not rebased into a path"
+    )
+  end
 
   -- `<...>` and a title survive the rewrite: only the destination is rebased (same reader as the check)
   ok(
