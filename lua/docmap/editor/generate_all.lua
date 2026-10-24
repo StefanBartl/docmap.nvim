@@ -34,8 +34,8 @@
 --- **Why no usercmd is registered here.** Unlike `:DocMap`, which is
 --- bound to one project resolved from the current buffer
 --- (`bindings/usrcmds/init.lua`'s `buffer_root`), "all of my projects" is
---- inherently something only the calling config can know — docmap.nvim
---- has no notion of "your personal plugin list". A consumer's own
+--- inherently something only the calling config can know — docmap.
+--- nvim has no notion of "your personal plugin list". A consumer's own
 --- usercmd (a five-line wrapper) supplies that list and decides how to
 --- show progress; this module supplies the orchestration underneath it.
 ---

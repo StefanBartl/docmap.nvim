@@ -86,7 +86,7 @@ function M.setup(opts)
 end
 
 ---The current self-instrumentation instance, if `M.setup` has created one
----— read by `:checkhealth docmap` to report live status rather than
+---— read by `:checkhealth documentation` to report live status rather than
 ---only whether runtime-analysis.nvim is installed.
 ---@return RA.Telemetry.Instance?
 function M.instance()

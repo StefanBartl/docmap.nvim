@@ -14,7 +14,7 @@
 --- never fight over registering the same command name — that collision was
 --- the actual bug this split avoids, not a hypothetical one.
 
-local notify = require("lib.nvim.notify").create("[documentation]")
+local notify = require("lib.nvim.notify").create("[docmap]")
 local autocmd = require("lib.nvim.bindings.autocmd")
 
 local M = {}

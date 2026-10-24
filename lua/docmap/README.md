@@ -1,4 +1,4 @@
-# `documentation`
+# `docmap`
 
 The pipeline: scan → LuaLS enrichment (opt-in) → check → render.
 

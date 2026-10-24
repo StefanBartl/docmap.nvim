@@ -185,7 +185,7 @@ function M.render()
   -- Autocommands -----------------------------------------------------------
   put("## Autocommands")
   put("")
-  put("All created lazily. Requiring `documentation` installs none of them.")
+  put("All created lazily. Requiring `docmap` installs none of them.")
   put("")
   for _, a in ipairs(manifest.list) do
     put(("### `%s` — %s"):format(table.concat(a.events, "`, `"), a.scope))

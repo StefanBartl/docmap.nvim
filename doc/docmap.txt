@@ -1,7 +1,7 @@
 *docmap.txt*  Doxygen for annotated Lua trees        *docmap.nvim*
 
                                                                        ~
-              docmap.nvim — generated module maps               ~
+              docmap.nvim — generated module maps                      ~
                                                                        ~
 
 ==============================================================================
@@ -84,7 +84,7 @@ filesystem, and the scanner never knows what will be drawn.
 
                                                         *docmap-health*
                                               *docmap-health-languages*
-`:checkhealth docmap` also reports, per language actually present in
+`:checkhealth documentation` also reports, per language actually present in
 your source roots, whether its treesitter grammar is available -- and names
 `:TSInstall <grammar>` when it is not. Scoped to the languages in the tree,
 never all twenty-three: a list of twenty-two absent grammars for a Lua
@@ -99,7 +99,7 @@ built, so they report in any language with nothing installed. A grammar buys
 function-level data; `lua-language-server` buys `@class`/`@alias` detail in
 Lua. Those are the only two external dependencies, and neither is a linter.
 
-`:checkhealth docmap` verifies all of the above and, more usefully,
+`:checkhealth documentation` verifies all of the above and, more usefully,
 prints the configuration a `:DocMap` issued right now would act on: the
 resolved root, the auto-detected source directory, how many `.lua` files are
 actually under it, and whether the committed map is older than the newest
@@ -1003,7 +1003,7 @@ no hover at all before, which is precisely static analysis's blind spot.
 
 `vim.lsp.buf.incoming_calls()` and |vim.lsp.buf.outgoing_calls()|
 then work in Lua buffers under `source/`; Neovim has no default keymap for
-either, so bind them yourself. `:checkhealth docmap` reports whether
+either, so bind them yourself. `:checkhealth documentation` reports whether
 the client is actually running — an unattached client and a function with
 no callers both produce an empty quickfix list. Setup, keymaps and the
 resolution limits: `docs/call_hierarchy.md` in the repository.
@@ -1155,7 +1155,7 @@ the install manifest (`docs/install.json`, `docs/INSTALL.md`), the spec roots
 of `spec_state` and the committed map follow a link only if, resolved one step
 at a time, it stays inside the project. The committed map is read by
 `--check`, `--api=`, `:DocMap serve` (its static files), `:DocBrowse`, the
-hover.nvim contribution and `:checkhealth docmap`; the editor-side ones
+hover.nvim contribution and `:checkhealth documentation`; the editor-side ones
 vet `out_dir` like the writers do, and a `docs/map` that leaves the project is
 refused (`:DocBrowse` says "map at <path> is not read: <why>", `:checkhealth`
 warns with the reason, hover answers nothing). A link that leaves the project

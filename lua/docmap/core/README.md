@@ -11,7 +11,7 @@ The IR is what holds the two halves apart:
 
 Everything here takes a `Docmap.Opts` and produces or transforms a
 `Docmap.IR`. Nothing here reads `state`, opens a window, or notifies the
-user — `grep -rln notify lua/documentation/core/` returns nothing, and that is
+user — `grep -rln notify lua/docmap/core/` returns nothing, and that is
 a property to preserve, not a coincidence.
 
 ## Layers, enforced

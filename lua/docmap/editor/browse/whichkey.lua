@@ -2,7 +2,7 @@
 --- Optional which-key registration for the `:DocBrowse` list buffer.
 ---
 --- Its own file, lazily required from `bind()`, for the same reason `browse`
---- itself is lazily required from `documentation/init.lua`: nothing on the
+--- itself is lazily required from `docmap/init.lua`: nothing on the
 --- generate/check path needs which-key, and a `require` at the top of
 --- `browse/init.lua` would make a headless `--check` run load a UI plugin.
 ---

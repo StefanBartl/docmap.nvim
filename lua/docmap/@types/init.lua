@@ -610,7 +610,7 @@
 ---@field repo string `"owner/repo"` GitHub shorthand.
 ---@field branch? string Default "main".
 ---@field lua_root? string The target repo's own Lua root, for the guessed path — `<lua_root>/<module, dots as slashes>.lua`. Default "lua".
----@field name? string The sibling's repository *directory* name, when it differs from the module prefix this entry is keyed by (`docmap.nvim` against a `documentation` key). Set it together with `local_path` to have `sibling-reference-missing` resolve `<name>/<path>` citations against that checkout; a prefix that already equals the directory name still needs it stated, because the check only considers names somebody declared.
+---@field name? string The sibling's repository *directory* name, when it differs from the module prefix this entry is keyed by (`docmap.nvim` against a `docmap` key). Set it together with `local_path` to have `sibling-reference-missing` resolve `<name>/<path>` citations against that checkout; a prefix that already equals the directory name still needs it stated, because the check only considers names somebody declared.
 ---@field local_path? string Path to a local checkout of the same repo, when one happens to exist. Absolute, or relative to `opts.root` (`"../lib.nvim"`) so a committed `.docmap.json` stays true on every machine; an absent checkout is silence, never a finding (this ecosystem's own sibling-repos-under-one-directory layout, for instance). When set, the path is *verified* against the checkout on disk — both the flat `<module>.lua` and the directory `<module>/init.lua` shape are real, common conventions (lib.nvim itself uses the directory shape almost everywhere), and guessing wrong produces a working link to a 404. Absent, the flat shape is assumed unverified — see `external_repos.lua`'s header. **Setting this obliges every machine that runs `--check` to have the checkout too:** the verified shape goes into the byte-compared artifact, so a machine without it generates not a worse map but a different one, and the gate then reports a tree nobody touched as stale.
 
 ---One file's changed line ranges, parsed out of `git diff --unified=0` by
@@ -862,7 +862,7 @@
 ---@field on_change fun(cb: fun(ir: Docmap.IR, findings: Docmap.Finding[])): fun() Subscribe; returns an unsubscribe function.
 ---@field uninstall fun() Equivalent to `docmap.uninstall(handle)`.
 
----@class Documentation
+---@class Docmap
 ---@field scan fun(opts: Docmap.Opts): Docmap.IR
 ---@field check fun(ir: Docmap.IR, opts: Docmap.Opts): Docmap.Finding[]
 ---@field scan_full fun(opts: Docmap.Opts): Docmap.IR, Docmap.Finding[] `scan` + optional LuaLS merge (`opts.luals`) + `check`, in one call. What `generate()` and `install()` both build on.

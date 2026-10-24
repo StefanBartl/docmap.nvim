@@ -1,10 +1,10 @@
 # Health
 
-What `:checkhealth docmap` asks, and why the interesting half is not the
+What `:checkhealth documentation` asks, and why the interesting half is not the
 dependency list.
 
 ```vim
-:checkhealth docmap
+:checkhealth documentation
 ```
 
 Checks the dependencies and the treesitter Lua parser, and then the part worth

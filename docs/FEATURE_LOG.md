@@ -11,8 +11,11 @@ Carried over from lib.nvim; the original, much longer process narrative each
 entry below compresses is in lib.nvim.s git history.
 
 > **Names in this file predate the extraction** (2026-07-28). Where it says
-> `docmap`, `:LibMap` or `lib.nvim.docmap`, read `documentation`, `:DocMap`
-> and `documentation.*`.
+> `docmap`, `:LibMap` or `lib.nvim.docmap`, read `docmap`, `:DocMap`
+> and `docmap.*`. The Lua namespace was `documentation.*` between the
+> extraction and 2026-10-24, when it became `docmap.*` with the repository
+> (`documentation.nvim` → `docmap.nvim`); older entries below may still say
+> `documentation`.
 
 ## IR & data model
 
@@ -315,7 +318,7 @@ library's own submodule:
   source file, which was correct while the mapped tree was always the one it
   lived in. Installed under a plugin manager that resolves to the plugin's own
   checkout, so the default is `vim.fn.getcwd()`. This is also why
-  `:checkhealth docmap` prints the resolved config — the failure mode
+  `:checkhealth documentation` prints the resolved config — the failure mode
   it introduced is invisible from `:DocMap`'s own output.
 - **`setup()` on `init.lua`** as the plugin entry point.
   `require("docmap")` alone still registers no command.
@@ -333,7 +336,7 @@ commit-list row count (`> 1`, true for a ~95-commit history), the
 `lib.nvim.fs` as the namespace fixture. Fixed as portability bugs, not
 renamed.
 
-## `?` key-hint overlay and `:checkhealth docmap` (2026-07-28)
+## `?` key-hint overlay and `:checkhealth documentation` (2026-07-28)
 
 The two items the roadmap's wayfinder survey ranked cheapest-and-most-valuable.
 
@@ -351,7 +354,7 @@ vanished reads as one that was never there. They stay *bound* in every mode
 too: the handlers already gate themselves, and an unbound key falls through to
 Vim's own meaning, where `+` moves the cursor down a line.
 
-**`:checkhealth docmap`** covers the dependencies and the treesitter Lua
+**`:checkhealth documentation`** covers the dependencies and the treesitter Lua
 parser (not optional the way `lua-language-server` is — without it the map
 renders a tree of modules with no functions, which looks like a scanner bug),
 then the section it exists for: the resolved configuration. Staleness there is
@@ -479,7 +482,7 @@ look different in the map.
 - **Separated on the first path segment.** A require whose leading segment is
   one the tree declares as its own is a claim about this tree, and this tree
   is what the scan can be authoritative about. Whole segment, never a raw
-  string prefix — `documentation` must not match `documentationx.util`.
+  string prefix — `docmap` must not match `documentationx.util`.
 - **`warn`, not `error`.** Same family as `require-cycle` and
   `dead-see-target`: a reference pointing at nothing. Error is reserved for
   the two checks about the tree's own contract (`missing-module-tag`,
@@ -625,7 +628,7 @@ accident of the purity rule, and nothing whatsoever stopped it re-merging:
 
 The plugin already shipped the mechanism (`opts.layers`, `layer-violation`),
 but it could not express this boundary against a flat tree. The editor half
-was five unrelated module paths, and a rule from `documentation` down to the
+was five unrelated module paths, and a rule from `docmap` down to the
 browser would have flagged `browse/init.lua` requiring `browse/view.lua`. Two
 prefixes make it one line, now declared in `scripts/gen_map.lua`:
 
@@ -654,7 +657,7 @@ Two spec assertions turned out to be about the *tree* rather than the code and
 failed the moment it moved — the same class of bug the extraction commit had
 to fix three times. `<CR> descends into the row under the cursor` asserted
 "row 3", which had happened to be a module and became a function; it now finds
-the last node-shaped row. And `gd` hardcoded `documentation/deps.lua`; it now
+the last node-shaped row. And `gd` hardcoded `docmap/deps.lua`; it now
 derives the path from the module name it centred on. Both were fixed as
 portability bugs in the spec, not by restoring the old layout.
 
@@ -1093,7 +1096,7 @@ verify `ecma.lua` during development were never available to CI itself.
 from source with the `tree-sitter` CLI (both `tree-sitter-javascript` and
 `tree-sitter-typescript` ship pre-generated `parser.c`, so only
 `tree-sitter build` — compiling, not generating — is needed) into
-`.deps/ts-parsers`, then exports `DOCUMENTATION_TS_PARSERS_DIR` via
+`.deps/ts-parsers`, then exports `DOCMAP_TS_PARSERS_DIR` via
 `$GITHUB_ENV` for the `scripts/ci.sh tests` step that follows it.
 `TESTS/run.lua` reads that variable itself and appends it to the rtp —
 optional, unlike the existing `LIB_NVIM_DIR` handling right above it in
@@ -1396,10 +1399,10 @@ exclusions came out of that run, each one now a named case in
 `TESTS/docs_spec.lua`:
 
 - **`docmap.nvim` is a repository, not a member access.** Ten of the
-  25 findings were "module `documentation` has no member `nvim`". Any
+  25 findings were "module `docmap` has no member `nvim`". Any
   `*.nvim` mention is now excluded, reading the same ecosystem convention
   `ecma.lua` already reads for `use*` hooks.
-- **`documentation.*` is a glob**, not a claim that `*` is a member. The
+- **`docmap.*` is a glob**, not a claim that `*` is a member. The
   remainder must now look like an identifier.
 - **`docmap.editor` is a real namespace** with no `init.lua` and
   therefore no `@module` tag to be indexed by. Every dotted *prefix* of a
@@ -1431,7 +1434,7 @@ noisy, which is the same trade `calls_heuristic` already makes.
 The one surviving finding was genuine, and it was in a document written
 earlier the same day: `docs/ecosystem.md` illustrated qualified references
 with a `scan_full` qualified onto `docmap.core.scan`, when
-`scan_full` lives in `documentation` itself. The check found a real error in
+`scan_full` lives in `docmap` itself. The check found a real error in
 the design document proposing the check. Fixed in the same commit.
 
 **And then it found this paragraph**, because the sentence above originally
@@ -1714,7 +1717,7 @@ own `:RASend` themselves.
 
 Verified with the real dependency in both states, not only the common
 one: `TESTS/run.lua` gained a `RUNTIME_ANALYSIS_DIR` environment variable,
-the same shape `DOCUMENTATION_TS_PARSERS_DIR` already has for the JS/TS
+the same shape `DOCMAP_TS_PARSERS_DIR` already has for the JS/TS
 parser tests — unset (this repository's own normal state), `gs`'s soft
 dependency degrades to a notification, verified directly; set to a real
 checkout of `runtime-analysis.nvim`, the same test exercises the real
@@ -2435,7 +2438,7 @@ everywhere else.
 fixed while building this — not a synthetic issue, a real one.** Verifying
 against real data (`runtime-analysis.telemetry`'s own self-instrumentation
 of this tree, curled through a real headless server) initially returned
-zero rows despite confirmed real data on disk. Root cause: `Docmap.
+zero rows despite confirmed real data on disk. Root cause: `Documentation.
 IR.nodes` is keyed by `node.id`, which `core/scan.lua` sets to a *file
 path*; `wrap_loaded()`/`telemetry.auto()` (this tree's own
 `core/telemetry_self.lua` uses the latter) resolve `Data.modules` values to
@@ -2658,7 +2661,7 @@ a fresh design question.
 
 **One identifier, not two — a real design decision, confirmed by tracing
 how telemetry's own two identifiers actually differ, not assumed they
-would.** `core/telemetry_self.lua` wraps `main = "documentation"` (a
+would.** `core/telemetry_self.lua` wraps `main = "docmap"` (a
 require prefix) under `namespace = "docmap.nvim"` (`opts.title`) —
 two different strings, for this repo itself, because a telemetry namespace
 can wrap arbitrary code under any prefix. A loaded snapshot has nothing to
@@ -3189,8 +3192,8 @@ not part of `browse/init.lua`'s public surface. `bind(st)` binds the
 trigger unconditionally; an all-disabled config or a missing `nvzone/menu`
 install both degrade to an empty menu / a single notify, never an error.
 
-- **Modules:** `documentation/integrations/menu.lua` (`M.items`,
-  `M.submenu`), `documentation/editor/browse/init.lua` (`bind`, trigger
+- **Modules:** `docmap/integrations/menu.lua` (`M.items`,
+  `M.submenu`), `docmap/editor/browse/init.lua` (`bind`, trigger
   wiring)
 - **Config:** `opts.menu` (default `true`, same opt-out shape as
   `opts.which_key`)
@@ -3460,8 +3463,8 @@ that names the project the other way is, by design, not placed inside it. The
 specs now spell such targets with `H.canonical`, and the property is stated in
 `docs/SECURITY.md`; an aliased `TMPDIR` reproduces the failure on Linux.
 
-- **Modules:** `documentation/core/safe_fs.lua` (new), `core/scan.lua`
-  (`entries`, source roots, cycle guard), `documentation/init.lua`
+- **Modules:** `docmap/core/safe_fs.lua` (new), `core/scan.lua`
+  (`entries`, source roots, cycle guard), `docmap/init.lua`
   (`write_artifacts`, `write_pdf_artifact`), `core/cli.lua` (`--check`,
   skipped-link report), `config/file.lua`, `standalone/win_links.lua` (new),
   `standalone/vim_shim.lua` (`uv.fs_lstat`, `uv.fs_readlink`, listing types)

@@ -205,7 +205,7 @@ function GATES.tests()
     "run",
     ".",
     "--sentinel",
-    "DOCUMENTATION_TESTS_OK",
+    "DOCMAP_TESTS_OK",
   }, "tests")
 end
 

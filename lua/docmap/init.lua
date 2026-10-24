@@ -595,7 +595,7 @@ function M.write_artifacts(ir, findings, opts)
   local plain, refusal = require("docmap.core.safe_fs").check_output(root, out_dir, names)
   if not plain then
     -- Level 0: the message is the whole message. `core/cli.lua` prints it
-    -- as it stands, and a `[string "documentation"]:594:` in front of it
+    -- as it stands, and a `[string "docmap"]:594:` in front of it
     -- says nothing to the person whose `docs/map` is a link.
     error(("docmap: refusing to write the map: %s"):format(refusal), 0)
   end
@@ -688,7 +688,7 @@ function M.generate(opts)
 end
 
 ---Install a live handle: a scanned IR kept in memory, optionally rescanned on
----save, with `on_change` subscribers. See `lua/documentation/registry.lua`
+---save, with `on_change` subscribers. See `lua/docmap/registry.lua`
 ---for the collision reason this is a separate module from `command.lua`
 ---rather than `install()` auto-registering a usercmd itself.
 ---@param opts Docmap.Opts

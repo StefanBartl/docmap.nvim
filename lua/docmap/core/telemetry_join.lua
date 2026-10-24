@@ -170,8 +170,8 @@ end
 ---survived that fix: a telemetry key's last segment is the table field name
 ---(`docmap.scan_full`), while `Docmap.FunctionInfo.name` is the
 ---name **as written** (`M.scan_full`). Building `node.id .. "#" .. field`
----produced `lua/documentation#scan_full`, and `used_keys(ir)` — and every
----consumer that looks a row up by IR key — has `lua/documentation#M.scan_full`.
+---produced `lua/docmap#scan_full`, and `used_keys(ir)` — and every
+---consumer that looks a row up by IR key — has `lua/docmap#M.scan_full`.
 ---
 ---**So the join silently matched nothing but bare-named locals**, which is a
 ---small minority of any Lua module: every `function M.foo()` in this

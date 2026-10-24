@@ -105,6 +105,6 @@ without also taking the commands.
 
 ## Checking that it worked
 
-`:checkhealth docmap` reports the configuration a `:DocMap` issued right
+`:checkhealth documentation` reports the configuration a `:DocMap` issued right
 now would act on -- the resolved root, the detected `source`, and how many
 files are under it. See [health.md](health.md).

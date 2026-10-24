@@ -206,7 +206,7 @@ return function(H)
     local ir = fake_ir()
     local entries = view.entries(
       ir,
-      { mode = "telemetry", opts = { title = "documentation-nvim-spec-no-such-namespace" } }
+      { mode = "telemetry", opts = { title = "docmap-nvim-spec-no-such-namespace" } }
     )
     eq(#entries, 1, "telemetry mode: one message entry when nothing was ever recorded")
     eq(entries[1].kind, "message", "telemetry mode: ... never a fabricated per-function list")
@@ -220,7 +220,7 @@ return function(H)
   if ok_ra then
     local telemetry = require("runtime-analysis.telemetry")
     local store = require("runtime-analysis.telemetry.store")
-    local namespace = "documentation-nvim-telemetry-join-spec"
+    local namespace = "docmap-nvim-telemetry-join-spec"
 
     -- No `dir` override on the instances below: `telemetry_join.load` (like
     -- the real `:DocMap check`/`:DocBrowse telemetry` it backs) always reads

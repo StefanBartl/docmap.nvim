@@ -1622,11 +1622,11 @@ end
 --- Telling them apart on the **first path segment**: a require whose leading
 --- segment matches one this tree declares as its own is a claim about this
 --- tree, and this tree is exactly what the scan can be authoritative about.
---- `lib.nvim.fs` from a `documentation`-rooted tree is somebody else's
+--- `lib.nvim.fs` from a `docmap`-rooted tree is somebody else's
 --- module and unknowable from here; `docmap.anything` is not.
 ---
---- Whole first segment, never a raw string prefix — `documentation` must not
---- match a `documentationx.util` that happens to start with the same letters.
+--- Whole first segment, never a raw string prefix — `docmap` must not
+--- match a `docmapx.util` that happens to start with the same letters.
 ---
 --- The one false positive left is a project deliberately split across repos
 --- under one namespace, and it already has an answer: `opts.tag_files` is the

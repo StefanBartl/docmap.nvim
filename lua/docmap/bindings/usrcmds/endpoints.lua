@@ -39,7 +39,7 @@ function M.run(ctx)
 
   if #all == 0 then
     ctx.notify.info(
-      "No call-based route registrations found — see :help documentation-endpoints "
+      "No call-based route registrations found — see :help docmap-endpoints "
         .. "for what is recognized."
     )
     return

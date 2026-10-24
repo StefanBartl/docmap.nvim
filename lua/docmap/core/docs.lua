@@ -44,7 +44,7 @@
 --- ## The one drift this can see
 ---
 --- `doc-references-missing`. A code span whose **longest dotted prefix is a
---- real module** but whose remainder names nothing in it — `` `documentation.
+--- real module** but whose remainder names nothing in it — `` `docmap.
 --- core.scan.parse_headr` `` — was unambiguously meant to name something
 --- here, and does not. That is a documentation file describing a function
 --- that has been renamed or removed: dead code's mirror image, in prose.
@@ -480,7 +480,7 @@ function M.build_index(ir)
   --    order, and iterating it fixes the output.
   -- 2. **Pointing somewhere true.** Stripping one segment off a module name
   --    and climbing one `parent` link move together, so `docmap.core`
-  --    resolves to the actual `lua/documentation/core` namespace node rather
+  --    resolves to the actual `lua/docmap/core` namespace node rather
   --    than to an arbitrary child of it. A prefix is a real place in this
   --    tree; the index should name that place.
   for _, id in ipairs(ir.order) do
@@ -579,7 +579,7 @@ function M.missing_member(idx, text)
   end
   -- `docmap.nvim`, `lib.nvim`, `mdview.nvim` — a Neovim *plugin* name,
   -- which is a repository, not a member access. Measured on this repository:
-  -- before this exclusion, "module `documentation` has no member `nvim`" was
+  -- before this exclusion, "module `docmap` has no member `nvim`" was
   -- the single largest source of findings, 10 of 25. The convention is as
   -- reliable as the `use*` hook convention `ecma.lua` already reads.
   if text:match("%.nvim$") then
@@ -625,8 +625,8 @@ function M.missing_member(idx, text)
   -- A remainder that is itself dotted (`mod.a.b`) is a nested reference this
   -- map has no model for — not a missing member of `mod`, so not reported.
   -- It must also *look* like something that could have been a function:
-  -- `documentation.*` in prose is a glob over the namespace, not a claim
-  -- that `documentation` exports a member named `*`.
+  -- `docmap.*` in prose is a glob over the namespace, not a claim
+  -- that `docmap` exports a member named `*`.
   if best_rest == "" or best_rest:find(".", 1, true) then
     return nil
   end

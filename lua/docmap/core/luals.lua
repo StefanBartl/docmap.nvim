@@ -138,7 +138,7 @@ end
 ---`node.types_detail` and populates `ir.edges`.
 ---
 ---`doc.json`'s `defines[].file` is relative to the `--doc=<dir>` argument
----`run()` was given (verified: scanning `lua/documentation` reports
+---`run()` was given (verified: scanning `lua/docmap` reports
 ---`"@types/init.lua"`, not a repo-relative or absolute path) — `source` is
 ---what turns that back into the repo-relative path `ir.nodes[*].types`
 ---already uses, which is how the two get matched up.

@@ -72,7 +72,7 @@ function M.run(ctx)
 
   if #all == 0 then
     ctx.notify.info(
-      "No lazy.nvim-shaped plugin specs found — see :help documentation-plugins "
+      "No lazy.nvim-shaped plugin specs found — see :help docmap-plugins "
         .. "for what is recognized."
     )
     return

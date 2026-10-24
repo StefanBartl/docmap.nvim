@@ -31,7 +31,7 @@ repository look like two repositories with two handles and two watchers.
 
 ## Nothing runs unless asked
 
-Requiring `documentation` installs no command and no autocommand. Every
+Requiring `docmap` installs no command and no autocommand. Every
 autocommand in this directory is created lazily by the function that owns its
 teardown — the watch autocmd by `install()` (and only with `opts.watch`), the
 server's shutdown hook by `start()`. The full account is in

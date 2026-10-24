@@ -133,7 +133,7 @@ If `docmap-callhierarchy` is missing, the usual causes, in order:
    buffers under the scanned subtree — same scoping as the watch autocmd. A
    file in `scripts/` or `TESTS/` will not get it.
 2. **`callhierarchy` was not set**, or was set on a second `setup()` for a
-   different root. `:checkhealth docmap` reports the option's state.
+   different root. `:checkhealth documentation` reports the option's state.
 3. **The handle was installed before the option existed** — the client attaches
    on `BufReadPost`, so a buffer already open when `setup()` ran needs a
    reload (`:e`).

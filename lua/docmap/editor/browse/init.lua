@@ -858,7 +858,7 @@ local function show_diff(st)
   vim.bo[buf].bufhidden = "hide"
   vim.bo[buf].swapfile = false
   vim.bo[buf].modifiable = false
-  pcall(vim.api.nvim_buf_set_name, buf, ("documentation://diff/%s"):format(sha:sub(1, 10)))
+  pcall(vim.api.nvim_buf_set_name, buf, ("docmap://diff/%s"):format(sha:sub(1, 10)))
 end
 
 ---`gO` — hand the current position over to the generated HTML page.
@@ -939,7 +939,7 @@ local function send_request(st)
 
   local runtime_analysis = require("docmap.core.soft_require").probe("runtime-analysis")
   if not runtime_analysis then
-    notify.warn("runtime-analysis.nvim is not installed — see :help documentation-endpoints")
+    notify.warn("runtime-analysis.nvim is not installed — see :help docmap-endpoints")
     return
   end
 
@@ -1611,7 +1611,7 @@ function M.open(opts)
 
   M.close()
 
-  -- Here rather than at require time, so merely requiring `documentation`
+  -- Here rather than at require time, so merely requiring `docmap`
   -- installs no autocmd — the same rule `command.setup()` follows for its
   -- user commands. Both calls are idempotent and hydration happens once per
   -- root, so re-opening never re-reads over pins made since.

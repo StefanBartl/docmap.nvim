@@ -272,7 +272,7 @@ nvim --headless -l scripts/gen_map.lua --full        # + LuaLS enrichment
 ```
 
 The `:DocMap` command is opt-in — call `require("docmap.bindings.usrcmds").setup()`
-to register it. Requiring `documentation` alone never creates a command.
+to register it. Requiring `docmap` alone never creates a command.
 
 ## Live objects: `install()` / `uninstall()`
 
@@ -1458,7 +1458,7 @@ live DOM so the export matches the theme it was taken from.
 
 ### Cross-project links (`opts.tag_files`)
 
-Doxygen's `TAGFILES` equivalent: since `docmap.cli`/the pre-commit hook
+Doxygen's `TAGFILES` equivalent: since `docmap.core.cli`/the pre-commit hook
 template made docmap trivially reusable (see "Reusing docmap in another
 plugin" below), a tree of several small plugins all depending on `lib.nvim`
 and each generating its own map is the normal case, not a hypothetical one.
@@ -1879,7 +1879,7 @@ docmap never scans the closure as its own unit). Unlike `tested`/
 `documented`, this is computed unconditionally during the same scan pass
 that already has the treesitter node in hand — there is no later
 IR-only "resolve" step that could derive it afterwards. Verified against
-this repo's own tree: the highest-ranked function is `docmap.command`'s
+this repo's own tree: the highest-ranked function is `docmap.editor.command`'s
 `M.setup` (complexity 104) — the `:DocMap` subcommand dispatcher, exactly
 the shape of function this ranking exists to surface.
 
@@ -2020,7 +2020,7 @@ from `file://`, the panel explains itself rather than doing nothing, the
 same treatment the History tab already gives that case, for the identical
 reason: a `file://` origin cannot `fetch()` anything at all.
 
-`telemetry_join.rows`/`by_key` had a real bug until 2026-08-10: `Docmap.
+`telemetry_join.rows`/`by_key` had a real bug until 2026-08-10: `Documentation.
 IR.nodes` is keyed by `node.id` (a file path, `core/scan.lua`'s `local id =
 rel`), but `runtime-analysis.telemetry`'s `wrap_loaded()`/`telemetry.auto()`
 resolve `Data.modules` values to the *dotted* `@module` form instead — the
@@ -2074,7 +2074,7 @@ implementation rather than two copies of the same discrepancy logic.
 
 **One identifier, not two, unlike Telemetry.** A telemetry namespace can
 genuinely differ from the module prefix it wraps (`core/telemetry_self.lua`
-wraps `main = "documentation"` under `namespace = "docmap.nvim"` —
+wraps `main = "docmap"` under `namespace = "docmap.nvim"` —
 two different strings, for this repo itself), so `telemetry_join.
 M.namespace(opts)` reads `opts.telemetry_namespace`/`opts.title`. A loaded
 snapshot has nothing to name except the prefix it was taken under, so
@@ -2376,7 +2376,7 @@ any different in the map from a dependency the scan was never meant to cover.
 The separation is on the **first path segment**. A require whose leading
 segment is one the tree declares as its own is a claim about this tree, and
 this tree is exactly what the scan *can* be authoritative about. Whole
-segment, never a raw string prefix, so `documentation` cannot match a
+segment, never a raw string prefix, so `docmap` cannot match a
 `documentationx.util`. Line numbers come from `requires_raw`, which is
 internal to the scan pipeline and never serialized — checks run against the
 in-memory IR right after the walk, so they are still there.
@@ -2459,8 +2459,8 @@ from the start to know nothing about lib.nvim's layout — `opts.root`,
 `opts.source`, `opts.extra_checks` exist precisely so it does not. That made
 the extraction a rename rather than a rewrite: the pipeline, the IR and every
 renderer are unchanged, and what moved is the module path
-(`lib.nvim.docmap.*` → `documentation.*`), the type namespace (`Lib.Docmap.*`
-→ `Docmap.*`), the command names (`:LibMap`/`:LibBrowse` →
+(`lib.nvim.docmap.*` → `documentation.*`, since renamed `docmap.*`), the type
+namespace (`Lib.Docmap.*` → `Documentation.*`, since `Docmap.*`), the command names (`:LibMap`/`:LibBrowse` →
 `:DocMap`/`:DocBrowse`), and `config.lua`, which went from *one repository's
 options* to *defaults derived from any root*.
 
@@ -2476,7 +2476,7 @@ library's own submodule:
   "where was Neovim started", not "which repository is the user looking at",
   and does not move when a buffer in another checkout is opened. `:DocMap`/
   `:DocBrowse` now resolve per invocation from the current buffer's file
-  instead — see |documentation-root|. `install()`'s own `opts.root` is
+  instead — see |docmap-root|. `install()`'s own `opts.root` is
   unaffected; it was always the caller's to set.)
 - **The repo-specific check moved out.** `type-not-exported` (lib.nvim's
   aggregate-`Lib`-class check) was in `config.lua`; it was never generic and

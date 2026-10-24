@@ -228,7 +228,7 @@ catalogue.docmap_required_by = {
 
 catalogue.docmap_callees = {
   description = "Call edges out of one function. `fn_key` is `<node id>#<declared name>`, "
-    .. "e.g. `lua/documentation/init.lua#M.generate`.",
+    .. "e.g. `lua/docmap/init.lua#M.generate`.",
   input_schema = {
     type = "object",
     properties = {

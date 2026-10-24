@@ -5,12 +5,12 @@
 # docmap.nvim
 
 ```
-     _                                       _        _   _
-  __| | ___   ___ _   _ _ __ ___   ___ _ __ | |_ __ _| |_(_) ___  _ __
- / _` |/ _ \ / __| | | | '_ ` _ \ / _ \ '_ \| __/ _` | __| |/ _ \| '_ \
-| (_| | (_) | (__| |_| | | | | | |  __/ | | | || (_| | |_| | (_) | | | |
- \__,_|\___/ \___|\__,_|_| |_| |_|\___|_| |_|\__\__,_|\__|_|\___/|_| |_|
-                                                                  .nvim
+    _
+ __| |___  __ _ __  __ _ _ __
+/ _` / _ \/ _| '  \/ _` | '_ \
+\__,_\___/\__|_|_|_\__,_| .__/
+                        |_|
+                        .nvim
 ```
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -18,11 +18,16 @@
 [![Lua](https://img.shields.io/badge/Lua-5.1%2FLuaJIT-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)
 ![Status](https://img.shields.io/badge/status-beta-orange)
 [![CI](https://github.com/StefanBartl/docmap.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/StefanBartl/docmap.nvim/actions/workflows/ci.yml)
-[![wkd](https://img.shields.io/badge/wkd-family-c6ff3d)](https://stefanbartl.github.io/wkd/p/documentation/)
+[![wkd](https://img.shields.io/badge/wkd-family-c6ff3d)](https://stefanbartl.github.io/wkd/p/docmap/)
 
-> Part of the [wkd](https://stefanbartl.github.io/wkd/) family — see this plugin's [page](https://stefanbartl.github.io/wkd/p/documentation/) on the site.
+> Part of the [wkd](https://stefanbartl.github.io/wkd/) family — see this plugin's [page](https://stefanbartl.github.io/wkd/p/docmap/) on the site.
 
 > **know your project**
+
+> **Renamed.** This plugin was `documentation.nvim` until 2026-10-24. The repository, the
+> Lua namespace (`require("docmap")`, no compatibility shim) and the types (`Docmap.*`) changed
+> with it; the commands (`:DocMap`, `:DocBrowse`), the standalone binary and `.docmap.json` did not.
+> Existing plugin specs need the new repository name and `require("docmap").setup({})`.
 
 Point it at a repository and it produces a **module map**: an interactive HTML
 page, a Markdown overview, a deterministic JSON artifact, and a set of drift
@@ -62,7 +67,7 @@ the question you arrived with. The four to reach for first:
 - [MCP server](docs/mcp.md) — nine read-only tools over stdio, and why none of them writes.
 - [Testing contract](docs/testing-contract.md) — which specs a change touches, from the require graph: freshness, explicit gaps, consumers in other repositories, and a "has specs" column in the map.
 - [Integrations](docs/integrations.md) — the context-menu bridge for `nvzone/menu`.
-- [Health](docs/health.md) — what `:checkhealth docmap` reports, including the declared external tools.
+- [Health](docs/health.md) — what `:checkhealth documentation` reports, including the declared external tools.
 - [Bindings cheatsheet](docs/BINDINGS.md) — every keymap, user command and autocommand.
 - [Workflow](docs/WORKFLOW.md) — which panel answers which question: Trail versus filter versus fuzzy jump.
 

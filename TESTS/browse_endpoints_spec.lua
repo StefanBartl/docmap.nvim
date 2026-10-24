@@ -175,7 +175,7 @@ return function(H)
 
     -- If a real checkout of runtime-analysis.nvim is on the rtp
     -- (`TESTS/run.lua` appends `RUNTIME_ANALYSIS_DIR` the same way it
-    -- already does `DOCUMENTATION_TS_PARSERS_DIR` for the JS/TS parser
+    -- already does `DOCMAP_TS_PARSERS_DIR` for the JS/TS parser
     -- tests), the actual integration is exercised end to end: the soft
     -- dependency resolves and a real request buffer opens, pre-filled with
     -- the selected route's method and path.

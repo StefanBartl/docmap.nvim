@@ -17,6 +17,14 @@
 > report it (`dead-readme-link` strips code spans by design and resolves links
 > only within one repository).
 
+> **This plugin was renamed from `documentation.nvim` to `docmap.nvim`
+> (2026-10-24).** The command, the standalone binary, the `.docmap.json`
+> file and the desktop app were `docmap` already; the repository and the Lua
+> namespace now are as well. Everything below says `docmap.nvim` where it
+> said `documentation.nvim` when it was written, and the reasoning is
+> unchanged. §5 below records the naming of `runtime-analysis.nvim`, which
+> pairs with whichever name this plugin has.
+
 > **A fifth piece arrived after this was written (2026-08-30).**
 > [`docmap-desktop`](https://github.com/StefanBartl/docmap-desktop) is a Tauri
 > app that runs this plugin's standalone binary and serves the same `/api/*`
@@ -33,9 +41,9 @@
     - [Seam B — artifact vs. serve](#seam-b--artifact-vs-serve)
   - [2. The feature list, sorted](#2-the-feature-list-sorted)
   - [3. Feature by feature](#3-feature-by-feature)
-    - [3.1 API endpoint inventory — static, docmap.nvim](#31-api-endpoint-inventory--static-documentationnvim)
+    - [3.1 API endpoint inventory — static, docmap.nvim](#31-api-endpoint-inventory--static-docmapnvim)
     - [3.2 API request runner — runtime, and the reason a new plugin is justified](#32-api-request-runner--runtime-and-the-reason-a-new-plugin-is-justified)
-    - [3.3 Docs cross-references — static, docmap.nvim, genuinely new data](#33-docs-cross-references--static-documentationnvim-genuinely-new-data)
+    - [3.3 Docs cross-references — static, docmap.nvim, genuinely new data](#33-docs-cross-references--static-docmapnvim-genuinely-new-data)
     - [3.4 Docs-only view / filter — cheap, once 3.3 exists](#34-docs-only-view--filter--cheap-once-33-exists)
     - [3.5 Hover previews — three different features wearing one name](#35-hover-previews--three-different-features-wearing-one-name)
     - [3.6 Three more in the same spirit](#36-three-more-in-the-same-spirit)

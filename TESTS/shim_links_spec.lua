@@ -409,7 +409,7 @@ return function(H)
     "10/08/2026  06:24 PM    <SYMLINKD>     split [x",
     "\\..\\..\\outside]",
     "10/08/2026  06:24 PM    <SYMLINKD>     a-b [C:\\elsewhere\\dash]",
-    "10/08/2026  06:24 PM    <JUNCTION>     documentation-output [C:\\elsewhere\\out]",
+    "10/08/2026  06:24 PM    <JUNCTION>     docmap-output [C:\\elsewhere\\out]",
     "10/08/2026  06:24 PM    <DIR>          plain",
     "10/08/2026  06:24 PM                12 f.txt",
     win_links.END_MARK,
@@ -448,7 +448,7 @@ return function(H)
         "twin",
         "split",
         "a\150b",
-        "documentation-output",
+        "docmap-output",
         "plain",
         "f.txt",
       },
@@ -464,9 +464,9 @@ return function(H)
     ["C:/proj/docs/twin"] = { kind = "directory", link = true },
     ["C:/proj/docs/split"] = { kind = "directory", link = true },
     ["C:/proj/docs/a\150b"] = { kind = "directory", link = true },
-    ["C:/proj/docs/documentation-output"] = { kind = "directory", link = true },
+    ["C:/proj/docs/docmap-output"] = { kind = "directory", link = true },
     -- Not listed by `lfs.dir`, which gives the long names only: the 8.3 alias
-    -- that NTFS answers for `documentation-output`.
+    -- that NTFS answers for `docmap-output`.
     ["C:/proj/docs/DOCUME~1"] = { kind = "directory", link = true },
     ["C:/proj/docs/plain"] = { kind = "directory" },
     ["C:/proj/docs/f.txt"] = { kind = "file" },
@@ -690,7 +690,7 @@ return function(H)
       eq(docs[" twin"], "link", "B: one of two links the listing reads alike")
       eq(docs.twin, "link", "B: ...and the other")
       eq(docs.split, "link", "B: a link whose target the listing broke over two lines")
-      eq(docs["documentation-output"], "link", "B: a link with a long name")
+      eq(docs["docmap-output"], "link", "B: a link with a long name")
       eq(#world.linked_stats, 0, "B: no link was ever statted -- the listing never opened one")
 
       -- The command, and what was done around it.

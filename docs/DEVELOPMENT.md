@@ -321,7 +321,7 @@ which quietly assumed the root has an incoming dependency edge. It normally
 does — but `ir.root` is whatever `source` names, and when that is a directory
 which merely *contains* the plugin the root is a namespace nothing requires.
 This repository shipped exactly that artifact from `8786299` to `ac2cbc5`
-(rooted at `lua`, not `lua/documentation`). Deps then renders a single message
+(rooted at `lua`, not `lua/docmap`). Deps then renders a single message
 row, `p` refuses it by design, and the spec reported `expected 1, got 0` — a
 statement about the committed JSON wearing the costume of one about the pin
 path.
@@ -391,7 +391,7 @@ lua/docmap/
                     under it touching disk)
     registry.lua    install()/uninstall(), the watch
     serve.lua       the local map server
-    health.lua      :checkhealth docmap
+    health.lua      :checkhealth documentation
 
   bindings/         keymaps.lua, usrcmds/, autocmds.lua, diagnostics.lua
     autocmds.lua    a manifest, not a creation site -- checkhealth and

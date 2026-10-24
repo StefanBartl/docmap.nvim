@@ -29,7 +29,7 @@ local M = {}
 ---no non-nil default (`watch`, `keys`, `layers`, `luals`, `calls_heuristic`,
 ---...) and so have no entry in `DEFAULTS.lua` at all — building "known" from
 ---`DEFAULTS` here would flag every one of those as an unknown-key typo.
----Transcribed from `lua/documentation/@types/init.lua`'s `Docmap.Opts`
+---Transcribed from `lua/docmap/@types/init.lua`'s `Docmap.Opts`
 ---class; keep in sync when a field is added there.
 ---@type table<string, true>
 M.KNOWN_OPTS_KEYS = {

@@ -15,7 +15,7 @@ and work the list like any other quickfix output. This is the "did I
 break anything" loop, and it is fast enough to run before every commit,
 not just occasionally: on a mid-sized repo it is a fraction of a second.
 
-`:checkhealth docmap` is the companion check for "is the tool
+`:checkhealth documentation` is the companion check for "is the tool
 itself set up right" (deps, treesitter parser, the resolved root for
 wherever you ran it from) — run it once per new repo, not per edit.
 
@@ -28,7 +28,7 @@ grammar a backend still produces a complete module tree, hierarchy, summaries
 and require edges, and **no function-level data at all**. That reads like a
 scanner bug and is a missing parser.
 
-`:checkhealth docmap` has a **language support** section that answers
+`:checkhealth documentation` has a **language support** section that answers
 exactly this, and it lists only the languages that actually occur in your
 source roots — never all twenty-three, because twenty-two absent grammars for a
 Lua repository are a wall nobody reads. Each line ends in the

@@ -40,5 +40,5 @@ the registered `command_name` (for messages — it is not always "DocMap"),
 ## Everything stays lazy
 
 `ACTIONS` values are thunks, not module paths, so a `:DocMap check` never loads
-the churn, diff or DOT code. The same reason `documentation/init.lua` puts
+the churn, diff or DOT code. The same reason `docmap/init.lua` puts
 `browse`, `diff`, `cli` and `history` behind `__index` metatables.

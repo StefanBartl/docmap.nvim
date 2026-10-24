@@ -119,7 +119,7 @@ function M.render(ir, findings, opts)
   local c = ir.meta.counts
   put("# " .. ir.meta.title .. " — module map\n")
   put(
-    "> **Generated** by `documentation`. Do not edit by hand — run `:DocMap`\n"
+    "> **Generated** by `docmap`. Do not edit by hand — run `:DocMap`\n"
       .. "> (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.\n"
   )
   put(

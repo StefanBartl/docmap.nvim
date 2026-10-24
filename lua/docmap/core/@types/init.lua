@@ -4,7 +4,7 @@
 ---
 --- The IR itself — `Docmap.Opts`, `Docmap.IR`,
 --- `Docmap.Node`, `Docmap.Finding` and everything they carry —
---- lives one level up in [`documentation/@types`](../../@types/init.lua),
+--- lives one level up in [`docmap/@types`](../../@types/init.lua),
 --- because every layer reads it. What is here is narrower: the result shapes
 --- of the analyses that run *over* an IR and are consumed by exactly one
 --- renderer or command each.

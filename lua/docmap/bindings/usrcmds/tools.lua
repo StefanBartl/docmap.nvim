@@ -42,7 +42,7 @@ function M.run(ctx)
   if not result then
     ctx.notify.info(
       "No lib.nvim.deps manifest found (docs/install.json or docs/INSTALL.md), "
-        .. "or lib.nvim.deps is unavailable — see :help documentation-tools."
+        .. "or lib.nvim.deps is unavailable — see :help docmap-tools."
     )
     return
   end

@@ -154,8 +154,8 @@ Two deliberate non-decisions:
 ## `@internal`
 
 Marks a function as implementation rather than published surface. Recognised
-by `docmap.functions` and used in four places: `undocumented-param` skips it,
-`docmap.diff` counts it among helpers instead of listing it as an API change,
+by `docmap.core.functions` and used in four places: `undocumented-param` skips it,
+`docmap.core.diff` counts it among helpers instead of listing it as an API change,
 the HTML map badges it, and `dead-function` checks it unconditionally for a
 missing caller (an ordinary exported function only gets that scrutiny under
 `opts.dead_code`, since a library's whole point is functions with no

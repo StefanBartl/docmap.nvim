@@ -23,7 +23,7 @@ shape below is what most clients use; the field names vary:
 ```json
 {
   "mcpServers": {
-    "documentation": {
+    "docmap": {
       "command": "nvim",
       "args": ["--headless", "-l", "scripts/mcp_server.lua"],
       "cwd": "/path/to/your/repo"
@@ -33,7 +33,7 @@ shape below is what most clients use; the field names vary:
 ```
 
 `scripts/mcp_server.lua` is thin on purpose and hardcodes only *this*
-repository's layout (`source = "lua/documentation"`). Another plugin copies
+repository's layout (`source = "lua/docmap"`). Another plugin copies
 the file and changes the options table at the bottom — the same arrangement
 `scripts/gen_map.lua` already uses, and for the same reason.
 

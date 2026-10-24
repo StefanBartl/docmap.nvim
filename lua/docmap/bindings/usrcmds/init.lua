@@ -3,7 +3,7 @@
 --- dispatch and completion.
 ---
 --- Opt-in: nothing here runs unless a caller invokes `setup()`, so requiring
---- `documentation` in a plugin does not silently register a command in the
+--- `docmap` in a plugin does not silently register a command in the
 --- user's editor.
 ---
 --- Built on `editor/registry.lua`: `setup()` ensures a live handle exists for
@@ -240,7 +240,7 @@ end
 ---@return Docmap.Handle
 function M.setup(opts)
   local usercmd = require("lib.nvim.bindings.usercmd")
-  local notify = require("lib.nvim.notify").create("[documentation]")
+  local notify = require("lib.nvim.notify").create("[docmap]")
   local registry = require("docmap.editor.registry")
 
   -- An explicit `root` pins, exactly as before: a caller who names a tree in

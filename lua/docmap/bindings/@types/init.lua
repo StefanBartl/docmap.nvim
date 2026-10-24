@@ -22,7 +22,7 @@
 ---@class Docmap.Bindings.Ctx
 ---@field cfg Docmap.Config Fully resolved options -- `root` included, hence the resolved type rather than the input one.
 ---@field handle Docmap.Handle Live registry handle; `handle.ir()` is the current IR.
----@field notify table `lib.nvim.notify` instance, prefixed "[documentation]".
+---@field notify table `lib.nvim.notify` instance, prefixed "[docmap]".
 ---@field command_name string The name `:DocMap` was actually registered under, for messages.
 ---@field open_map fun(hash: string?): boolean Open the generated page, optionally at a URL fragment.
 ---@field find_node fun(ir: Docmap.IR, name: string, lua_root: string): string? Resolve a user-typed module name to a node id.

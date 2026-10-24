@@ -158,7 +158,7 @@ so.
 
 * **Loads but never calls** — `A` pulls `B` in and nothing along the way
   invokes it. In the require graph alone that is indistinguishable from a live
-  dependency. Real in this repository: the top-level `documentation` module
+  dependency. Real in this repository: the top-level `docmap` module
   requires `core.cli`, `core.diff` and both renderers without calling into any
   of them.
 * **Calls without a require path** — the static dependency graph understates

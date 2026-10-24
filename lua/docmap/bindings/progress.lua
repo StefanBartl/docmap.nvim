@@ -35,7 +35,7 @@ local progress_mod = require("docmap.core.soft_require").probe("lib.nvim.progres
 
 ---Starts a progress handle, or returns nil when lib.nvim isn't installed.
 ---@param ctx Docmap.Bindings.Ctx
----@param text string Initial message, shown after the "[documentation]" title
+---@param text string Initial message, shown after the "[docmap]" title
 ---@param total integer|nil Total unit count, when the operation is countable
 ---@return table|nil
 function M.create(ctx, text, total)
@@ -43,7 +43,7 @@ function M.create(ctx, text, total)
     return nil
   end
   local handle = progress_mod.create({
-    title = "[documentation]",
+    title = "[docmap]",
     style = (ctx.cfg and ctx.cfg.progress_style) or "auto",
   })
   handle:update({ text = text, current = total and 0 or nil, total = total })

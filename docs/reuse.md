@@ -32,7 +32,7 @@ Nothing beyond the plugin spec:
 
 With no `root` set, `:DocMap`/`:DocBrowse` resolve one **per invocation** from
 the current buffer's file (up to the nearest `.git`, see
-|documentation-root|) — right when you maintain several repositories side by
+|docmap-root|) — right when you maintain several repositories side by
 side, and wrong when you want one fixed target. Set `root` explicitly for the
 latter, which is what the CLI path below does — a headless run has no buffer
 to resolve from in the first place.
@@ -117,7 +117,7 @@ an exit code rather than calling `cq` itself, so it stays a plain function a
 test can assert on.
 
 The runtimepath block matters more than it looks. A headless `nvim -l` run has
-no plugin manager, so neither `documentation` nor `lib.nvim` is reachable by
+no plugin manager, so neither `docmap` nor `lib.nvim` is reachable by
 default. The copied script resolves `lib.nvim` from `$LIB_NVIM_DIR`, then
 `.deps/lib.nvim`, then a sibling checkout — and `docmap.nvim` itself the
 same way if it is not already on your rtp.

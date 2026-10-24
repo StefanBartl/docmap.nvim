@@ -93,7 +93,7 @@ notify, never an error.
 
 ## Autocommands
 
-All created lazily. Requiring `documentation` installs none of them.
+All created lazily. Requiring `docmap` installs none of them.
 
 ### `BufWritePost` — global
 

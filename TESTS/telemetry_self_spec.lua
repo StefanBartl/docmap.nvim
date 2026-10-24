@@ -57,7 +57,7 @@ return function(H)
     -- private state.
     do
       telemetry_self._reset_for_test()
-      local ns = "documentation-nvim-self-telemetry-spec-override"
+      local ns = "docmap-nvim-self-telemetry-spec-override"
       store.clear(ns, { dir = cache_dir })
       local inst = assert(
         telemetry_self.setup({ title = "wrong-name", telemetry_namespace = ns }),
@@ -74,7 +74,7 @@ return function(H)
     -- instance" warning exists specifically to catch).
     do
       telemetry_self._reset_for_test()
-      local ns = "documentation-nvim-self-telemetry-spec-idempotent"
+      local ns = "docmap-nvim-self-telemetry-spec-idempotent"
       store.clear(ns, { dir = cache_dir })
       local first =
         assert(telemetry_self.setup({ title = ns }), "setup: first call returns a real instance")

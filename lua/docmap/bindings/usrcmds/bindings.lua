@@ -110,7 +110,7 @@ function M.run(ctx)
       "No keymaps, user commands or autocmds found. The vim.* APIs are always "
         .. "recognized; a config binding through its own helper (map(...), "
         .. "usercmd.create(...)) must declare it in opts.bindings.wrappers — "
-        .. "see :help documentation-bindings."
+        .. "see :help docmap-bindings."
     )
     return
   end

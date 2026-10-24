@@ -129,7 +129,7 @@ link only if, resolved one step at a time without opening anything on the way,
 it stays inside the project. The committed map is read by `--check`, the app's
 `--api=` routes, the static files of `:DocMap serve`, `:DocBrowse` (the map and
 its staleness check), the hover.nvim contribution and `:checkhealth
-documentation`; the editor-side readers vet `out_dir` with `core/safe_out_dir`
+docmap`; the editor-side readers vet `out_dir` with `core/safe_out_dir`
 as the writers do. The same holds for the other files a repository can name:
 the install manifest (`docs/install.json`, `docs/INSTALL.md`, the `install_dir`
 key; read with a 1 MiB bound, so a device cannot exhaust memory), the spec roots

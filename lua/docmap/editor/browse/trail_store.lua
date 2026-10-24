@@ -305,7 +305,7 @@ end
 ---Subscribe to `trail` and arrange the exit flush. Idempotent.
 ---
 ---Called from `browse.open` rather than at require time, so merely requiring
----`documentation` never installs an autocmd in the user's editor — the same
+---`docmap` never installs an autocmd in the user's editor — the same
 ---rule `command.setup()` follows for its user commands.
 function M.attach()
   if attached then

@@ -1,6 +1,6 @@
 # docmap.nvim — module map
 
-> **Generated** by `documentation`. Do not edit by hand — run `:DocMap`
+> **Generated** by `docmap`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
 **6 modules** · 7 namespaces · 136 helper files
@@ -296,14 +296,10 @@ flowchart LR
 
 ## Drift
 
-0 errors · 4 warnings · 30 info
+0 errors · 0 warnings · 30 info
 
-| Severity | Check | Message |
-|---|---|---|
-| warn | `doc-references-missing` | docs/annotations.md:157 references 'docmap.functions', but docmap has no 'functions' |
-| warn | `doc-references-missing` | docs/pipeline.md:1461 references 'docmap.cli', but docmap has no 'cli' |
-| warn | `doc-references-missing` | docs/annotations.md:158 references 'docmap.diff', but docmap has no 'diff' |
-| warn | `doc-references-missing` | docs/pipeline.md:1882 references 'docmap.command', but docmap has no 'command' |
+No errors or warnings.
+
 
 <details>
 <summary>30 informational findings</summary>
