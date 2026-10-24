@@ -411,11 +411,17 @@ print(("   %s (%.1f MB)"):format(generated, csize / 1024 / 1024))
 
 print("== compile")
 local exe = WINDOWS and "docmap.exe" or "docmap"
+-- Built under a name distinct from the published one: `stage/` has a
+-- `docmap/` directory (the staged Lua module, since the rename from
+-- `documentation`), and `gcc -o docmap` in that same cwd fails with
+-- "cannot open output file docmap: Is a directory" rather than overwriting
+-- it. Compiled here, then copied out under the real name below.
+local build_out = WINDOWS and "docmap.build.exe" or "docmap.build"
 local libargs = {}
 for _, l in ipairs(libs) do
   libargs[#libargs + 1] = quoted(l)
 end
-local cc_parts = { quoted(CC), "-O2", "-o", quoted(exe), quoted(generated) }
+local cc_parts = { quoted(CC), "-O2", "-o", quoted(build_out), quoted(generated) }
 for _, l in ipairs(libargs) do
   cc_parts[#cc_parts + 1] = l
 end
@@ -423,7 +429,7 @@ cc_parts[#cc_parts + 1] = "-Iluainc"
 cc_parts[#cc_parts + 1] = "-lm"
 sh(cmdline(cc_parts), "compiling " .. generated)
 
-local bin = io.open(exe, "rb")
+local bin = io.open(build_out, "rb")
 if not bin then
   lfs.chdir(cwd)
   die("no binary produced")
@@ -431,7 +437,7 @@ end
 local bytes = bin:seek("end")
 bin:close()
 
-copy(stage_abs .. "/" .. exe, cwd .. "/" .. out_dir .. "/" .. exe)
+copy(stage_abs .. "/" .. build_out, cwd .. "/" .. out_dir .. "/" .. exe)
 lfs.chdir(cwd)
 -- `copy()` is plain `io.open`/`io.write`, which does not carry an
 -- executable bit through even on a filesystem that has one. gcc already
