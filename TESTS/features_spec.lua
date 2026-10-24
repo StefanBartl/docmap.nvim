@@ -14,8 +14,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local features = require("documentation.core.features")
-  local docmap = require("documentation")
+  local features = require("docmap.core.features")
+  local docmap = require("docmap")
 
   local function dwrite(root, rel, text)
     local abs = root .. "/" .. rel

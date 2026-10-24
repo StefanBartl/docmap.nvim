@@ -24,26 +24,26 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docs = require("documentation.core.docs")
-  local scan = require("documentation.core.scan")
-  local render = require("documentation.core.render.markdown")
+  local docs = require("docmap.core.docs")
+  local scan = require("docmap.core.scan")
+  local render = require("docmap.core.render.markdown")
 
   -- ---------------------------------------------------------------------
   -- The shared resolver.
   -- ---------------------------------------------------------------------
   eq(
-    docs.resolve_link("lua/documentation/config", "DEFAULTS.lua"),
-    "lua/documentation/config/DEFAULTS.lua",
+    docs.resolve_link("lua/docmap/config", "DEFAULTS.lua"),
+    "lua/docmap/config/DEFAULTS.lua",
     "resolve_link: a bare name resolves beside the file that wrote it"
   )
   eq(
-    docs.resolve_link("lua/documentation/core", "../config/init.lua"),
-    "lua/documentation/config/init.lua",
+    docs.resolve_link("lua/docmap/core", "../config/init.lua"),
+    "lua/docmap/config/init.lua",
     "resolve_link: `..` walks up"
   )
   eq(
-    docs.resolve_link("lua/documentation/core", "./x.lua"),
-    "lua/documentation/core/x.lua",
+    docs.resolve_link("lua/docmap/core", "./x.lua"),
+    "lua/docmap/core/x.lua",
     "resolve_link: `.` is a no-op segment, not a directory named `.`"
   )
 

@@ -31,9 +31,9 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local config = require("documentation.config")
-  local registry = require("documentation.core.lang_registry")
-  local safe_fs = require("documentation.core.safe_fs")
+  local config = require("docmap.config")
+  local registry = require("docmap.core.lang_registry")
+  local safe_fs = require("docmap.core.safe_fs")
   local is_windows = vim.fn.has("win32") == 1
 
   -- Every fixed name a backend's `detect_source` puts under the root, first
@@ -309,7 +309,7 @@ return function(H)
     "single: links that stay inside the project name the sources"
   )
   eq(
-    require("documentation.core.lang.rust").detect_source(single_root),
+    require("docmap.core.lang.rust").detect_source(single_root),
     ".",
     "single: ...and a workspace member reached through one is a member"
   )
@@ -345,7 +345,7 @@ return function(H)
     -- `"link"`, which is not a directory, and the name did the rest. Nor is
     -- one that stands for the `__init__.py` that makes a directory a package.
     eq(
-      require("documentation.core.lang.python").detect_source(nested_root),
+      require("docmap.core.lang.python").detect_source(nested_root),
       nil,
       "nested: a file link out of the project is not a Python file"
     )
@@ -356,7 +356,7 @@ return function(H)
     ok(H.link(inner_root .. "/real/a.py", inner_root .. "/src/a.py", false), "a file link inside")
     safe_fs.forget()
     eq(
-      require("documentation.core.lang.python").detect_source(inner_root),
+      require("docmap.core.lang.python").detect_source(inner_root),
       "src",
       "nested: ...while one that stays inside is"
     )

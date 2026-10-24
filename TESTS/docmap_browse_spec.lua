@@ -5,7 +5,7 @@
 ---@diagnostic disable: duplicate-set-field
 -- The fixtures below carry only the fields the unit under test reads; a full
 -- IR, node, finding or entry per case would be noise, not coverage.
--- TESTS/docmap_browse_spec.lua — documentation.editor.browse
+-- TESTS/docmap_browse_spec.lua — docmap.editor.browse
 --
 -- Two halves, deliberately separated: `view`/`source` are pure and get a
 -- synthetic IR (deterministic, no dependency on whether docs/map is present
@@ -15,9 +15,9 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local source = require("documentation.editor.browse.source")
-  local view = require("documentation.editor.browse.view")
-  local browse = require("documentation.editor.browse")
+  local source = require("docmap.editor.browse.source")
+  local view = require("docmap.editor.browse.view")
+  local browse = require("docmap.editor.browse")
 
   -- A three-node tree: root -> {alpha, beta}. alpha requires beta, and
   -- alpha's `M.run` calls beta's `M.helper`.
@@ -386,7 +386,7 @@ return function(H)
   -- `trail.lua` is pure by design — a table of records, no window, no buffer,
   -- no `vim` API — so the whole model is driven here without mounting
   -- anything. Only the keys that reach it need the UI half below.
-  local trail = require("documentation.editor.browse.trail")
+  local trail = require("docmap.editor.browse.trail")
   trail.reset()
   local troot = "/tmp/x"
 
@@ -492,7 +492,7 @@ return function(H)
   -- The query language, driven straight — it is pure, so none of this needs a
   -- window. `describe` rather than the raw string is what the status line
   -- shows, so asserting on it also pins what a reader is told is in effect.
-  local flt = require("documentation.editor.browse.filter")
+  local flt = require("docmap.editor.browse.filter")
 
   eq(flt.parse(""), nil, "filter: an empty query is no filter")
   eq(flt.parse("   "), nil, "filter: and so is whitespace")
@@ -578,7 +578,7 @@ return function(H)
   -- Persistence, pointed at a temp file rather than the user's real state
   -- directory — the reason `M.path` is a function every caller goes through
   -- instead of a constant.
-  local store = require("documentation.editor.browse.trail_store")
+  local store = require("docmap.editor.browse.trail_store")
   local store_file = H.tmpfile(".json")
   store.path = function()
     return store_file
@@ -740,9 +740,9 @@ return function(H)
       end
     end
 
-    local list_win, list_buf = slot("documentation-browse-list")
-    local _, detail_buf = slot("documentation-browse-detail")
-    local _, status_buf = slot("documentation-browse-status")
+    local list_win, list_buf = slot("docmap-browse-list")
+    local _, detail_buf = slot("docmap-browse-detail")
+    local _, status_buf = slot("docmap-browse-status")
     ok(list_win ~= nil, "browse: the list slot is mounted")
     ok(detail_buf ~= nil, "browse: the detail slot is mounted")
     ok(status_buf ~= nil, "browse: the status slot is mounted")
@@ -764,14 +764,14 @@ return function(H)
     -- is code in this pane and it is marked", not how much.
     -- ------------------------------------------------------------------
     do
-      local hl_ns = vim.api.nvim_create_namespace("documentation.browse.detail")
+      local hl_ns = vim.api.nvim_create_namespace("docmap.browse.detail")
 
       ---@return integer spans, integer marks
       local function detail_marks()
         local lines = vim.api.nvim_buf_get_lines(detail_buf, 0, -1, false)
         local spans = 0
         for _, line in ipairs(lines) do
-          spans = spans + #require("documentation.editor.browse.highlight").spans(line)
+          spans = spans + #require("docmap.editor.browse.highlight").spans(line)
         end
         local marks = vim.api.nvim_buf_get_extmarks(detail_buf, hl_ns, 0, -1, {})
         return spans, #marks
@@ -861,7 +861,7 @@ return function(H)
       vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(k, true, false, true), "x", false)
     end
     local function status_now()
-      local _, b = slot("documentation-browse-status")
+      local _, b = slot("docmap-browse-status")
       return vim.api.nvim_buf_get_lines(b, 0, 1, false)[1]
     end
 
@@ -870,7 +870,7 @@ return function(H)
     -- something when the start is where we think it is.
     browse.close()
     browse.open({ root = root })
-    vim.api.nvim_set_current_win((slot("documentation-browse-list")))
+    vim.api.nvim_set_current_win((slot("docmap-browse-list")))
 
     local at_start = status_now()
     press("2") -- deps
@@ -936,7 +936,7 @@ return function(H)
     if in_git then
       browse.close()
       browse.open({ root = root, mode = "history" })
-      local h_win, h_buf = slot("documentation-browse-list")
+      local h_win, h_buf = slot("docmap-browse-list")
       vim.api.nvim_set_current_win(h_win)
 
       -- **Wait for `git log` before looking.** Since the async rewrite
@@ -1002,11 +1002,11 @@ return function(H)
     -- termcodes (`\r`, `\15`) and the panel spells them `<CR>`, `<C-o>`.
     browse.close()
     browse.open({ root = root })
-    local q_win, q_buf = slot("documentation-browse-list")
+    local q_win, q_buf = slot("docmap-browse-list")
     vim.api.nvim_set_current_win(q_win)
     press("?")
 
-    local _, help_buf = slot("documentation-browse-help")
+    local _, help_buf = slot("docmap-browse-help")
     ok(help_buf ~= nil, "browse: ? opens the key panel")
     local help = table.concat(vim.api.nvim_buf_get_lines(help_buf or 0, 0, -1, false), "\n")
     ok(help:find("quickfix", 1, true) ~= nil, "browse: the panel describes what the keys do")
@@ -1061,7 +1061,7 @@ return function(H)
         which_key = false,
       })
 
-      local _, k_buf = slot("documentation-browse-list")
+      local _, k_buf = slot("docmap-browse-list")
       local bound = {}
       for _, m in ipairs(vim.api.nvim_buf_get_keymap(k_buf or 0, "n")) do
         bound[(vim.fn.keytrans(m.lhs):gsub("<lt>", "<")):lower()] = true
@@ -1084,10 +1084,10 @@ return function(H)
 
       -- And the panel follows the override rather than the defaults — the
       -- whole point of rendering it from the resolved set.
-      local kw = slot("documentation-browse-list")
+      local kw = slot("docmap-browse-list")
       vim.api.nvim_set_current_win(kw)
       press("?")
-      local _, k_help = slot("documentation-browse-help")
+      local _, k_help = slot("docmap-browse-help")
       ok(k_help ~= nil, "browse: ? still opens the panel with custom keys")
       local ktext = table.concat(vim.api.nvim_buf_get_lines(k_help or 0, 0, -1, false), "\n")
       ok(ktext:find("gQ", 1, true) ~= nil, "browse: the panel shows the rebound key")
@@ -1128,7 +1128,7 @@ return function(H)
     -- map gate's job, and mixing the two would make one failure look like the
     -- other.
     do
-      local rendered = require("documentation.bindings.docs").render()
+      local rendered = require("docmap.bindings.docs").render()
       local specs = browse.keyspecs()
 
       local missing = {}
@@ -1159,7 +1159,7 @@ return function(H)
       )
 
       -- Both commands and all four autocommands, from their manifests.
-      local manifest = require("documentation.bindings.autocmds")
+      local manifest = require("docmap.bindings.autocmds")
       for _, c in ipairs(manifest.usrcmds) do
         ok(
           rendered:find(":" .. c.name, 1, true) ~= nil,
@@ -1208,7 +1208,7 @@ return function(H)
     trail.clear(root)
     browse.close()
     browse.open({ root = root, center = pin_center })
-    vim.api.nvim_set_current_win((slot("documentation-browse-list")))
+    vim.api.nvim_set_current_win((slot("docmap-browse-list")))
 
     -- Pinned from Deps, so the axes have something to restore that Structure
     -- would not reproduce on its own.
@@ -1228,7 +1228,7 @@ return function(H)
 
     press("6")
     ok(status_now():find("1 pinned", 1, true) ~= nil, "browse: mode 6 opens the trail")
-    local _, t_buf = slot("documentation-browse-list")
+    local _, t_buf = slot("docmap-browse-list")
     ok(vim.api.nvim_buf_line_count(t_buf) >= 1, "browse: the trail lists the pin")
 
     -- The axes, not the whole status line: a pin records the *entry under the
@@ -1305,16 +1305,16 @@ return function(H)
 
     trail.clear(root)
 
-    -- Centering on a NAMESPACE: `lua/documentation/render` has no init.lua and
-    -- so declares no @module, but `documentation.core.render` is what a user types.
+    -- Centering on a NAMESPACE: `lua/docmap/render` has no init.lua and
+    -- so declares no @module, but `docmap.core.render` is what a user types.
     -- Resolving only on a declared module silently lands on the root instead.
     browse.close()
     eq(
-      browse.open({ root = root, center = "documentation.core.render" }),
+      browse.open({ root = root, center = "docmap.core.render" }),
       true,
       "browse: opens centered on a namespace"
     )
-    local _, status2 = slot("documentation-browse-status")
+    local _, status2 = slot("docmap-browse-status")
     local line = vim.api.nvim_buf_get_lines(status2, 0, 1, false)[1]
     ok(
       line:find("render", 1, true) ~= nil,
@@ -1326,8 +1326,8 @@ return function(H)
     -- (they close it), so they come last.
     browse.close()
     vim.fn.setqflist({}, "r")
-    browse.open({ root = root, center = "documentation" })
-    vim.api.nvim_set_current_win((slot("documentation-browse-list")))
+    browse.open({ root = root, center = "docmap" })
+    vim.api.nvim_set_current_win((slot("docmap-browse-list")))
     press("gq")
 
     eq(browse.is_open(), false, "browse: gq closes the browser")
@@ -1353,9 +1353,9 @@ return function(H)
     -- with the pane", so any one row that reports a figure proves it.
     -- `break` after the first, because re-opening the browser per row is the
     -- expensive part and one agreement is the whole claim.
-    browse.open({ root = root, center = "documentation" })
-    local i_win, i_buf = slot("documentation-browse-list")
-    local _, i_detail = slot("documentation-browse-detail")
+    browse.open({ root = root, center = "docmap" })
+    local i_win, i_buf = slot("docmap-browse-list")
+    local _, i_detail = slot("docmap-browse-detail")
     vim.api.nvim_set_current_win(i_win)
 
     local checked = 0
@@ -1388,15 +1388,15 @@ return function(H)
       handed = url
       return true
     end
-    browse.open({ root = root, center = "documentation" })
-    vim.api.nvim_set_current_win((slot("documentation-browse-list")))
+    browse.open({ root = root, center = "docmap" })
+    vim.api.nvim_set_current_win((slot("docmap-browse-list")))
     press("2") -- deps
     press("h") -- incoming
     press("gO")
     ok(handed ~= nil, "browse: gO handed a URL to the opener")
     ok((handed or ""):find("view=deps", 1, true) ~= nil, "browse: carrying the current mode")
     ok((handed or ""):find("dir=in", 1, true) ~= nil, "browse: and the current direction")
-    ok((handed or ""):find("documentation", 1, true) ~= nil, "browse: and the centered node")
+    ok((handed or ""):find("docmap", 1, true) ~= nil, "browse: and the centered node")
     ok((handed or ""):sub(1, 5) == "file:", "browse: as a file:// URL, so the fragment survives")
     browse.close()
     package.loaded["lib.nvim.cross.open_default"] = nil
@@ -1406,10 +1406,10 @@ return function(H)
     -- The expected path is derived from the module name rather than written
     -- out, so moving a module does not fail an assertion about `gd`. Splitting
     -- the tree into core/ and editor/ broke the literal form once already.
-    local gd_center = "documentation.core.deps"
+    local gd_center = "docmap.core.deps"
     local gd_expect = "lua/" .. gd_center:gsub("%.", "/") .. ".lua"
     browse.open({ root = root, center = gd_center })
-    local gd_list_win, gd_list_buf = slot("documentation-browse-list")
+    local gd_list_win, gd_list_buf = slot("docmap-browse-list")
     vim.api.nvim_set_current_win(gd_list_win)
     local target_row
     for i, row in ipairs(vim.api.nvim_buf_get_lines(gd_list_buf, 0, -1, false)) do

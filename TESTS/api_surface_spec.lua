@@ -20,7 +20,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
+  local docmap = require("docmap")
 
   local root = vim.fn.tempname()
   vim.fn.mkdir(root .. "/lua/surf", "p")
@@ -62,7 +62,7 @@ return function(H)
     "return M",
   }, "\n") .. "\n")
 
-  local opts = require("documentation.config").build(root, { source = "lua/surf" })
+  local opts = require("docmap.config").build(root, { source = "lua/surf" })
   local ir, findings = docmap.scan_full(opts)
   local html = docmap.render.html(ir, findings, opts)
 

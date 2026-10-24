@@ -16,8 +16,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local pick = require("documentation.editor.pick")
-  local scan = require("documentation.core.scan")
+  local pick = require("docmap.editor.pick")
+  local scan = require("docmap.core.scan")
 
   local dr = H.tmpfile("_pick")
   local function dwrite(rel, lines)
@@ -121,7 +121,7 @@ return function(H)
   -- the 913/0 measurement and the one a reader actually picks from.
   -- ---------------------------------------------------------------------
   local root = (vim.fn.getcwd():gsub("\\", "/"))
-  local real = scan.scan(require("documentation.config").build(root, {}))
+  local real = scan.scan(require("docmap.config").build(root, {}))
   local real_items = pick.entries(real, root)
   ok(#real_items > 100, "pick: the real map produces a substantial list (" .. #real_items .. ")")
 

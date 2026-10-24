@@ -21,7 +21,7 @@ write:
 
 ```lua
 {
-  "StefanBartl/documentation.nvim",
+  "StefanBartl/docmap.nvim",
   dependencies = { "StefanBartl/lib.nvim" },
   opts = {
     source = "lua/myplugin",   -- the subtree to scan
@@ -186,6 +186,6 @@ questions, and Neovim merges them.
   questions, and why `opts.diagnostics` pairs with it.
 - [docs/pipeline.md](pipeline.md) — how `core/calls.lua` resolves a call edge,
   and the four shapes it can and cannot see.
-- `lua/documentation/editor/callhierarchy.lua` — the client itself, including
+- `lua/docmap/editor/callhierarchy.lua` — the client itself, including
   the one sharp edge in Neovim's in-process `cmd` shape (its methods are
   called *without* an implicit `self`).

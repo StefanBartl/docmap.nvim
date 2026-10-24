@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_js_spec.lua — documentation.core.lang.js/ts/tsx (ecma.lua)
+-- TESTS/lang_js_spec.lua — docmap.core.lang.js/ts/tsx (ecma.lua)
 --
 -- Skips rather than failing when the javascript/typescript/tsx treesitter
 -- parsers are not on the runtimepath — the same precedent
@@ -27,7 +27,7 @@ return function(H)
     return
   end
 
-  local js_backend = require("documentation.core.lang_registry").get("js")
+  local js_backend = require("docmap.core.lang_registry").get("js")
 
   local fixture = H.tmpfile(".js")
   local fw = assert(io.open(fixture, "w"))
@@ -119,7 +119,7 @@ return function(H)
   ok(lines > 0, "lang.js: line count computed the same way as the Lua backend")
 
   -- Module identity is deliberately never set — see ecma.lua's own header.
-  local hdr = require("documentation.core.lang_registry").get("js").parse_header(fixture)
+  local hdr = require("docmap.core.lang_registry").get("js").parse_header(fixture)
   eq(hdr.module, nil, "lang.js: module identity is never a tag — it is the file path, elsewhere")
   eq(hdr.summary, "Module-level summary line.", "lang.js: file-level JSDoc still gives a summary")
 
@@ -188,7 +188,7 @@ return function(H)
       },
       edges = {},
     }
-    local edges = require("documentation.core.calls").build(ir)
+    local edges = require("docmap.core.calls").build(ir)
     eq(#edges, 1, "lang.js: exactly the bare call resolves to a real edge")
     eq(edges[1].from_fn, "caller", "lang.js: ... from the right caller")
     eq(edges[1].to_fn, "callee", "lang.js: ... to the right callee")
@@ -198,7 +198,7 @@ return function(H)
   end
 
   -- Symbols: module-scope non-function, non-require bindings, mirroring
-  -- `documentation.core.symbols`'s own Lua scope and classification.
+  -- `docmap.core.symbols`'s own Lua scope and classification.
   do
     local symbols_fixture = H.tmpfile(".js")
     local sf = assert(io.open(symbols_fixture, "w"))
@@ -330,7 +330,7 @@ return function(H)
     local twf = assert(io.open(ts_fixture, "w"))
     twf:write("export function add(a, b) {\n  return a + b;\n}\n")
     twf:close()
-    local ts_fns = require("documentation.core.lang_registry").get("ts").scan_file(ts_fixture)
+    local ts_fns = require("docmap.core.lang_registry").get("ts").scan_file(ts_fixture)
     eq(#ts_fns, 1, "lang.ts: shares ecma.lua's recognizer, registered under its own extension")
     os.remove(ts_fixture)
   end

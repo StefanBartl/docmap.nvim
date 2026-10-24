@@ -72,7 +72,7 @@ return function(H)
     vim.treesitter.query.parse("lua", "(method_index_expression method: (identifier) @m)")
 
   local used_vim, used_method = {}, {}
-  local files = lua_files(root .. "/lua/documentation/core")
+  local files = lua_files(root .. "/lua/docmap/core")
   ok(#files > 50, "shim contract: found the core tree to read (" .. #files .. " files)")
 
   for _, path in ipairs(files) do

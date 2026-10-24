@@ -25,7 +25,7 @@ were lifted out of it into the pages below rather than kept in two places.
 | Document | Answers |
 |---|---|
 | [`tabs.md`](tabs.md) | The generated page, tab by tab: what each one shows and why it shows it that way — including the two the published copy answers on demand rather than from the artifact. |
-| [`api.md`](api.md) | `generate()` versus `install()`: the live `Documentation.Handle`, rescan-on-write, native call hierarchy, and drift findings as diagnostics. |
+| [`api.md`](api.md) | `generate()` versus `install()`: the live `Docmap.Handle`, rescan-on-write, native call hierarchy, and drift findings as diagnostics. |
 | [`commands.md`](commands.md) | `:DocMap` and `:DocBrowse`, subcommand by subcommand — all twenty-one actions, what each writes, and why the read-only browser is a separate command rather than `:DocMap browse`. |
 | [`WORKFLOW.md`](WORKFLOW.md) | Day to day: which panel answers which question, how to read the Telemetry join's badges correctly, Trail vs filter vs fuzzy jump. The one document about *combining* features rather than describing them. |
 | [`BINDINGS.md`](BINDINGS.md) | Every key, user command and autocommand this plugin installs. **Generated** from the tables that drive the plugin — do not edit by hand. |
@@ -40,7 +40,7 @@ were lifted out of it into the pages below rather than kept in two places.
 | Document | Answers |
 |---|---|
 | [`reuse.md`](reuse.md) | Generating a map for your own repository — editor, CI and pre-commit hook, cross-project links, and what the tree has to look like. |
-| [`languages.md`](languages.md) | **Twenty-three backends**: what each one reads, the `Documentation.LangBackend` contract field by field, how grammars are resolved, what a missing one costs, and how to add the twenty-fourth. |
+| [`languages.md`](languages.md) | **Twenty-three backends**: what each one reads, the `Docmap.LangBackend` contract field by field, how grammars are resolved, what a missing one costs, and how to add the twenty-fourth. |
 | [`annotation_tags.md`](annotation_tags.md) | Annotating your own plugin: what each LuaCATS tag buys you here, the minimum viable set, and which custom tags would be worth adding. |
 | [`framework_conventions.md`](framework_conventions.md) | The layer *above* language support — recognizing an ecosystem's structural convention (lazy.nvim specs today; Next.js-style file routing and React hooks costed as the web case). |
 | [`features_format.md`](features_format.md) | The `docs/FEATURES/` shape the Features tab reads, and what happens when you leave a piece out. |

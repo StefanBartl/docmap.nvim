@@ -10,7 +10,7 @@
 -- sibling plugins), so these fixtures are the only evidence this check has.
 
 return function(H)
-  local fmsg = require("documentation.core.findings").format
+  local fmsg = require("docmap.core.findings").format
   local eq = H.eq
 
   local root = (vim.fn.tempname():gsub("\\", "/"))
@@ -28,10 +28,10 @@ return function(H)
       fd:write("---@module 'e'\n--- Examples.\nlocal M = {}\n" .. body .. "\nreturn M\n")
       fd:close()
     end
-    local opts = require("documentation.config").build(abs)
-    local ir = require("documentation.core.scan").scan(opts)
+    local opts = require("docmap.config").build(abs)
+    local ir = require("docmap.core.scan").scan(opts)
     local out = {}
-    for _, f in ipairs(require("documentation.core.check").run(ir, opts)) do
+    for _, f in ipairs(require("docmap.core.check").run(ir, opts)) do
       if f.check == "example-does-not-parse" then
         out[#out + 1] = fmsg(f)
       end

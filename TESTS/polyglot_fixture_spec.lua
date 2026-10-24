@@ -22,7 +22,7 @@ return function(H)
   local root = (vim.fn.getcwd():gsub("\\", "/")) .. "/TESTS/fixtures/polyglot"
   ok(vim.fn.isdirectory(root) == 1, "polyglot: the fixture tree is checked in")
 
-  local opts = require("documentation.config").build(root)
+  local opts = require("docmap.config").build(root)
 
   -- The failure this fixture exists for. Before source detection asked the
   -- backends, this came back as the single string "lua" and the scan died.
@@ -34,7 +34,7 @@ return function(H)
   local detected = type(source) == "table" and table.concat(source, " + ") or tostring(source)
   eq(detected, "lua/pgl + src", "polyglot: both source roots are detected, Lua's and the ECMA one")
 
-  local ir = require("documentation.core.scan").scan(opts)
+  local ir = require("docmap.core.scan").scan(opts)
 
   -- Several roots need a parent, and it is the repository directory they
   -- share rather than an invented node.

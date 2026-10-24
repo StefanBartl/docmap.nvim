@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_python_spec.lua — documentation.core.lang.python
+-- TESTS/lang_python_spec.lua — docmap.core.lang.python
 --
 -- Skips when the python parser is not reachable, the precedent
 -- `lang_js_spec.lua` set and for the same reason: CI does not install a
@@ -29,7 +29,7 @@ return function(H)
     ok_add, has_python = pcall(vim.treesitter.language.add, "python")
   end
 
-  local registry = require("documentation.core.lang_registry")
+  local registry = require("docmap.core.lang_registry")
   local py = registry.get("python")
   ok(py ~= nil, "the python backend must be registered")
 
@@ -163,7 +163,7 @@ return function(H)
   eq(by["add"].owner, nil, "a module-level function has no owner")
   eq(by["add"].owner_kind, nil, "and no kind either — the two are set together")
 
-  local scopes = require("documentation.core.scopes")
+  local scopes = require("docmap.core.scopes")
   local free, groups = scopes.split(fns)
   eq(#groups, 1, "one class in this file, one scope")
   eq(groups[1].name, "Thing")
@@ -344,6 +344,6 @@ return function(H)
   -- Markers come from `#` comments and only those. A "TODO" inside a
   -- docstring is prose the author published on purpose.
   -- ---------------------------------------------------------------------
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(#markers.scan_source("# TODO: finish this", py), 1)
 end

@@ -12,14 +12,14 @@ return function(H)
   vim.fn.mkdir(root .. "/lua/lazyfix", "p")
   vim.fn.writefile({ "local M = {}", "return M" }, root .. "/lua/lazyfix/init.lua")
 
-  local scan_full = require("documentation").scan_full
+  local scan_full = require("docmap").scan_full
   local scans = 0
-  require("documentation").scan_full = function(...)
+  require("docmap").scan_full = function(...)
     scans = scans + 1
     return scan_full(...)
   end
 
-  local handle = require("documentation.bindings.usrcmds").setup({
+  local handle = require("docmap.bindings.usrcmds").setup({
     root = root,
     command_name = "DocMapLazySpec",
     browse_command_name = "DocBrowseLazySpec",
@@ -40,8 +40,8 @@ return function(H)
   eq(scans, 1, "later reads reuse the scan")
 
   -- findings() on its own is also a first read.
-  require("documentation.editor.registry").uninstall(root)
-  local second = require("documentation.bindings.usrcmds").setup({
+  require("docmap.editor.registry").uninstall(root)
+  local second = require("docmap.bindings.usrcmds").setup({
     root = root,
     command_name = "DocMapLazySpec",
     browse_command_name = "DocBrowseLazySpec",
@@ -52,7 +52,7 @@ return function(H)
   ok(type(second.findings()) == "table", "findings() on a fresh lazy handle scans and answers")
   eq(scans, before + 1, "findings() as first read costs one scan")
 
-  require("documentation.editor.registry").uninstall(root)
-  require("documentation").scan_full = scan_full
+  require("docmap.editor.registry").uninstall(root)
+  require("docmap").scan_full = scan_full
   vim.fn.delete(root, "rf")
 end

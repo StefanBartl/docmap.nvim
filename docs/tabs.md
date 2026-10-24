@@ -10,7 +10,7 @@ structural **duplicates** (functions whose parse-tree shape is identical,
 which is the one kind of drift the require graph is blind to by construction
 — two modules that each grew their own `read(path)` do not require each
 other), **plugins**: every lazy.nvim spec in the tree, which matters when
-`documentation.nvim` is pointed at a Neovim *config* rather than a plugin —
+`docmap.nvim` is pointed at a Neovim *config* rather than a plugin —
 `lua/plugins/*.lua` is mostly `return { { "author/repo", event = "…" } }`
 with no function in sight, invisible to every other panel — and **tools**:
 this repo's own [`lib.nvim.deps`](https://github.com/StefanBartl/lib.nvim)

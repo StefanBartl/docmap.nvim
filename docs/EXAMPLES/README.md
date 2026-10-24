@@ -12,12 +12,12 @@ Neovim instance.
 ## The two entry points, side by side
 
 `generate()` is one-shot: scan, write files, done. `install()` is the live half
-— a `Documentation.Handle` another plugin's code reaches for directly instead
+— a `Docmap.Handle` another plugin's code reaches for directly instead
 of parsing `module_map.json` off disk.
 
 ```lua
 -- One-shot. What :DocMap and the CI/hook CLI use.
-local ir, findings, written = require("documentation").generate({
+local ir, findings, written = require("docmap").generate({
   root = vim.fn.getcwd(),
   source = "lua/myplugin",
   title = "myplugin.nvim",
@@ -26,7 +26,7 @@ local ir, findings, written = require("documentation").generate({
 })
 
 -- Live. Nothing is written; the IR stays in memory.
-local handle = require("documentation").install({
+local handle = require("docmap").install({
   root = vim.fn.getcwd(),
   source = "lua/myplugin",
   watch = true,      -- rescan on BufWritePost under source/**.lua, debounced
@@ -44,7 +44,7 @@ local unsub = handle.on_change(function(ir, findings)
 end)
 
 unsub()
-handle.uninstall()   -- idempotent; or require("documentation").uninstall(handle)
+handle.uninstall()   -- idempotent; or require("docmap").uninstall(handle)
 ```
 
 The graph queries live **on the handle** rather than as free functions over an

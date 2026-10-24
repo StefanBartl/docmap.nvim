@@ -6,9 +6,9 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local scan = require("documentation.core.scan")
-  local tagfiles = require("documentation.core.tagfiles")
-  local external_repos = require("documentation.core.external_repos")
+  local scan = require("docmap.core.scan")
+  local tagfiles = require("docmap.core.tagfiles")
+  local external_repos = require("docmap.core.external_repos")
 
   local function write(root, rel, lines)
     local abs = root .. "/" .. rel
@@ -212,7 +212,7 @@ return function(H)
       "return M",
     })
     local other_ir = scan.scan({ root = other, source = "lua/plenary", lua_root = "lua" })
-    local json = require("documentation.core.json")
+    local json = require("docmap.core.json")
     local fd = assert(io.open(other .. "/docs/map/module_map.json", "w"))
     fd:write(json.encode({
       meta = other_ir.meta,

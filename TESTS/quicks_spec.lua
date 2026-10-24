@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/quicks_spec.lua — documentation.core.quicks
+-- TESTS/quicks_spec.lua — docmap.core.quicks
 --
 -- Hand-built IRs rather than a real scan, for the reason `docs_spec.lua`
 -- gives: `compute` takes an IR and a finding list, so a scan would only make
@@ -24,7 +24,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local quicks = require("documentation.core.quicks")
+  local quicks = require("docmap.core.quicks")
 
   ---Build an IR whose published functions have the given traits.
   ---@param fns table[]
@@ -71,7 +71,7 @@ return function(H)
     }
   end
 
-  ---@param res Documentation.Quicks.Result
+  ---@param res Docmap.Quicks.Result
   ---@param id string
   local function find(res, id)
     for _, q in ipairs(res.good) do

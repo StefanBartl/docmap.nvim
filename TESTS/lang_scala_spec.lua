@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_scala_spec.lua — documentation.core.lang.scala
+-- TESTS/lang_scala_spec.lua — docmap.core.lang.scala
 --
 -- Skips when the scala parser is not reachable; `DOCMAP_SCALA_PARSER` points
 -- at one without installing it into a runtimepath.
@@ -25,7 +25,7 @@ return function(H)
     ok_add, has_sc = pcall(vim.treesitter.language.add, "scala")
   end
 
-  local sc = require("documentation.core.lang_registry").get("scala")
+  local sc = require("docmap.core.lang_registry").get("scala")
   ok(sc ~= nil, "the scala backend must be registered")
 
   eq(sc.is_source("Widget.scala"), true)
@@ -194,6 +194,6 @@ return function(H)
   )
   eq(seen["Widget.name"] ~= nil, true, "a constructor parameter is a field")
 
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(#markers.scan_source("// TODO: finish this", sc), 1)
 end

@@ -13,10 +13,10 @@
 -- cannot exercise.
 
 return function(H)
-  local fmsg = require("documentation.core.findings").format
+  local fmsg = require("docmap.core.findings").format
   local eq, ok = H.eq, H.ok
-  local tools = require("documentation.core.tools")
-  local docmap = require("documentation")
+  local tools = require("docmap.core.tools")
+  local docmap = require("docmap")
 
   local function dwrite(root, rel, text)
     local abs = root .. "/" .. rel
@@ -114,7 +114,7 @@ return function(H)
 
   -- A minimal real tree (scan_full needs something to walk) plus a manifest
   -- with one invalid entry — exercised through the real pipeline
-  -- (`documentation.scan_full`), not a hand-built IR, since `ir.tools` is
+  -- (`docmap.scan_full`), not a hand-built IR, since `ir.tools` is
   -- only ever set there.
   do
     local dr = H.tmpfile("_tools_check")

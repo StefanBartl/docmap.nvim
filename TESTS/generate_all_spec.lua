@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/generate_all_spec.lua — documentation.editor.generate_all
+-- TESTS/generate_all_spec.lua — docmap.editor.generate_all
 --
 -- Real subprocesses, not mocked: `vim.system()` spawning `nvim --headless`
 -- is the entire point of this module (see its own header for why), so a
@@ -15,7 +15,7 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local ga = require("documentation.editor.generate_all")
+  local ga = require("docmap.editor.generate_all")
   local repo_root = (debug.getinfo(1, "S").source:sub(2):match("(.*)[/\\]TESTS[/\\]")) or "."
 
   -- ------------------------------------------------------- a real project

@@ -20,7 +20,7 @@
 --      `E:/repo/standalone/vim_shim.lua` bundles a module called
 --      `E.repos.…​.standalone.vim_shim`, and the binary dies at its first
 --      `require`. So this stages a tree whose *relative* paths spell the
---      require names — `documentation/`, `lib/nvim/`, `standalone/`,
+--      require names — `docmap/`, `lib/nvim/`, `standalone/`,
 --      `dkjson.lua` — and invokes `luastatic` from inside it. `init.lua`
 --      works because luastatic's injected searcher tries
 --      `lua_bundle[name] or lua_bundle[name .. ".init"]`.
@@ -102,7 +102,7 @@ local function mkdirp(path)
   -- Silent on Windows for as long as this script has existed, because
   -- every path there carries a drive letter and never starts with `/`.
   -- Surfaced the first time `--out` was ever handed an absolute Unix path
-  -- (`package: cannot write .../stage/documentation/init.lua` — every
+  -- (`package: cannot write .../stage/docmap/init.lua` — every
   -- parent directory silently existed, just not at the path being
   -- written to).
   local acc = path:sub(1, 1) == "/" and "/" or nil
@@ -215,7 +215,7 @@ mkdirp(stage)
 ---@param p string
 ---@return string?
 local function staged_name(p)
-  local doc = p:match(".*/lua/(documentation/.+)$") or p:match("^lua/(documentation/.+)$")
+  local doc = p:match(".*/lua/(docmap/.+)$") or p:match("^lua/(docmap/.+)$")
   if doc then
     return doc
   end
@@ -332,7 +332,7 @@ local stamp = {
   "",
 }
 
-local stamp_rel = "documentation/build.lua"
+local stamp_rel = "docmap/build.lua"
 local stamp_fd = assert(io.open(stage .. "/" .. stamp_rel, "wb"), "cannot write the build stamp")
 stamp_fd:write(table.concat(stamp, "\n"))
 stamp_fd:close()
@@ -456,7 +456,7 @@ if run_it then
     cmdline({
       quoted(cwd .. "/" .. out_dir .. "/" .. exe),
       quoted(repo),
-      "--source=lua/documentation",
+      "--source=lua/docmap",
       "--out-dir=.deps/package-verify",
     }),
     "running the binary"

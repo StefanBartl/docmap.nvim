@@ -245,7 +245,7 @@ under `source`, alongside whatever real language server is already
 there — LuaLS, typically. Answers `textDocument/prepareCallHierarchy`,
 `callHierarchy/incomingCalls`/`outgoingCalls`, and injects a
 caller/callee count into `textDocument/hover`, all backed by
-`Documentation.Handle.callers`/`callees` with no new scan. Built because
+`Docmap.Handle.callers`/`callees` with no new scan. Built because
 LuaLS has no call-hierarchy support of its own — checked against its
 source (zero hits for `callHierarchy`) and its own long-open, unstaffed
 feature request, not assumed. Neovim's own native `vim.lsp.buf.
@@ -262,12 +262,12 @@ any part of it.
 
 ## Findings as native diagnostics
 
-`opts.diagnostics` publishes `Documentation.Finding[]` — until now
+`opts.diagnostics` publishes `Docmap.Finding[]` — until now
 reachable only through the `:DocMap check` quickfix list — as native
 `vim.diagnostic` entries on every open buffer that has one. No LSP
 client needed, unlike call hierarchy above: `vim.diagnostic.set()` works
 directly on an already-open buffer. File-level granularity, matching the
-quickfix list's own existing precedent (`Documentation.Finding` carries
+quickfix list's own existing precedent (`Docmap.Finding` carries
 no line number); `info`-severity findings map to
 `vim.diagnostic.severity.HINT` and are shown, where the quickfix list
 drops them.
@@ -390,7 +390,7 @@ without a live session.
 
 ## Owning scope — a class with its methods under it
 
-A function records what owns it: `Documentation.FunctionInfo.owner` (the
+A function records what owns it: `Docmap.FunctionInfo.owner` (the
 class, `impl` block, trait, receiver type or inline module it is declared in)
 and `owner_kind` (which of those it is). Fourteen of the twenty backend files
 set it; the rest have no such construct to read, and the three that do and
@@ -420,7 +420,7 @@ node — no summary, no coverage, no edges, no id.
   `core/render/html.lua` (`groupByOwner`)
 - **Config:** none — always available, and silent for a language with no
   owning construct.
-- **Artifact:** `Documentation.FunctionInfo.owner`/`owner_kind`, schema 6
+- **Artifact:** `Docmap.FunctionInfo.owner`/`owner_kind`, schema 6
 - **Tests:** `TESTS/scopes_spec.lua`, plus owner assertions in
   `TESTS/lang_python_spec.lua` and `TESTS/lang_rust_spec.lua`
 - **Docs:** [`docs/languages.md`](../languages.md) "Owning scope" section.

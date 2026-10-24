@@ -1,6 +1,6 @@
 ---@module 'scripts.affected_specs'
 --- Which specs does a change touch? The command-line face of
---- `documentation.testing.affected_specs` (contract: docs/testing-contract.md).
+--- `docmap.testing.affected_specs` (contract: docs/testing-contract.md).
 ---
 ---   nvim --headless -l scripts/affected_specs.lua --changed lua/a.lua,lua/b.lua
 ---   nvim --headless -l scripts/affected_specs.lua --since origin/main
@@ -56,7 +56,7 @@ if here then
   vim.opt.runtimepath:prepend(here)
 end
 ensure("lib.nvim.fs.read", "lib.nvim")
-ensure("documentation.testing", "documentation.nvim")
+ensure("docmap.testing", "docmap.nvim")
 
 local opts = { root = start, changed = {}, spec_roots = {} }
 local argv = _G.arg or {}
@@ -98,10 +98,10 @@ if #opts.spec_roots == 0 then
   opts.spec_roots = nil
 end
 
-local result, err = require("documentation.testing").affected_specs(opts)
+local result, err = require("docmap.testing").affected_specs(opts)
 if not result then
   io.stderr:write(tostring(err) .. "\n")
   os.exit(2)
 end
-io.stdout:write(require("documentation.core.json").encode(result), "\n")
+io.stdout:write(require("docmap.core.json").encode(result), "\n")
 os.exit(0)

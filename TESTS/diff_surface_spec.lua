@@ -11,7 +11,7 @@
 -- and puts them back.)
 return function(H)
   local eq, ok = H.eq, H.ok
-  local diff = require("documentation.core.diff")
+  local diff = require("docmap.core.diff")
 
   ---@param fns table[] functions of the single node "n"
   local function ir(fns)
@@ -185,8 +185,8 @@ return function(H)
     return
   end
 
-  local cli = require("documentation.core.cli")
-  local docmap = require("documentation")
+  local cli = require("docmap.core.cli")
+  local docmap = require("docmap")
 
   local function capture(f)
     local real_out, real_err = io.stdout, io.stderr

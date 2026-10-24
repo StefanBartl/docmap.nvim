@@ -8,7 +8,7 @@
 
 return function(H)
   local ok = H.ok
-  local check = require("documentation.core.check")
+  local check = require("docmap.core.check")
 
   local function make_ir(fns)
     return {

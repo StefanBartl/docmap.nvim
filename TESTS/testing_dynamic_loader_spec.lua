@@ -1,7 +1,7 @@
 -- Test code: a nil from a fixture read or a decode must crash the spec and name
 -- it; the nil guards LuaLS asks for would hide the failure being tested.
 ---@diagnostic disable: need-check-nil, undefined-field, param-type-mismatch, assign-type-mismatch
--- TESTS/testing_dynamic_loader_spec.lua -- documentation.testing: `require(variable)` is a gap
+-- TESTS/testing_dynamic_loader_spec.lua -- docmap.testing: `require(variable)` is a gap
 --
 -- A module that loads others by a computed name has no edge to them in the
 -- graph. The affected-selection answer must not call itself complete when such
@@ -17,7 +17,7 @@
 --   p.fmt                    require(("p.fmt.%s"):format(k))
 --   p.multi                  require(<newline> name <newline>)   (the layout stylua gives a long call)
 --
--- The scanner behind it (`documentation.testing.specs.scan_computed`) is also
+-- The scanner behind it (`docmap.testing.specs.scan_computed`) is also
 -- checked on its own, form by form.
 --
 -- Kept apart from testing_provider_spec.lua: every generated project costs a
@@ -25,8 +25,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local testing = require("documentation.testing")
-  local specs = require("documentation.testing.specs")
+  local testing = require("docmap.testing")
+  local specs = require("docmap.testing.specs")
 
   -- The scanner, form by form: what it reports for one source text.
   local function scan(src)
@@ -120,7 +120,7 @@ return function(H)
   vim.fn.mkdir(root, "p")
 
   local function regenerate(msg)
-    require("documentation").generate({
+    require("docmap").generate({
       root = root,
       source = "lua/p",
       title = "p",

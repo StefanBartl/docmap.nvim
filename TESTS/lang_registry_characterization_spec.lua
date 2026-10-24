@@ -1,4 +1,4 @@
--- TESTS/lang_registry_characterization_spec.lua — documentation.core.lang_registry
+-- TESTS/lang_registry_characterization_spec.lua — docmap.core.lang_registry
 --
 -- Pins the behaviour of the registry as seen from outside, so the move of its
 -- storage onto `lib.nvim.registry` changes nothing a caller can observe. It
@@ -16,7 +16,7 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local REG = "documentation.core.lang_registry"
+  local REG = "docmap.core.lang_registry"
 
   -- Registration order == order of KNOWN_BACKENDS in the registry.
   local TAILS = {
@@ -46,7 +46,7 @@ return function(H)
   }
 
   local function backend_mod(tail)
-    return "documentation.core.lang." .. tail
+    return "docmap.core.lang." .. tail
   end
 
   ---Run `fn(reg)` with a fresh registry module and fresh backend modules, then

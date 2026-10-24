@@ -2,7 +2,7 @@
 
 Every key, user command and autocommand this plugin installs.
 
-**Generated** by `documentation.bindings.docs` from the tables that
+**Generated** by `docmap.bindings.docs` from the tables that
 actually drive the plugin — do not edit by hand. Regenerate with
 `nvim --headless -l scripts/gen_map.lua`.
 
@@ -43,7 +43,7 @@ buffer-local to the `:DocBrowse` scratch buffer and set with `nowait`,
 so it can only ever shadow a key *inside* that buffer.
 
 Modes (`1`…`11`): structure, deps, calls, types, history, trail, endpoints, telemetry, loaded, rules, traffic. These are positional and deliberately not
-rebindable — see `Documentation.Browse.KeyAction`.
+rebindable — see `Docmap.Browse.KeyAction`.
 
 | Keys | Action | Modes | Does |
 |---|---|---|---|
@@ -93,46 +93,46 @@ notify, never an error.
 
 ## Autocommands
 
-All created lazily. Requiring `documentation` installs none of them.
+All created lazily. Requiring `docmap` installs none of them.
 
 ### `BufWritePost` — global
 
-**Owner:** `documentation.editor.registry`  
+**Owner:** `docmap.editor.registry`  
 **Lifetime:** Created by `install()` when `opts.watch` is set; removed by `uninstall()`.
 
 Rescan the tree after a write under `source/`, debounced by `opts.watch_ms`, so a live handle's IR and every `on_change` subscriber stay current. Filtered by `fs.is_subpath` rather than by an autocmd glob pattern — a pattern would have to match the user's path spelling exactly, and a mismatch fails silently.
 
 ### `BufReadPost`, `BufNewFile` — global
 
-**Owner:** `documentation.editor.registry`  
+**Owner:** `docmap.editor.registry`  
 **Lifetime:** Created by `install()` when `opts.callhierarchy` is set (`ensure_callhierarchy`); removed by `uninstall()`.
 
 Attach the second, narrow in-process LSP client (`editor/callhierarchy.lua`) to a Lua buffer opened under `source/` — answers `textDocument/prepareCallHierarchy`/`callHierarchy/incomingCalls`/`outgoingCalls` and injects a caller/callee count into hover, alongside whatever real language server (LuaLS) is already attached. Same `fs.is_subpath` scoping as the watch autocmd above.
 
 ### `BufReadPost`, `BufNewFile` — global
 
-**Owner:** `documentation.editor.registry`  
+**Owner:** `docmap.editor.registry`  
 **Lifetime:** Created by `install()` when `opts.diagnostics` is set (`ensure_diagnostics`); removed by `uninstall()`.
 
-Publish `Documentation.Finding[]` as native `vim.diagnostic` entries (`bindings/diagnostics.lua`) on a Lua buffer opened under `source/`, plus one `handle.on_change` subscription for live refresh on a watch-triggered or manual rescan. Same `fs.is_subpath` scoping as the watch autocmd above.
+Publish `Docmap.Finding[]` as native `vim.diagnostic` entries (`bindings/diagnostics.lua`) on a Lua buffer opened under `source/`, plus one `handle.on_change` subscription for live refresh on a watch-triggered or manual rescan. Same `fs.is_subpath` scoping as the watch autocmd above.
 
 ### `CursorMoved` — buffer
 
-**Owner:** `documentation.editor.browse`  
+**Owner:** `docmap.editor.browse`  
 **Lifetime:** Created by `bind()` on the browser's list buffer; dies with the buffer when the browser closes.
 
 Drive the detail pane from the cursor, so `j`/`k` stay native keys and counts and `scrolloff` keep behaving.
 
 ### `VimLeavePre` — global
 
-**Owner:** `documentation.editor.browse.trail_store`  
+**Owner:** `docmap.editor.browse.trail_store`  
 **Lifetime:** Created by `attach()` on the first browser open; idempotent, lives for the session.
 
 Flush pinned trails to `stdpath('state')`. Never into the repository — a trail has no more claim on the project than a jumplist has, and committing it would give `--check` an opinion about where one person happened to look.
 
 ### `VimLeavePre` — global
 
-**Owner:** `documentation.editor.serve`  
+**Owner:** `docmap.editor.serve`  
 **Lifetime:** Created by `start()`; removed by `stop()` along with its augroup.
 
 Shut the local map server down with the editor, so no listening socket outlives the Neovim session that opened it.

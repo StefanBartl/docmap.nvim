@@ -26,13 +26,13 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local churn = require("documentation.core.churn")
-  local join = require("documentation.core.telemetry_join")
-  local history = require("documentation.core.history")
+  local churn = require("docmap.core.churn")
+  local join = require("docmap.core.telemetry_join")
+  local history = require("docmap.core.history")
 
   ---Two modules: `hot` and `cold`, each with one documented function, both
   ---churning identically so only the runtime axis can tell them apart.
-  ---@return Documentation.IR
+  ---@return Docmap.IR
   local function fake_ir()
     return {
       order = { "hot.lua", "cold.lua" },
@@ -229,7 +229,7 @@ return function(H)
 
   ---One impact result over the same two modules: both touched, so only the
   ---runtime axis can order them.
-  ---@return Documentation.History.Impact
+  ---@return Docmap.History.Impact
   local function fake_impact()
     return {
       files = { "hot.lua", "cold.lua" },

@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/mcp_spec.lua — `documentation.mcp.protocol` and `documentation.mcp.tools`,
+-- TESTS/mcp_spec.lua — `docmap.mcp.protocol` and `docmap.mcp.tools`,
 -- the MCP server's two halves that have nothing to do with stdio.
 --
 -- Driven through `protocol.dispatch(server, line)` with real JSON strings on
@@ -20,8 +20,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
-  local protocol = require("documentation.mcp.protocol")
+  local docmap = require("docmap")
+  local protocol = require("docmap.mcp.protocol")
 
   local function dwrite(root, rel, lines)
     local abs = root .. "/" .. rel

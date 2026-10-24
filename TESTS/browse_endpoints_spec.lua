@@ -2,7 +2,7 @@
 -- The fixtures below carry only the fields the unit under test reads; a full
 -- IR, node, finding or entry per case would be noise, not coverage.
 -- TESTS/browse_endpoints_spec.lua — the Endpoints mode in
--- documentation.editor.browse.view (step 6 of docs/ecosystem.md).
+-- docmap.editor.browse.view (step 6 of docs/ecosystem.md).
 --
 -- Its own file, not a block in docmap_browse_spec.lua: that file already
 -- sits near Lua's 200-local-per-function ceiling. view.lua's own header
@@ -12,9 +12,9 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local view = require("documentation.editor.browse.view")
+  local view = require("docmap.editor.browse.view")
 
-  ---@return Documentation.IR
+  ---@return Docmap.IR
   local function fake_ir()
     return {
       order = { "a", "b" },
@@ -131,7 +131,7 @@ return function(H)
   -- (Lua has no such operation), so the copied table's `run` field is still
   -- the real one `init.lua` registers, not a stand-in.
   do
-    local browse = require("documentation.editor.browse")
+    local browse = require("docmap.editor.browse")
     local keys = browse.keyspecs()
     local send_spec
     for _, k in ipairs(keys) do
@@ -175,7 +175,7 @@ return function(H)
 
     -- If a real checkout of runtime-analysis.nvim is on the rtp
     -- (`TESTS/run.lua` appends `RUNTIME_ANALYSIS_DIR` the same way it
-    -- already does `DOCUMENTATION_TS_PARSERS_DIR` for the JS/TS parser
+    -- already does `DOCMAP_TS_PARSERS_DIR` for the JS/TS parser
     -- tests), the actual integration is exercised end to end: the soft
     -- dependency resolves and a real request buffer opens, pre-filled with
     -- the selected route's method and path.
@@ -212,7 +212,7 @@ return function(H)
   -- Endpoint coverage join with runtime-analysis.nvim: pure logic first,
   -- no plugin needed.
   do
-    local coverage = require("documentation.core.endpoint_coverage")
+    local coverage = require("docmap.core.endpoint_coverage")
 
     eq(
       coverage.path_of("https://api.example.com/users/123?x=1"),

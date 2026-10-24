@@ -8,14 +8,14 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local usrcmds = require("documentation.bindings.usrcmds")
+  local usrcmds = require("docmap.bindings.usrcmds")
   local names = usrcmds.action_names()
 
   ok(#names > 0, "action_names(): returns a non-empty list")
 
   -- ------------------------------------------------- autocmds.lua's args string
   do
-    local autocmds = require("documentation.bindings.autocmds")
+    local autocmds = require("docmap.bindings.autocmds")
     local docmap = nil
     for _, entry in ipairs(autocmds.usrcmds) do
       if entry.name == "DocMap" then

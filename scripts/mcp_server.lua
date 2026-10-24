@@ -8,7 +8,7 @@
 --- has hung, because it is doing exactly what it should: waiting for a line.
 ---
 --- Thin on purpose, same as `gen_map.lua`: everything that is not this
---- repository's own layout lives in `documentation.mcp`, so another plugin
+--- repository's own layout lives in `docmap.mcp`, so another plugin
 --- copies this file and changes only the options at the bottom.
 
 local root = vim.uv.cwd():gsub("\\", "/"):gsub("/+$", "")
@@ -44,7 +44,7 @@ local function ensure(modname, dirname)
 end
 
 ensure("lib.nvim.fs.read", "lib.nvim")
-ensure("documentation.mcp", "documentation.nvim")
+ensure("docmap.mcp", "docmap.nvim")
 
 -- Anything that notifies during the scan must not land on stdout, which
 -- carries JSON-RPC and nothing else. Headless Neovim already routes most
@@ -56,9 +56,9 @@ vim.notify = function(msg, _, _)
   io.stderr:write(tostring(msg), "\n")
 end
 
-local opts = require("documentation.config").build(root, {
-  source = "lua/documentation",
-  title = "documentation.nvim",
+local opts = require("docmap.config").build(root, {
+  source = "lua/docmap",
+  title = "docmap.nvim",
 })
 
-os.exit(require("documentation.mcp").serve(opts))
+os.exit(require("docmap.mcp").serve(opts))

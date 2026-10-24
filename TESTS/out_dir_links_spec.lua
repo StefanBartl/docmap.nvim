@@ -6,7 +6,7 @@
 --
 -- `out_dir_traversal_spec.lua` pins the string checks (`..`, a leading `/`, a
 -- drive letter). A link makes a perfectly clean string lead anywhere, so
--- these run the **real** write routine (`documentation.generate`,
+-- these run the **real** write routine (`docmap.generate`,
 -- `write_artifacts`, `write_pdf_artifact`) and the **real** `--check` against
 -- a real project whose output path goes through a real link -- a symlink, or
 -- a directory junction on Windows (`H.link`) -- and then look at the places
@@ -22,9 +22,9 @@
 -- and puts them back.)
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
-  local config = require("documentation.config")
-  local cli = require("documentation.core.cli")
+  local docmap = require("docmap")
+  local config = require("docmap.config")
+  local cli = require("docmap.core.cli")
 
   local function slashed(p)
     return (p:gsub("\\", "/"))
@@ -660,7 +660,7 @@ return function(H)
   -- project named in another case -- on an in-memory tree: a real link of
   -- that kind cannot be made on the host the suite usually runs on.
   do
-    local safe_fs = require("documentation.core.safe_fs")
+    local safe_fs = require("docmap.core.safe_fs")
     local links = {
       ["c:/proj/reports"] = true,
       ["./reports"] = true,
@@ -719,7 +719,7 @@ return function(H)
   -- `scripts/gen_map.lua` writes `docs/BINDINGS.md` itself, after `cli.run`
   -- has written the map. The script is the thing under test, so it runs as
   -- itself: a real headless Neovim over a real minimal project (the script
-  -- names `lua/documentation` as its source, so that is the one the project
+  -- names `lua/docmap` as its source, so that is the one the project
   -- has).
   -- ---------------------------------------------------------------------
   do
@@ -749,7 +749,7 @@ return function(H)
         }, {
           cwd = proj,
           text = true,
-          env = { DOCUMENTATION_NVIM_DIR = repo_root, LIB_NVIM_DIR = lib_dir },
+          env = { DOCMAP_NVIM_DIR = repo_root, LIB_NVIM_DIR = lib_dir },
         })
         :wait(60000)
     end
@@ -759,8 +759,8 @@ return function(H)
       bases[#bases + 1] = base
       local proj = base .. "/proj"
       H.write(
-        proj .. "/lua/documentation/foo.lua",
-        { "---@module 'documentation.foo'", "local M = {}", "return M" }
+        proj .. "/lua/docmap/foo.lua",
+        { "---@module 'docmap.foo'", "local M = {}", "return M" }
       )
       H.write(proj .. "/docs/real.md", { "REAL-ORIGINAL" })
       H.write(base .. "/outside/victim.md", { "VICTIM-ORIGINAL" })

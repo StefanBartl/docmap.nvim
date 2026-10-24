@@ -15,7 +15,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local functions = require("documentation.core.functions")
+  local functions = require("docmap.core.functions")
 
   local fixture = H.tmpfile(".lua")
   local lines = {

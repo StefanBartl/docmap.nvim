@@ -9,7 +9,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
+  local docmap = require("docmap")
 
   local function reset_mdview()
     package.loaded["mdview.core.state"] = nil
@@ -85,8 +85,7 @@ return function(H)
     -- Normalising the expectation the same way is the real comparison --
     -- the assertion still pins the exact, full `<root>/<out_dir>/overview.md`
     -- rather than being loosened to a suffix or case-insensitive match.
-    local expected_path = require("documentation.config").normalise_root(root)
-      .. "/docs/map/overview.md"
+    local expected_path = require("docmap.config").normalise_root(root) .. "/docs/map/overview.md"
     eq(calls[1].path, expected_path, "mdview: pushes to <root>/<out_dir>/overview.md")
     ok(calls[1].opts.immediate == true, "mdview: sends immediately, not queued")
     ok(

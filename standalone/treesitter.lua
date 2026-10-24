@@ -81,7 +81,7 @@ local M = {}
 ---all*, so every call on such a value is reported. Only what this translator
 ---calls on a node is listed; the two names installed on the binding's own
 ---metatable above are reached through it, not through this class.
----@class Documentation.Standalone.BindingNode
+---@class Docmap.Standalone.BindingNode
 ---@field start_byte fun(self): integer
 ---@field end_byte fun(self): integer
 
@@ -253,7 +253,7 @@ function M.build()
       if not index.field then
         ---Every child under `name`, not just the first — Neovim's semantics.
         ---@param name string
-        ---@return Documentation.Standalone.BindingNode[]
+        ---@return Docmap.Standalone.BindingNode[]
         function index:field(name)
           local out = {}
           for i = 0, self:child_count() - 1 do
@@ -269,7 +269,7 @@ function M.build()
         ---repository uses only the first value, but the second is emitted
         ---anyway: a shim that quietly narrows an API is how the *next* call
         ---site acquires a bug that looks like a scanner defect.
-        ---@return fun(): Documentation.Standalone.BindingNode?, string?
+        ---@return fun(): Docmap.Standalone.BindingNode?, string?
         function index:iter_children()
           local i, n = 0, self:child_count()
           return function()
@@ -309,8 +309,8 @@ function M.build()
   local Query = {}
   Query.__index = Query
 
-  ---@param node Documentation.Standalone.BindingNode
-  ---@return fun(): integer?, Documentation.Standalone.BindingNode?
+  ---@param node Docmap.Standalone.BindingNode
+  ---@return fun(): integer?, Docmap.Standalone.BindingNode?
   function Query:iter_captures(node)
     local cursor = ts.Query.Cursor.new(self._q, node)
     return function()
@@ -330,8 +330,8 @@ function M.build()
     end
   end
 
-  ---@param node Documentation.Standalone.BindingNode
-  ---@return fun(): integer?, table<integer, Documentation.Standalone.BindingNode[]>?
+  ---@param node Docmap.Standalone.BindingNode
+  ---@return fun(): integer?, table<integer, Docmap.Standalone.BindingNode[]>?
   function Query:iter_matches(node)
     local cursor = ts.Query.Cursor.new(self._q, node)
     return function()
@@ -386,7 +386,7 @@ function M.build()
       }
     end,
 
-    ---@param node Documentation.Standalone.BindingNode
+    ---@param node Docmap.Standalone.BindingNode
     ---@param src string
     ---@return string
     get_node_text = function(node, src)

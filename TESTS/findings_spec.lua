@@ -19,9 +19,9 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local findings = require("documentation.core.findings")
-  local scan = require("documentation.core.scan")
-  local check = require("documentation.core.check")
+  local findings = require("docmap.core.findings")
+  local scan = require("docmap.core.scan")
+  local check = require("docmap.core.check")
 
   -- One plausible value per placeholder any template uses. Deliberately a
   -- flat table shared by every key rather than per-key fixtures: the

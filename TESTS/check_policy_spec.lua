@@ -12,11 +12,11 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local policy = require("documentation.core.check_policy")
+  local policy = require("docmap.core.check_policy")
 
   ---@param severity string
   ---@param check string
-  ---@return Documentation.Finding
+  ---@return Docmap.Finding
   local function finding(severity, check)
     return { severity = severity, check = check, node = "n", params = {} }
   end
@@ -30,7 +30,7 @@ return function(H)
 
   ---`check` codes of a result list, joined, so a mismatch reads as a list
   ---rather than as "expected table, got table".
-  ---@param list Documentation.Finding[]
+  ---@param list Docmap.Finding[]
   ---@return string
   local function codes(list)
     local out = {}
@@ -157,7 +157,7 @@ return function(H)
   -- `check.run` actually applies it, and after `extra_checks`.
   -- ---------------------------------------------------------------------
 
-  local check = require("documentation.core.check")
+  local check = require("docmap.core.check")
   local empty_ir = { root = "lua", nodes = {}, order = {}, edges = {}, meta = {} }
 
   -- An empty directory of its own, never the working directory: `check.run`

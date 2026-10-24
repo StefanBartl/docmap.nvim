@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_ocaml_spec.lua — documentation.core.lang.ocaml
+-- TESTS/lang_ocaml_spec.lua — docmap.core.lang.ocaml
 --
 -- Skips when the ocaml parsers are not reachable. Two are needed:
 -- `DOCMAP_OCAML_PARSER` for `.ml` and `DOCMAP_OCAML_INTERFACE_PARSER` for
@@ -33,7 +33,7 @@ return function(H)
   local has_ml = add_lang("ocaml", "DOCMAP_OCAML_PARSER")
   local has_mli = add_lang("ocaml_interface", "DOCMAP_OCAML_INTERFACE_PARSER")
 
-  local ml = require("documentation.core.lang_registry").get("ocaml")
+  local ml = require("docmap.core.lang_registry").get("ocaml")
   ok(ml ~= nil, "the ocaml backend must be registered")
 
   eq(ml.is_source("widget.ml"), true)
@@ -224,6 +224,6 @@ return function(H)
       .. "what came before"
   )
 
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(#markers.scan_source("(* TODO: finish this *)", ml), 1)
 end

@@ -1,7 +1,7 @@
 -- TESTS/browse_telemetry_spec.lua — the static x runtime join, ecosystem.md
--- step 8: `documentation.core.check.used_keys`, `documentation.core.
--- telemetry_join`, the Telemetry mode in `documentation.editor.browse.view`,
--- and dead-function suppression in `documentation.core.check`.
+-- step 8: `docmap.core.check.used_keys`, `docmap.core.
+-- telemetry_join`, the Telemetry mode in `docmap.editor.browse.view`,
+-- and dead-function suppression in `docmap.core.check`.
 --
 -- Same shape `browse_endpoints_spec.lua` already established for a soft
 -- dependency on `runtime-analysis.nvim`: every assertion that only needs
@@ -11,16 +11,16 @@
 -- (`RUNTIME_ANALYSIS_DIR`, wired the same way in TESTS/run.lua).
 
 return function(H)
-  local fmsg = require("documentation.core.findings").format
+  local fmsg = require("docmap.core.findings").format
   local eq, ok = H.eq, H.ok
-  local check = require("documentation.core.check")
-  local telemetry_join = require("documentation.core.telemetry_join")
-  local view = require("documentation.editor.browse.view")
+  local check = require("docmap.core.check")
+  local telemetry_join = require("docmap.core.telemetry_join")
+  local view = require("docmap.editor.browse.view")
 
   ---A small tree: one call edge (a#used_by_edge -> a#callee), one @see
   ---reference (a#seen_by_see), one local_refs count (a#used_as_value), and
   ---one function nothing reaches at all (a#truly_unused).
-  ---@return Documentation.IR
+  ---@return Docmap.IR
   local function fake_ir()
     return {
       order = { "a" },
@@ -206,7 +206,7 @@ return function(H)
     local ir = fake_ir()
     local entries = view.entries(
       ir,
-      { mode = "telemetry", opts = { title = "documentation-nvim-spec-no-such-namespace" } }
+      { mode = "telemetry", opts = { title = "docmap-nvim-spec-no-such-namespace" } }
     )
     eq(#entries, 1, "telemetry mode: one message entry when nothing was ever recorded")
     eq(entries[1].kind, "message", "telemetry mode: ... never a fabricated per-function list")
@@ -220,7 +220,7 @@ return function(H)
   if ok_ra then
     local telemetry = require("runtime-analysis.telemetry")
     local store = require("runtime-analysis.telemetry.store")
-    local namespace = "documentation-nvim-telemetry-join-spec"
+    local namespace = "docmap-nvim-telemetry-join-spec"
 
     -- No `dir` override on the instances below: `telemetry_join.load` (like
     -- the real `:DocMap check`/`:DocBrowse telemetry` it backs) always reads

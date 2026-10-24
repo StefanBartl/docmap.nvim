@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_rust_spec.lua — documentation.core.lang.rust
+-- TESTS/lang_rust_spec.lua — docmap.core.lang.rust
 --
 -- Skips when the rust parser is not reachable; `DOCMAP_RUST_PARSER` points at
 -- one without installing it into a runtimepath.
@@ -28,7 +28,7 @@ return function(H)
     ok_add, has_rust = pcall(vim.treesitter.language.add, "rust")
   end
 
-  local rs = require("documentation.core.lang_registry").get("rust")
+  local rs = require("docmap.core.lang_registry").get("rust")
   ok(rs ~= nil, "the rust backend must be registered")
 
   -- ---------------------------------------------------------------------
@@ -217,7 +217,7 @@ return function(H)
   eq(by["inner::nested"].owner_kind, "module", "the one Rust owner that is not a type")
   eq(by["add"].owner, nil, "a free function has no owner")
 
-  local scopes = require("documentation.core.scopes")
+  local scopes = require("docmap.core.scopes")
   local free, groups = scopes.split(fns)
   eq(#groups, 3, "impl Widget, trait Doer, mod inner")
   eq(#free, 2, "add and private are the file's own")
@@ -266,6 +266,6 @@ return function(H)
       .. "edges that names a file rather than a path through the module tree"
   )
 
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(#markers.scan_source("// TODO: finish this", rs), 1)
 end

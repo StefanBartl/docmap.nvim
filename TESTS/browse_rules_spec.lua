@@ -1,5 +1,5 @@
--- TESTS/browse_rules_spec.lua — `documentation.core.rules_join` and the
--- Rules mode in `documentation.editor.browse.view`.
+-- TESTS/browse_rules_spec.lua — `docmap.core.rules_join` and the
+-- Rules mode in `docmap.editor.browse.view`.
 --
 -- Same shape `browse_telemetry_spec.lua`/`browse_endpoints_spec.lua` already
 -- established for a soft dependency: the pure logic (join + entry shaping)
@@ -11,10 +11,10 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local rules_join = require("documentation.core.rules_join")
-  local view = require("documentation.editor.browse.view")
+  local rules_join = require("docmap.core.rules_join")
+  local view = require("docmap.editor.browse.view")
 
-  ---@return Documentation.IR
+  ---@return Docmap.IR
   local function fake_ir()
     return { order = {}, nodes = {}, edges = {} }
   end

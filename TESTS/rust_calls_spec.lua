@@ -36,7 +36,7 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local registry = require("documentation.core.lang_registry")
+  local registry = require("docmap.core.lang_registry")
   local rs = registry.get("rust")
   ok(rs ~= nil, "rust: the backend must be registered")
   eq(rs.emits_calls, true, "rust: this backend returns call sites")
@@ -91,7 +91,7 @@ return function(H)
     }
     table.insert(ir.nodes["src/lib.rs"].functions, { name = "String::from", owner = "String" })
     local got = {}
-    for _, e in ipairs(require("documentation.core.calls").build(ir, {})) do
+    for _, e in ipairs(require("docmap.core.calls").build(ir, {})) do
       got[e.from .. ":" .. e.from_fn .. ">" .. e.to .. "#" .. e.to_fn] = true
     end
     ok(
@@ -125,8 +125,8 @@ return function(H)
   local root = (vim.fn.getcwd():gsub("\\", "/")) .. "/TESTS/fixtures/rscalls"
   ok(vim.fn.isdirectory(root) == 1, "rust_calls: the fixture crate is checked in")
 
-  local opts = require("documentation.config").build(root)
-  local ir = require("documentation.core.scan").scan(opts)
+  local opts = require("docmap.config").build(root)
+  local ir = require("docmap.core.scan").scan(opts)
 
   local calls, n = {}, 0
   for _, e in ipairs(ir.edges or {}) do

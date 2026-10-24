@@ -18,7 +18,7 @@
 # Everything below the three variables is generic — copy this file verbatim
 # into your own repo's `scripts/hooks/pre-commit` and only touch the three
 # lines the comment marks. `GEN_SCRIPT` is your own thin wrapper around
-# `documentation.cli` (see docs/REUSE.md — usually the same handful of lines
+# `docmap.cli` (see docs/REUSE.md — usually the same handful of lines
 # as this repo's `scripts/gen_map.lua`, pointed at your own options table).
 
 # --- project-specific: match your documentation opts (source/out_dir) -------

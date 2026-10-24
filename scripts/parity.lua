@@ -33,8 +33,8 @@ else
   vim.opt.runtimepath:append(vim.fs.dirname(root) .. "/lib.nvim")
 end
 
-local registry = require("documentation.core.lang_registry")
-local markers = require("documentation.core.markers")
+local registry = require("docmap.core.lang_registry")
+local markers = require("docmap.core.markers")
 
 ---The eleven capabilities the parity entry names, in its order. `probe` is
 ---handed the backend's own answers and returns whether that capability came
@@ -222,7 +222,7 @@ end
 ---grammars in `EXTRA_GRAMMARS`. An extra that will not load is **not** a
 ---reason to skip the row: the backend still reads its own language, and the
 ---cell it costs is exactly the finding worth reporting.
----@param backend Documentation.LangBackend
+---@param backend Docmap.LangBackend
 ---@return boolean ready
 local function ensure_grammar(backend)
   for _, extra in ipairs(EXTRA_GRAMMARS[backend.name] or {}) do
@@ -234,7 +234,7 @@ local function ensure_grammar(backend)
   return add_grammar(backend.grammar)
 end
 
----@param backend Documentation.LangBackend
+---@param backend Docmap.LangBackend
 ---@param path string
 ---@return table? answers `nil` when the file could not be read.
 local function measure(backend, path)

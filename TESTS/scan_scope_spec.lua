@@ -13,9 +13,9 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local registry = require("documentation.core.lang_registry")
-  local scan = require("documentation.core.scan")
-  local config = require("documentation.config")
+  local registry = require("docmap.core.lang_registry")
+  local scan = require("docmap.core.scan")
+  local config = require("docmap.config")
 
   local root = (vim.fn.tempname():gsub("\\", "/"))
   local n = 0
@@ -23,8 +23,8 @@ return function(H)
   ---Build a tree and scan it.
   ---@param files table<string, string> Repo-relative path to contents.
   ---@param overrides table? Merged into `config.build`'s overrides.
-  ---@return Documentation.IR
-  ---@return Documentation.Opts
+  ---@return Docmap.IR
+  ---@return Docmap.Opts
   local function scanned(files, overrides)
     n = n + 1
     local abs = ("%s/case%d"):format(root, n)
@@ -42,7 +42,7 @@ return function(H)
   end
 
   ---Every node id in the IR, sorted.
-  ---@param ir Documentation.IR
+  ---@param ir Docmap.IR
   ---@return string[]
   local function ids(ir)
     local out = {}
@@ -53,7 +53,7 @@ return function(H)
     return out
   end
 
-  ---@param ir Documentation.IR
+  ---@param ir Docmap.IR
   ---@param id string
   ---@return boolean
   local function has(ir, id)

@@ -1,4 +1,4 @@
--- TESTS/safe_fs_spec.lua — `documentation.core.safe_fs`: where a link may
+-- TESTS/safe_fs_spec.lua — `docmap.core.safe_fs`: where a link may
 -- lead, decided without opening what it leads to.
 --
 -- Three layers, because the rules live in three places:
@@ -21,7 +21,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local safe_fs = require("documentation.core.safe_fs")
+  local safe_fs = require("docmap.core.safe_fs")
 
   ---Run `fn` with the module pointed at `host` and the platform rules of
   ---`windows`, and put both back whatever happens: this suite runs in one
@@ -365,7 +365,7 @@ return function(H)
 
   -- Whether the file system folds case is asked of the disk: `root` looked up
   -- with the last letter of its path in the other case.
-  ---@param host Documentation.SafeFs.Host
+  ---@param host Docmap.SafeFs.Host
   ---@param root_path string
   ---@param windows boolean?
   ---@return boolean

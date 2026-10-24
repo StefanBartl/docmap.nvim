@@ -86,7 +86,7 @@ end
 -- Optional, carried over from the old TESTS/run.lua: CI builds real javascript/typescript/tsx/go
 -- grammars into a directory and points here via this variable, so the specs that need a parser run
 -- their real assertions instead of their stated skip path. A local run without it skips them.
-local parsers = vim.env.DOCUMENTATION_TS_PARSERS_DIR
+local parsers = vim.env.DOCMAP_TS_PARSERS_DIR
 if parsers and parsers ~= "" and vim.fn.isdirectory(parsers) == 1 then
   vim.opt.rtp:append(parsers)
 end

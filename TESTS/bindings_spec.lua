@@ -8,10 +8,10 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local B = require("documentation.core.bindings")
+  local B = require("docmap.core.bindings")
 
   ---@param src string
-  ---@return Documentation.BindingSpec[]
+  ---@return Docmap.BindingSpec[]
   local function extract(src)
     local root = vim.treesitter.get_string_parser(src, "lua"):parse()[1]:root()
     return B.extract(root, src)

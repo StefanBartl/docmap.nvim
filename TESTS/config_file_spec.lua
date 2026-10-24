@@ -19,8 +19,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local cfg = require("documentation.config")
-  local file = require("documentation.config.file")
+  local cfg = require("docmap.config")
+  local file = require("docmap.config.file")
 
   local root_dir = (vim.fn.tempname():gsub("\\", "/"))
 
@@ -271,12 +271,12 @@ return function(H)
   eq(#(own.layers or {}), 4, "this repo's own .docmap.json still supplies its four layer rules")
   eq(
     (own.layers[4] or {}).siblings,
-    "documentation.core.lang",
+    "docmap.core.lang",
     "the fourth rule keeps the language backends apart from each other"
   )
   eq(
     own.repo_url,
-    "https://github.com/StefanBartl/documentation.nvim",
+    "https://github.com/StefanBartl/docmap.nvim",
     "this repo's own .docmap.json still supplies repo_url"
   )
 end

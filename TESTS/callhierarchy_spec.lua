@@ -12,7 +12,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
+  local docmap = require("docmap")
 
   local function dwrite(root, rel, lines)
     local abs = root .. "/" .. rel

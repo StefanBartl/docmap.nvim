@@ -1,4 +1,4 @@
--- TESTS/lang_registry_spec.lua — documentation.core.lang_registry
+-- TESTS/lang_registry_spec.lua — docmap.core.lang_registry
 --
 -- Its own file rather than a block inside docmap_spec.lua: that file already
 -- sits at Lua's 200-local-per-function ceiling, and this suite touches the
@@ -8,7 +8,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local reg = require("documentation.core.lang_registry")
+  local reg = require("docmap.core.lang_registry")
 
   -- Real "lua" is already registered by the time any spec runs: scan.lua
   -- requires the registry, which requires core/lang/lua.lua, before any

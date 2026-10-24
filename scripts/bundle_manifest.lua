@@ -13,7 +13,7 @@
 -- lines is wrong in both directions here, which is the whole reason this file
 -- exists:
 --
---   * **Too many.** `lua/documentation` mentions thirteen `lib.nvim` modules;
+--   * **Too many.** `lua/docmap` mentions thirteen `lib.nvim` modules;
 --     the standalone build loads seven files from five of them. `usercmd`,
 --     `ui.kit`, `notify`, `autocmd`, `map`, `debounce` and the rest belong to
 --     the editor half, which this entry point never reaches. Bundling them
@@ -226,7 +226,7 @@ end
 ---@param name string
 ---@return "project"|"lib"|"runtime_analysis"|"rock"|nil
 local function bucket(name)
-  if name:match("^documentation") or name:match("^standalone") then
+  if name:match("^docmap") or name:match("^standalone") then
     return "project"
   end
   -- `lib.nvim` and `lib.lua` are both sub-namespaces the same `lib.nvim`

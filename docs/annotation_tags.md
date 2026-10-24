@@ -1,6 +1,6 @@
-# Annotation tags: what documentation.nvim reads, and why
+# Annotation tags: what docmap.nvim reads, and why
 
-A field guide for **annotating your own plugin** so `documentation.nvim` has
+A field guide for **annotating your own plugin** so `docmap.nvim` has
 something to work with. For each tag: which part of the pipeline consumes it,
 what you get in return, and what happens if you leave it out.
 
@@ -10,8 +10,8 @@ which tags a particular tree happens to use, counted. This one is the
 that one when auditing.
 
 Everything below was verified against the source at the time of writing;
-[`core/functions.lua`](../lua/documentation/core/functions.lua) `parse_doc_block`
-and [`core/scan.lua`](../lua/documentation/core/scan.lua) `parse_header` are the
+[`core/functions.lua`](../lua/docmap/core/functions.lua) `parse_doc_block`
+and [`core/scan.lua`](../lua/docmap/core/scan.lua) `parse_header` are the
 two functions that decide what is understood.
 
 ---
@@ -197,7 +197,7 @@ separate avoids collapsing two meanings into one tag.
 ```
 
 Not a LuaCATS standard tag, and — unlike every other tag on this page —
-**not parsed, not rendered, not checked by `documentation.nvim` at all**
+**not parsed, not rendered, not checked by `docmap.nvim` at all**
 (confirmed: zero references across `core/functions.lua`, `core/scan.lua`,
 `core/check.lua`, `core/render/*.lua`). It exists in this tree purely as
 informal prose documenting what a function can `error()`, following the
@@ -272,10 +272,10 @@ the fix itself.
 
 `@class`, `@alias`, `@field` and `@enum` are **not** parsed by this plugin's
 own scanner. They are read by `lua-language-server --doc`, which
-`documentation.nvim` runs **only under `:DocMap full`** (or `opts.luals =
+`docmap.nvim` runs **only under `:DocMap full`** (or `opts.luals =
 true`) because a full-tree run costs real seconds.
 
-What you get when it runs — see [`core/luals.lua`](../lua/documentation/core/luals.lua):
+What you get when it runs — see [`core/luals.lua`](../lua/docmap/core/luals.lua):
 
 | Tag | Effect |
 |---|---|

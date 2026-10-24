@@ -1,4 +1,4 @@
--- TESTS/detect_source_spec.lua — documentation.config.detect_source
+-- TESTS/detect_source_spec.lua — docmap.config.detect_source
 --
 -- Its own file because the thing under test is a *dispatch*, not a
 -- heuristic: `config.detect_source` used to be Lua's own guess and nothing
@@ -8,7 +8,7 @@
 
 return function(H)
   local eq = H.eq
-  local cfg = require("documentation.config")
+  local cfg = require("docmap.config")
 
   -- Joined rather than compared as tables: `H.eq` is `~=`, which on two
   -- tables asks whether they are the same table, and every expectation here

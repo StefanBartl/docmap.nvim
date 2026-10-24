@@ -1,6 +1,6 @@
-# documentation.nvim — module map
+# docmap.nvim — module map
 
-> **Generated** by `documentation`. Do not edit by hand — run `:DocMap`
+> **Generated** by `docmap`. Do not edit by hand — run `:DocMap`
 > (or `nvim --headless -l scripts/gen_map.lua`) to regenerate.
 
 **6 modules** · 7 namespaces · 136 helper files
@@ -13,29 +13,29 @@ source links; this page is the version the code host renders directly.
 
 ```mermaid
 flowchart LR
-  nlua_documentation["documentation.nvim"]
-  nlua_documentation_bindings["bindings"]
-  nlua_documentation_bindings_usrcmds["usrcmdsbr/smallThe user commands: `:DocMap` and…/small"]
-  nlua_documentation_config["configbr/smallResolving a full `Documentation.Opts` for a…/small"]
-  nlua_documentation_core["core"]
-  nlua_documentation_core_lang["lang"]
-  nlua_documentation_core_render["render"]
-  nlua_documentation_editor["editor"]
-  nlua_documentation_editor_browse["browsebr/small`:DocBrowse` — the module map inside the…/small"]
-  nlua_documentation_integrations["integrations"]
-  nlua_documentation_mcp["mcpbr/smallAn MCP (Model Context Protocol) server…/small"]
-  nlua_documentation_testing["testingbr/smallWhich specs does a change touch, and what…/small"]
-  nlua_documentation --> nlua_documentation_bindings
-  nlua_documentation_bindings --> nlua_documentation_bindings_usrcmds
-  nlua_documentation --> nlua_documentation_config
-  nlua_documentation --> nlua_documentation_core
-  nlua_documentation_core --> nlua_documentation_core_lang
-  nlua_documentation_core --> nlua_documentation_core_render
-  nlua_documentation --> nlua_documentation_editor
-  nlua_documentation_editor --> nlua_documentation_editor_browse
-  nlua_documentation --> nlua_documentation_integrations
-  nlua_documentation --> nlua_documentation_mcp
-  nlua_documentation --> nlua_documentation_testing
+  nlua_docmap["docmap.nvim"]
+  nlua_docmap_bindings["bindings"]
+  nlua_docmap_bindings_usrcmds["usrcmdsbr/smallThe user commands: `:DocMap` and…/small"]
+  nlua_docmap_config["configbr/smallResolving a full `Docmap.Opts` for a…/small"]
+  nlua_docmap_core["core"]
+  nlua_docmap_core_lang["lang"]
+  nlua_docmap_core_render["render"]
+  nlua_docmap_editor["editor"]
+  nlua_docmap_editor_browse["browsebr/small`:DocBrowse` — the module map inside the…/small"]
+  nlua_docmap_integrations["integrations"]
+  nlua_docmap_mcp["mcpbr/smallAn MCP (Model Context Protocol) server…/small"]
+  nlua_docmap_testing["testingbr/smallWhich specs does a change touch, and what…/small"]
+  nlua_docmap --> nlua_docmap_bindings
+  nlua_docmap_bindings --> nlua_docmap_bindings_usrcmds
+  nlua_docmap --> nlua_docmap_config
+  nlua_docmap --> nlua_docmap_core
+  nlua_docmap_core --> nlua_docmap_core_lang
+  nlua_docmap_core --> nlua_docmap_core_render
+  nlua_docmap --> nlua_docmap_editor
+  nlua_docmap_editor --> nlua_docmap_editor_browse
+  nlua_docmap --> nlua_docmap_integrations
+  nlua_docmap --> nlua_docmap_mcp
+  nlua_docmap --> nlua_docmap_testing
 ```
 
 
@@ -47,233 +47,233 @@ in both directions, with load-time and lazy requires told apart.
 
 ```mermaid
 flowchart LR
-  nlua_documentation_bindings_autocmds_lua["documentation.bindings.autocmds"]
-  nlua_documentation_bindings_diagnostics_lua["documentation.bindings.diagnostics"]
-  nlua_documentation_bindings_docs_lua["documentation.bindings.docs"]
-  nlua_documentation_bindings_keymaps_lua["documentation.bindings.keymaps"]
-  nlua_documentation_bindings_progress_lua["documentation.bindings.progress"]
-  nlua_documentation_bindings_usrcmds["documentation.bindings.usrcmds"]
-  nlua_documentation_config_DEFAULTS_lua["documentation.config.DEFAULTS"]
-  nlua_documentation_config_file_lua["documentation.config.file"]
-  nlua_documentation_core_annotate_lua["documentation.core.annotate"]
-  nlua_documentation_core_api_lua["documentation.core.api"]
-  nlua_documentation_core_artifact_lua["documentation.core.artifact"]
-  nlua_documentation_core_bindings_lua["documentation.core.bindings"]
-  nlua_documentation_core_calls_lua["documentation.core.calls"]
-  nlua_documentation_core_check_lua["documentation.core.check"]
-  nlua_documentation_core_check_policy_lua["documentation.core.check_policy"]
-  nlua_documentation_core_checklist_lua["documentation.core.checklist"]
-  nlua_documentation_core_churn_lua["documentation.core.churn"]
-  nlua_documentation_core_cli_lua["documentation.core.cli"]
-  nlua_documentation_core_consumers_lua["documentation.core.consumers"]
-  nlua_documentation_core_coverage_lua["documentation.core.coverage"]
-  nlua_documentation_core_deps_lua["documentation.core.deps"]
-  nlua_documentation_core_diff_lua["documentation.core.diff"]
-  nlua_documentation_core_doccoverage_lua["documentation.core.doccoverage"]
-  nlua_documentation_core_docs_lua["documentation.core.docs"]
-  nlua_documentation_core_endpoint_coverage_lua["documentation.core.endpoint_coverage"]
-  nlua_documentation_core_endpoints_lua["documentation.core.endpoints"]
-  nlua_documentation_core_features_lua["documentation.core.features"]
-  nlua_documentation_core_find_lua["documentation.core.find"]
-  nlua_documentation_core_findings_lua["documentation.core.findings"]
-  nlua_documentation_core_functions_lua["documentation.core.functions"]
-  nlua_documentation_core_history_lua["documentation.core.history"]
-  nlua_documentation_core_json_lua["documentation.core.json"]
-  nlua_documentation_core_lang["lang"]
-  nlua_documentation_core_lang_registry_lua["documentation.core.lang_registry"]
-  nlua_documentation_core_loaded_diff_lua["documentation.core.loaded_diff"]
-  nlua_documentation_core_markers_lua["documentation.core.markers"]
-  nlua_documentation_core_plugins_lua["documentation.core.plugins"]
-  nlua_documentation_core_quicks_lua["documentation.core.quicks"]
-  nlua_documentation_core_render["render"]
-  nlua_documentation_core_rules_join_lua["documentation.core.rules_join"]
-  nlua_documentation_core_safe_fs_lua["documentation.core.safe_fs"]
-  nlua_documentation_core_safe_out_dir_lua["documentation.core.safe_out_dir"]
-  nlua_documentation_core_scan_lua["documentation.core.scan"]
-  nlua_documentation_core_scopes_lua["documentation.core.scopes"]
-  nlua_documentation_core_snippet_lua["documentation.core.snippet"]
-  nlua_documentation_core_soft_require_lua["documentation.core.soft_require"]
-  nlua_documentation_core_startup_graph_lua["documentation.core.startup_graph"]
-  nlua_documentation_core_symbols_lua["documentation.core.symbols"]
-  nlua_documentation_core_tagfiles_lua["documentation.core.tagfiles"]
-  nlua_documentation_core_tags_lua["documentation.core.tags"]
-  nlua_documentation_core_telemetry_join_lua["documentation.core.telemetry_join"]
-  nlua_documentation_core_telemetry_self_lua["documentation.core.telemetry_self"]
-  nlua_documentation_core_timing_lua["documentation.core.timing"]
-  nlua_documentation_core_tools_lua["documentation.core.tools"]
-  nlua_documentation_core_traffic_join_lua["documentation.core.traffic_join"]
-  nlua_documentation_editor_browse["documentation.editor.browse"]
-  nlua_documentation_editor_callhierarchy_lua["documentation.editor.callhierarchy"]
-  nlua_documentation_editor_command_lua["documentation.editor.command"]
-  nlua_documentation_editor_health_lua["documentation.editor.health"]
-  nlua_documentation_editor_pick_lua["documentation.editor.pick"]
-  nlua_documentation_editor_registry_lua["documentation.editor.registry"]
-  nlua_documentation_editor_serve_lua["documentation.editor.serve"]
-  nlua_documentation_integrations_menu_lua["documentation.integrations.menu"]
-  nlua_documentation_mcp_protocol_lua["documentation.mcp.protocol"]
-  nlua_documentation_mcp_tools_lua["documentation.mcp.tools"]
-  nlua_documentation_testing_freshness_lua["documentation.testing.freshness"]
-  nlua_documentation_testing_git_lua["documentation.testing.git"]
-  nlua_documentation_testing_specs_lua["documentation.testing.specs"]
-  nlua_documentation_bindings_autocmds_lua --> nlua_documentation_bindings_usrcmds
-  nlua_documentation_bindings_diagnostics_lua --> nlua_documentation_core_findings_lua
-  nlua_documentation_bindings_docs_lua --> nlua_documentation_bindings_autocmds_lua
-  nlua_documentation_bindings_docs_lua --> nlua_documentation_editor_browse
-  nlua_documentation_bindings_progress_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_bindings_progress_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_config_DEFAULTS_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_annotate_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_calls_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_check_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_checklist_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_churn_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_consumers_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_deps_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_diff_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_find_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_findings_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_history_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_telemetry_join_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_telemetry_self_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_core_timing_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_editor_browse
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_editor_pick_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_editor_registry_lua
-  nlua_documentation_bindings_usrcmds --> nlua_documentation_editor_serve_lua
-  nlua_documentation_config_file_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_annotate_lua --> nlua_documentation_core_check_lua
-  nlua_documentation_core_annotate_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_api_lua --> nlua_documentation_core_artifact_lua
-  nlua_documentation_core_api_lua --> nlua_documentation_core_checklist_lua
-  nlua_documentation_core_api_lua --> nlua_documentation_core_history_lua
-  nlua_documentation_core_api_lua --> nlua_documentation_core_loaded_diff_lua
-  nlua_documentation_core_api_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_core_api_lua --> nlua_documentation_core_telemetry_join_lua
-  nlua_documentation_core_artifact_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_calls_lua --> nlua_documentation_core_deps_lua
-  nlua_documentation_core_calls_lua --> nlua_documentation_core_lang_registry_lua
-  nlua_documentation_core_check_lua --> nlua_documentation_core_check_policy_lua
-  nlua_documentation_core_check_lua --> nlua_documentation_core_consumers_lua
-  nlua_documentation_core_check_lua --> nlua_documentation_core_deps_lua
-  nlua_documentation_core_check_lua --> nlua_documentation_core_doccoverage_lua
-  nlua_documentation_core_check_lua --> nlua_documentation_core_docs_lua
-  nlua_documentation_core_check_lua --> nlua_documentation_core_lang_registry_lua
-  nlua_documentation_core_check_lua --> nlua_documentation_core_loaded_diff_lua
-  nlua_documentation_core_check_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_check_lua --> nlua_documentation_core_scopes_lua
-  nlua_documentation_core_check_lua --> nlua_documentation_core_telemetry_join_lua
-  nlua_documentation_core_checklist_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_churn_lua --> nlua_documentation_core_telemetry_join_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_artifact_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_coverage_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_diff_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_doccoverage_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_findings_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_lang_registry_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_render
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_safe_out_dir_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_scopes_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_startup_graph_lua
-  nlua_documentation_core_cli_lua --> nlua_documentation_core_telemetry_join_lua
-  nlua_documentation_core_consumers_lua --> nlua_documentation_core_artifact_lua
-  nlua_documentation_core_coverage_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_deps_lua --> nlua_documentation_core_lang_registry_lua
-  nlua_documentation_core_diff_lua --> nlua_documentation_core_check_lua
-  nlua_documentation_core_diff_lua --> nlua_documentation_core_deps_lua
-  nlua_documentation_core_doccoverage_lua --> nlua_documentation_core_check_lua
-  nlua_documentation_core_doccoverage_lua --> nlua_documentation_core_lang_registry_lua
-  nlua_documentation_core_doccoverage_lua --> nlua_documentation_core_render
-  nlua_documentation_core_docs_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_endpoint_coverage_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_core_features_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_find_lua --> nlua_documentation_core_check_lua
-  nlua_documentation_core_functions_lua --> nlua_documentation_core_bindings_lua
-  nlua_documentation_core_functions_lua --> nlua_documentation_core_calls_lua
-  nlua_documentation_core_functions_lua --> nlua_documentation_core_deps_lua
-  nlua_documentation_core_functions_lua --> nlua_documentation_core_plugins_lua
-  nlua_documentation_core_functions_lua --> nlua_documentation_core_scan_lua
-  nlua_documentation_core_functions_lua --> nlua_documentation_core_snippet_lua
-  nlua_documentation_core_functions_lua --> nlua_documentation_core_symbols_lua
-  nlua_documentation_core_history_lua --> nlua_documentation_core_deps_lua
-  nlua_documentation_core_history_lua --> nlua_documentation_core_telemetry_join_lua
-  nlua_documentation_core_lang --> nlua_documentation_core_endpoints_lua
-  nlua_documentation_core_lang --> nlua_documentation_core_functions_lua
-  nlua_documentation_core_lang --> nlua_documentation_core_lang_registry_lua
-  nlua_documentation_core_lang --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_lang --> nlua_documentation_core_scan_lua
-  nlua_documentation_core_lang --> nlua_documentation_core_snippet_lua
-  nlua_documentation_core_loaded_diff_lua --> nlua_documentation_core_check_lua
-  nlua_documentation_core_loaded_diff_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_core_quicks_lua --> nlua_documentation_core_doccoverage_lua
-  nlua_documentation_core_render --> nlua_documentation_core_docs_lua
-  nlua_documentation_core_render --> nlua_documentation_core_findings_lua
-  nlua_documentation_core_render --> nlua_documentation_core_json_lua
-  nlua_documentation_core_render --> nlua_documentation_core_lang_registry_lua
-  nlua_documentation_core_render --> nlua_documentation_core_markers_lua
-  nlua_documentation_core_render --> nlua_documentation_core_startup_graph_lua
-  nlua_documentation_core_render --> nlua_documentation_core_tags_lua
-  nlua_documentation_core_rules_join_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_core_scan_lua --> nlua_documentation_core_bindings_lua
-  nlua_documentation_core_scan_lua --> nlua_documentation_core_calls_lua
-  nlua_documentation_core_scan_lua --> nlua_documentation_core_deps_lua
-  nlua_documentation_core_scan_lua --> nlua_documentation_core_lang_registry_lua
-  nlua_documentation_core_scan_lua --> nlua_documentation_core_markers_lua
-  nlua_documentation_core_scan_lua --> nlua_documentation_core_plugins_lua
-  nlua_documentation_core_scan_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_scan_lua --> nlua_documentation_core_snippet_lua
-  nlua_documentation_core_startup_graph_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_core_symbols_lua --> nlua_documentation_core_scan_lua
-  nlua_documentation_core_tagfiles_lua --> nlua_documentation_core_find_lua
-  nlua_documentation_core_telemetry_join_lua --> nlua_documentation_core_check_lua
-  nlua_documentation_core_telemetry_join_lua --> nlua_documentation_core_doccoverage_lua
-  nlua_documentation_core_telemetry_join_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_core_telemetry_self_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_core_tools_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_core_tools_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_core_traffic_join_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_editor_browse --> nlua_documentation_bindings_keymaps_lua
-  nlua_documentation_editor_browse --> nlua_documentation_bindings_usrcmds
-  nlua_documentation_editor_browse --> nlua_documentation_core_artifact_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_check_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_deps_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_endpoint_coverage_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_history_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_lang_registry_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_loaded_diff_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_rules_join_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_safe_out_dir_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_telemetry_join_lua
-  nlua_documentation_editor_browse --> nlua_documentation_core_traffic_join_lua
-  nlua_documentation_editor_browse --> nlua_documentation_editor_command_lua
-  nlua_documentation_editor_browse --> nlua_documentation_editor_registry_lua
-  nlua_documentation_editor_browse --> nlua_documentation_integrations_menu_lua
-  nlua_documentation_editor_callhierarchy_lua --> nlua_documentation_config_DEFAULTS_lua
-  nlua_documentation_editor_callhierarchy_lua --> nlua_documentation_core_telemetry_join_lua
-  nlua_documentation_editor_command_lua --> nlua_documentation_bindings_usrcmds
-  nlua_documentation_editor_command_lua --> nlua_documentation_core_find_lua
-  nlua_documentation_editor_health_lua --> nlua_documentation_core_lang_registry_lua
-  nlua_documentation_editor_health_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_editor_health_lua --> nlua_documentation_core_safe_out_dir_lua
-  nlua_documentation_editor_health_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_editor_pick_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_editor_registry_lua --> nlua_documentation_bindings_diagnostics_lua
-  nlua_documentation_editor_registry_lua --> nlua_documentation_core_render
-  nlua_documentation_editor_registry_lua --> nlua_documentation_core_soft_require_lua
-  nlua_documentation_editor_registry_lua --> nlua_documentation_core_telemetry_join_lua
-  nlua_documentation_editor_registry_lua --> nlua_documentation_editor_callhierarchy_lua
-  nlua_documentation_editor_serve_lua --> nlua_documentation_core_api_lua
-  nlua_documentation_editor_serve_lua --> nlua_documentation_core_safe_fs_lua
-  nlua_documentation_editor_serve_lua --> nlua_documentation_core_safe_out_dir_lua
-  nlua_documentation_mcp_protocol_lua --> nlua_documentation_mcp_tools_lua
-  nlua_documentation_mcp_tools_lua --> nlua_documentation_core_checklist_lua
-  nlua_documentation_mcp_tools_lua --> nlua_documentation_core_findings_lua
-  nlua_documentation_mcp_tools_lua --> nlua_documentation_core_json_lua
-  nlua_documentation_testing_freshness_lua --> nlua_documentation_testing_git_lua
-  nlua_documentation_testing_specs_lua --> nlua_documentation_core_deps_lua
-  nlua_documentation_testing_specs_lua --> nlua_documentation_core_safe_fs_lua
+  nlua_docmap_bindings_autocmds_lua["docmap.bindings.autocmds"]
+  nlua_docmap_bindings_diagnostics_lua["docmap.bindings.diagnostics"]
+  nlua_docmap_bindings_docs_lua["docmap.bindings.docs"]
+  nlua_docmap_bindings_keymaps_lua["docmap.bindings.keymaps"]
+  nlua_docmap_bindings_progress_lua["docmap.bindings.progress"]
+  nlua_docmap_bindings_usrcmds["docmap.bindings.usrcmds"]
+  nlua_docmap_config_DEFAULTS_lua["docmap.config.DEFAULTS"]
+  nlua_docmap_config_file_lua["docmap.config.file"]
+  nlua_docmap_core_annotate_lua["docmap.core.annotate"]
+  nlua_docmap_core_api_lua["docmap.core.api"]
+  nlua_docmap_core_artifact_lua["docmap.core.artifact"]
+  nlua_docmap_core_bindings_lua["docmap.core.bindings"]
+  nlua_docmap_core_calls_lua["docmap.core.calls"]
+  nlua_docmap_core_check_lua["docmap.core.check"]
+  nlua_docmap_core_check_policy_lua["docmap.core.check_policy"]
+  nlua_docmap_core_checklist_lua["docmap.core.checklist"]
+  nlua_docmap_core_churn_lua["docmap.core.churn"]
+  nlua_docmap_core_cli_lua["docmap.core.cli"]
+  nlua_docmap_core_consumers_lua["docmap.core.consumers"]
+  nlua_docmap_core_coverage_lua["docmap.core.coverage"]
+  nlua_docmap_core_deps_lua["docmap.core.deps"]
+  nlua_docmap_core_diff_lua["docmap.core.diff"]
+  nlua_docmap_core_doccoverage_lua["docmap.core.doccoverage"]
+  nlua_docmap_core_docs_lua["docmap.core.docs"]
+  nlua_docmap_core_endpoint_coverage_lua["docmap.core.endpoint_coverage"]
+  nlua_docmap_core_endpoints_lua["docmap.core.endpoints"]
+  nlua_docmap_core_features_lua["docmap.core.features"]
+  nlua_docmap_core_find_lua["docmap.core.find"]
+  nlua_docmap_core_findings_lua["docmap.core.findings"]
+  nlua_docmap_core_functions_lua["docmap.core.functions"]
+  nlua_docmap_core_history_lua["docmap.core.history"]
+  nlua_docmap_core_json_lua["docmap.core.json"]
+  nlua_docmap_core_lang["lang"]
+  nlua_docmap_core_lang_registry_lua["docmap.core.lang_registry"]
+  nlua_docmap_core_loaded_diff_lua["docmap.core.loaded_diff"]
+  nlua_docmap_core_markers_lua["docmap.core.markers"]
+  nlua_docmap_core_plugins_lua["docmap.core.plugins"]
+  nlua_docmap_core_quicks_lua["docmap.core.quicks"]
+  nlua_docmap_core_render["render"]
+  nlua_docmap_core_rules_join_lua["docmap.core.rules_join"]
+  nlua_docmap_core_safe_fs_lua["docmap.core.safe_fs"]
+  nlua_docmap_core_safe_out_dir_lua["docmap.core.safe_out_dir"]
+  nlua_docmap_core_scan_lua["docmap.core.scan"]
+  nlua_docmap_core_scopes_lua["docmap.core.scopes"]
+  nlua_docmap_core_snippet_lua["docmap.core.snippet"]
+  nlua_docmap_core_soft_require_lua["docmap.core.soft_require"]
+  nlua_docmap_core_startup_graph_lua["docmap.core.startup_graph"]
+  nlua_docmap_core_symbols_lua["docmap.core.symbols"]
+  nlua_docmap_core_tagfiles_lua["docmap.core.tagfiles"]
+  nlua_docmap_core_tags_lua["docmap.core.tags"]
+  nlua_docmap_core_telemetry_join_lua["docmap.core.telemetry_join"]
+  nlua_docmap_core_telemetry_self_lua["docmap.core.telemetry_self"]
+  nlua_docmap_core_timing_lua["docmap.core.timing"]
+  nlua_docmap_core_tools_lua["docmap.core.tools"]
+  nlua_docmap_core_traffic_join_lua["docmap.core.traffic_join"]
+  nlua_docmap_editor_browse["docmap.editor.browse"]
+  nlua_docmap_editor_callhierarchy_lua["docmap.editor.callhierarchy"]
+  nlua_docmap_editor_command_lua["docmap.editor.command"]
+  nlua_docmap_editor_health_lua["docmap.editor.health"]
+  nlua_docmap_editor_pick_lua["docmap.editor.pick"]
+  nlua_docmap_editor_registry_lua["docmap.editor.registry"]
+  nlua_docmap_editor_serve_lua["docmap.editor.serve"]
+  nlua_docmap_integrations_menu_lua["docmap.integrations.menu"]
+  nlua_docmap_mcp_protocol_lua["docmap.mcp.protocol"]
+  nlua_docmap_mcp_tools_lua["docmap.mcp.tools"]
+  nlua_docmap_testing_freshness_lua["docmap.testing.freshness"]
+  nlua_docmap_testing_git_lua["docmap.testing.git"]
+  nlua_docmap_testing_specs_lua["docmap.testing.specs"]
+  nlua_docmap_bindings_autocmds_lua --> nlua_docmap_bindings_usrcmds
+  nlua_docmap_bindings_diagnostics_lua --> nlua_docmap_core_findings_lua
+  nlua_docmap_bindings_docs_lua --> nlua_docmap_bindings_autocmds_lua
+  nlua_docmap_bindings_docs_lua --> nlua_docmap_editor_browse
+  nlua_docmap_bindings_progress_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_bindings_progress_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_config_DEFAULTS_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_annotate_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_calls_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_check_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_checklist_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_churn_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_consumers_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_deps_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_diff_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_find_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_findings_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_history_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_telemetry_join_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_telemetry_self_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_core_timing_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_editor_browse
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_editor_pick_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_editor_registry_lua
+  nlua_docmap_bindings_usrcmds --> nlua_docmap_editor_serve_lua
+  nlua_docmap_config_file_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_annotate_lua --> nlua_docmap_core_check_lua
+  nlua_docmap_core_annotate_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_api_lua --> nlua_docmap_core_artifact_lua
+  nlua_docmap_core_api_lua --> nlua_docmap_core_checklist_lua
+  nlua_docmap_core_api_lua --> nlua_docmap_core_history_lua
+  nlua_docmap_core_api_lua --> nlua_docmap_core_loaded_diff_lua
+  nlua_docmap_core_api_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_core_api_lua --> nlua_docmap_core_telemetry_join_lua
+  nlua_docmap_core_artifact_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_calls_lua --> nlua_docmap_core_deps_lua
+  nlua_docmap_core_calls_lua --> nlua_docmap_core_lang_registry_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_check_policy_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_consumers_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_deps_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_doccoverage_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_docs_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_lang_registry_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_loaded_diff_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_scopes_lua
+  nlua_docmap_core_check_lua --> nlua_docmap_core_telemetry_join_lua
+  nlua_docmap_core_checklist_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_churn_lua --> nlua_docmap_core_telemetry_join_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_artifact_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_coverage_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_diff_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_doccoverage_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_findings_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_lang_registry_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_render
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_safe_out_dir_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_scopes_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_startup_graph_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_telemetry_join_lua
+  nlua_docmap_core_consumers_lua --> nlua_docmap_core_artifact_lua
+  nlua_docmap_core_coverage_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_deps_lua --> nlua_docmap_core_lang_registry_lua
+  nlua_docmap_core_diff_lua --> nlua_docmap_core_check_lua
+  nlua_docmap_core_diff_lua --> nlua_docmap_core_deps_lua
+  nlua_docmap_core_doccoverage_lua --> nlua_docmap_core_check_lua
+  nlua_docmap_core_doccoverage_lua --> nlua_docmap_core_lang_registry_lua
+  nlua_docmap_core_doccoverage_lua --> nlua_docmap_core_render
+  nlua_docmap_core_docs_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_endpoint_coverage_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_core_features_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_find_lua --> nlua_docmap_core_check_lua
+  nlua_docmap_core_functions_lua --> nlua_docmap_core_bindings_lua
+  nlua_docmap_core_functions_lua --> nlua_docmap_core_calls_lua
+  nlua_docmap_core_functions_lua --> nlua_docmap_core_deps_lua
+  nlua_docmap_core_functions_lua --> nlua_docmap_core_plugins_lua
+  nlua_docmap_core_functions_lua --> nlua_docmap_core_scan_lua
+  nlua_docmap_core_functions_lua --> nlua_docmap_core_snippet_lua
+  nlua_docmap_core_functions_lua --> nlua_docmap_core_symbols_lua
+  nlua_docmap_core_history_lua --> nlua_docmap_core_deps_lua
+  nlua_docmap_core_history_lua --> nlua_docmap_core_telemetry_join_lua
+  nlua_docmap_core_lang --> nlua_docmap_core_endpoints_lua
+  nlua_docmap_core_lang --> nlua_docmap_core_functions_lua
+  nlua_docmap_core_lang --> nlua_docmap_core_lang_registry_lua
+  nlua_docmap_core_lang --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_lang --> nlua_docmap_core_scan_lua
+  nlua_docmap_core_lang --> nlua_docmap_core_snippet_lua
+  nlua_docmap_core_loaded_diff_lua --> nlua_docmap_core_check_lua
+  nlua_docmap_core_loaded_diff_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_core_quicks_lua --> nlua_docmap_core_doccoverage_lua
+  nlua_docmap_core_render --> nlua_docmap_core_docs_lua
+  nlua_docmap_core_render --> nlua_docmap_core_findings_lua
+  nlua_docmap_core_render --> nlua_docmap_core_json_lua
+  nlua_docmap_core_render --> nlua_docmap_core_lang_registry_lua
+  nlua_docmap_core_render --> nlua_docmap_core_markers_lua
+  nlua_docmap_core_render --> nlua_docmap_core_startup_graph_lua
+  nlua_docmap_core_render --> nlua_docmap_core_tags_lua
+  nlua_docmap_core_rules_join_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_core_scan_lua --> nlua_docmap_core_bindings_lua
+  nlua_docmap_core_scan_lua --> nlua_docmap_core_calls_lua
+  nlua_docmap_core_scan_lua --> nlua_docmap_core_deps_lua
+  nlua_docmap_core_scan_lua --> nlua_docmap_core_lang_registry_lua
+  nlua_docmap_core_scan_lua --> nlua_docmap_core_markers_lua
+  nlua_docmap_core_scan_lua --> nlua_docmap_core_plugins_lua
+  nlua_docmap_core_scan_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_scan_lua --> nlua_docmap_core_snippet_lua
+  nlua_docmap_core_startup_graph_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_core_symbols_lua --> nlua_docmap_core_scan_lua
+  nlua_docmap_core_tagfiles_lua --> nlua_docmap_core_find_lua
+  nlua_docmap_core_telemetry_join_lua --> nlua_docmap_core_check_lua
+  nlua_docmap_core_telemetry_join_lua --> nlua_docmap_core_doccoverage_lua
+  nlua_docmap_core_telemetry_join_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_core_telemetry_self_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_core_tools_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_core_tools_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_core_traffic_join_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_editor_browse --> nlua_docmap_bindings_keymaps_lua
+  nlua_docmap_editor_browse --> nlua_docmap_bindings_usrcmds
+  nlua_docmap_editor_browse --> nlua_docmap_core_artifact_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_check_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_deps_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_endpoint_coverage_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_history_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_lang_registry_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_loaded_diff_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_rules_join_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_safe_out_dir_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_telemetry_join_lua
+  nlua_docmap_editor_browse --> nlua_docmap_core_traffic_join_lua
+  nlua_docmap_editor_browse --> nlua_docmap_editor_command_lua
+  nlua_docmap_editor_browse --> nlua_docmap_editor_registry_lua
+  nlua_docmap_editor_browse --> nlua_docmap_integrations_menu_lua
+  nlua_docmap_editor_callhierarchy_lua --> nlua_docmap_config_DEFAULTS_lua
+  nlua_docmap_editor_callhierarchy_lua --> nlua_docmap_core_telemetry_join_lua
+  nlua_docmap_editor_command_lua --> nlua_docmap_bindings_usrcmds
+  nlua_docmap_editor_command_lua --> nlua_docmap_core_find_lua
+  nlua_docmap_editor_health_lua --> nlua_docmap_core_lang_registry_lua
+  nlua_docmap_editor_health_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_editor_health_lua --> nlua_docmap_core_safe_out_dir_lua
+  nlua_docmap_editor_health_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_editor_pick_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_editor_registry_lua --> nlua_docmap_bindings_diagnostics_lua
+  nlua_docmap_editor_registry_lua --> nlua_docmap_core_render
+  nlua_docmap_editor_registry_lua --> nlua_docmap_core_soft_require_lua
+  nlua_docmap_editor_registry_lua --> nlua_docmap_core_telemetry_join_lua
+  nlua_docmap_editor_registry_lua --> nlua_docmap_editor_callhierarchy_lua
+  nlua_docmap_editor_serve_lua --> nlua_docmap_core_api_lua
+  nlua_docmap_editor_serve_lua --> nlua_docmap_core_safe_fs_lua
+  nlua_docmap_editor_serve_lua --> nlua_docmap_core_safe_out_dir_lua
+  nlua_docmap_mcp_protocol_lua --> nlua_docmap_mcp_tools_lua
+  nlua_docmap_mcp_tools_lua --> nlua_docmap_core_checklist_lua
+  nlua_docmap_mcp_tools_lua --> nlua_docmap_core_findings_lua
+  nlua_docmap_mcp_tools_lua --> nlua_docmap_core_json_lua
+  nlua_docmap_testing_freshness_lua --> nlua_docmap_testing_git_lua
+  nlua_docmap_testing_specs_lua --> nlua_docmap_core_deps_lua
+  nlua_docmap_testing_specs_lua --> nlua_docmap_core_safe_fs_lua
 ```
 
 
@@ -282,17 +282,17 @@ flowchart LR
 | Module | Description | Fns | Docs |
 |---|---|---|---|
 | `bindings` |  |  |  |
-| &nbsp;&nbsp;`documentation.bindings.usrcmds` | The user commands: `:DocMap` and `:DocBrowse` — registration, argument dispatch and completion. | 7 | [README](../../lua/documentation/bindings/usrcmds/README.md) · [src](../../lua/documentation/bindings/usrcmds/init.lua) |
-| `documentation.config` | Resolving a full `Documentation.Opts` for a repository: the defaults in [`DEFAULTS.lua`](../../lua/documentation/config/DEFAULTS.lua), what can be derived from `root`, and the merge rule… | 7 | [README](../../lua/documentation/config/README.md) · [src](../../lua/documentation/config/init.lua) |
-| `core` |  |  | [README](../../lua/documentation/core/README.md) |
+| &nbsp;&nbsp;`docmap.bindings.usrcmds` | The user commands: `:DocMap` and `:DocBrowse` — registration, argument dispatch and completion. | 7 | [README](../../lua/docmap/bindings/usrcmds/README.md) · [src](../../lua/docmap/bindings/usrcmds/init.lua) |
+| `docmap.config` | Resolving a full `Docmap.Opts` for a repository: the defaults in [`DEFAULTS.lua`](../../lua/docmap/config/DEFAULTS.lua), what can be derived from `root`, and the merge rule every… | 7 | [README](../../lua/docmap/config/README.md) · [src](../../lua/docmap/config/init.lua) |
+| `core` |  |  | [README](../../lua/docmap/core/README.md) |
 | &nbsp;&nbsp;`lang` |  |  |  |
 | &nbsp;&nbsp;&nbsp;&nbsp;`glossary` |  |  |  |
 | &nbsp;&nbsp;`render` |  |  |  |
-| `editor` |  |  | [README](../../lua/documentation/editor/README.md) |
-| &nbsp;&nbsp;`documentation.editor.browse` | `:DocBrowse` — the module map inside the editor. | 42 | [README](../../lua/documentation/editor/browse/README.md) · [src](../../lua/documentation/editor/browse/init.lua) |
+| `editor` |  |  | [README](../../lua/docmap/editor/README.md) |
+| &nbsp;&nbsp;`docmap.editor.browse` | `:DocBrowse` — the module map inside the editor. | 42 | [README](../../lua/docmap/editor/browse/README.md) · [src](../../lua/docmap/editor/browse/init.lua) |
 | `integrations` |  |  |  |
-| `documentation.mcp` | An MCP (Model Context Protocol) server exposing this repository's module map to a coding agent. | 1 | [src](../../lua/documentation/mcp/init.lua) |
-| `documentation.testing` | Which specs does a change touch, and what do the specs say about the map. | 20 | [README](../../lua/documentation/testing/README.md) · [src](../../lua/documentation/testing/init.lua) |
+| `docmap.mcp` | An MCP (Model Context Protocol) server exposing this repository's module map to a coding agent. | 1 | [src](../../lua/docmap/mcp/init.lua) |
+| `docmap.testing` | Which specs does a change touch, and what do the specs say about the map. | 20 | [README](../../lua/docmap/testing/README.md) · [src](../../lua/docmap/testing/init.lua) |
 
 ## Drift
 
@@ -311,31 +311,31 @@ No errors or warnings.
 | `undocumented-param` | M.rank has 4 parameter(s) but only 3 @param line(s) |
 | `undocumented-param` | complexity has 3 parameter(s) but only 2 @param line(s) |
 | `undocumented-param` | is_ignorable has 2 parameter(s) but only 0 @param line(s) |
-| `unreferenced-module` | documentation.bindings.docs is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.config is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.asm is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.c is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.cpp is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.csharp is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.dart is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.elixir is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.erlang is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.go is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.haskell is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.java is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.js is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.kotlin is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.lua is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.ocaml is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.php is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.python is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.ruby is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.rust is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.scala is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.swift is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.ts is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.tsx is required by no other file in the tree |
-| `unreferenced-module` | documentation.core.lang.zig is required by no other file in the tree |
-| `unreferenced-module` | documentation.mcp is required by no other file in the tree |
+| `unreferenced-module` | docmap.bindings.docs is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.config is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.asm is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.c is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.cpp is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.csharp is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.dart is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.elixir is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.erlang is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.go is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.haskell is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.java is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.js is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.kotlin is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.lua is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.ocaml is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.php is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.python is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.ruby is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.rust is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.scala is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.swift is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.ts is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.tsx is required by no other file in the tree |
+| `unreferenced-module` | docmap.core.lang.zig is required by no other file in the tree |
+| `unreferenced-module` | docmap.mcp is required by no other file in the tree |
 
 </details>

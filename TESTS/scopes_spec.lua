@@ -1,7 +1,7 @@
 -- The fixtures below carry only the fields `scopes.summary` reads; a full IR
 -- and a full node per case would be noise rather than coverage.
 ---@diagnostic disable: missing-fields
--- TESTS/scopes_spec.lua — documentation.core.scopes
+-- TESTS/scopes_spec.lua — docmap.core.scopes
 --
 -- No grammar needed, deliberately. The two backend specs that *do* need one
 -- (`lang_python_spec.lua`, `lang_rust_spec.lua`) assert that the owner comes
@@ -17,9 +17,9 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local scopes = require("documentation.core.scopes")
+  local scopes = require("docmap.core.scopes")
 
-  ---One `Documentation.FunctionInfo`, cut down to what this module reads.
+  ---One `Docmap.FunctionInfo`, cut down to what this module reads.
   ---@param name string
   ---@param owner string?
   ---@param kind string?

@@ -1,13 +1,13 @@
 # The `docs/FEATURES/` format: what the Features tab reads, and why
 
 A field guide for **documenting your own plugin's features** so
-`documentation.nvim` has something to build its Features tab from. Written
+`docmap.nvim` has something to build its Features tab from. Written
 the same way [`annotation_tags.md`](annotation_tags.md) documents `@module`/
 `@param`/etc.: what the parser reads, what you get in return, and what
 happens if you leave a piece out.
 
 Everything below is verified against the source at the time of writing —
-[`core/features.lua`](../lua/documentation/core/features.lua)'s `M.resolve`
+[`core/features.lua`](../lua/docmap/core/features.lua)'s `M.resolve`
 is the one function that decides what is understood.
 
 ---

@@ -45,7 +45,7 @@ made the drift visible and left it there — this is the fix.
 | `@module` | 125 | This repo's own "module path" convention — required on every file, checked by `docmap`'s `missing-module-tag`. **One per file, and there are 125 files**, which is the whole point of the check. |
 | `@class` | 87 | Structured types in `@types/` files |
 | `@alias` | 10 | Named unions / enum-shaped string literals |
-| `@raises` | 8 | Author-facing only, not evaluated by `documentation.nvim` — see [`annotation_tags.md` § `@raises`](annotation_tags.md#raises--an-author-facing-convention-not-evaluated-here). It was not in the table at all last time. |
+| `@raises` | 8 | Author-facing only, not evaluated by `docmap.nvim` — see [`annotation_tags.md` § `@raises`](annotation_tags.md#raises--an-author-facing-convention-not-evaluated-here). It was not in the table at all last time. |
 | `@meta` | 6 | Marks `@types/init.lua` files as pure-definition, non-executable |
 | `@generic` | 3 | Type-agnostic function signatures |
 | `@internal` | 2 | Part of the implementation, not the published surface. Sharpens every "is this used" question — `undocumented-param` skips it and the coverage number excludes it. |
@@ -82,7 +82,7 @@ say. Recorded so somebody can decide which it was.
   [`annotation_tags.md`](annotation_tags.md) for the full contract, including
   the one piece still open (`undocumented-param` does not yet credit an
   overload-only parameter list).
-- **`@deprecated`** — no hits. `docmap`'s function scanner (see [`functions.lua`](../lua/documentation/core/functions.lua))
+- **`@deprecated`** — no hits. `docmap`'s function scanner (see [`functions.lua`](../lua/docmap/core/functions.lua))
   recognizes it and renders a deprecation banner + surfaces it in the Functions section. High value:
   this is the single most Doxygen-shaped signal missing today.
 - **`@see`** — no hits. Recognized as a cross-reference; `docmap` renders it as a clickable link when
@@ -91,7 +91,7 @@ say. Recorded so somebody can decide which it was.
 - **`@async`** — no hits. Recognized as a badge on a documented function once function-level scanning
   exists. Medium value on its own; only useful once functions are individually documented.
 - **`@enum`** — no hits. This repo currently expresses "one of these string literals" via
-  `@alias Foo "a"|"b"|"c"` (see e.g. `Documentation.Kind`). For a table that's a real *runtime* value (like
+  `@alias Foo "a"|"b"|"c"` (see e.g. `Docmap.Kind`). For a table that's a real *runtime* value (like
   `vim.log.levels`-shaped constants), `@enum` is more accurate than `@alias` — LuaLS then knows the table
   itself is the enum, not just its keys' string shape. Medium value, but a case-by-case call, not a
   blanket replacement for every `@alias`.
@@ -112,7 +112,7 @@ Already in informal use, tolerated by `scan.lua`'s header parser as an alternati
 - **`@brief`** (8 hits), **`@description`** (10 hits) — competing convention for a module's leading
   summary line.
 
-Recognized by [`functions.lua`](../lua/documentation/core/functions.lua):
+Recognized by [`functions.lua`](../lua/docmap/core/functions.lua):
 
 - **`@example`** — a code sample attached to a function's doc block, rendered by `docmap` as its own
   fenced block instead of being flattened into prose. Many modules already informally embed a ` ```lua `
@@ -154,8 +154,8 @@ Two deliberate non-decisions:
 ## `@internal`
 
 Marks a function as implementation rather than published surface. Recognised
-by `docmap.functions` and used in four places: `undocumented-param` skips it,
-`docmap.diff` counts it among helpers instead of listing it as an API change,
+by `docmap.core.functions` and used in four places: `undocumented-param` skips it,
+`docmap.core.diff` counts it among helpers instead of listing it as an API change,
 the HTML map badges it, and `dead-function` checks it unconditionally for a
 missing caller (an ordinary exported function only gets that scrutiny under
 `opts.dead_code`, since a library's whole point is functions with no

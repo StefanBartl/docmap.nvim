@@ -24,7 +24,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
+  local docmap = require("docmap")
 
   ---@param gr string
   ---@param args string[]
@@ -74,8 +74,8 @@ return function(H)
     return vim.trim(r.stdout or "")
   end
 
-  ---@param handle Documentation.Handle
-  ---@return Documentation.Bindings.Ctx ctx
+  ---@param handle Docmap.Handle
+  ---@return Docmap.Bindings.Ctx ctx
   ---@return table calls {info=string[], warn=string[]}
   local function fake_ctx(handle)
     local calls = { info = {}, warn = {} }
@@ -92,7 +92,7 @@ return function(H)
         end,
       },
       find_node = function(ir2, name, lua_root)
-        return require("documentation.core.find").node(ir2, name, lua_root)
+        return require("docmap.core.find").node(ir2, name, lua_root)
       end,
       open_map = function()
         return true
@@ -133,7 +133,7 @@ return function(H)
 
   -- ================================================================ churn
   do
-    local churn = require("documentation.bindings.usrcmds.churn")
+    local churn = require("docmap.bindings.usrcmds.churn")
 
     local gr = H.tmpfile("_usrcmds_churn")
     vim.fn.mkdir(gr, "p")
@@ -209,7 +209,7 @@ return function(H)
 
   -- ================================================================= diff
   do
-    local diff_cmd = require("documentation.bindings.usrcmds.diff")
+    local diff_cmd = require("docmap.bindings.usrcmds.diff")
 
     local gr = H.tmpfile("_usrcmds_diff")
     vim.fn.mkdir(gr, "p")
@@ -281,7 +281,7 @@ return function(H)
 
   -- =============================================================== impact
   do
-    local impact_cmd = require("documentation.bindings.usrcmds.impact")
+    local impact_cmd = require("docmap.bindings.usrcmds.impact")
 
     local gr = H.tmpfile("_usrcmds_impact")
     vim.fn.mkdir(gr, "p")
@@ -348,7 +348,7 @@ return function(H)
 
   -- ============================================================ checklist
   do
-    local checklist_cmd = require("documentation.bindings.usrcmds.checklist")
+    local checklist_cmd = require("docmap.bindings.usrcmds.checklist")
 
     local gr = H.tmpfile("_usrcmds_checklist")
     vim.fn.mkdir(gr, "p")

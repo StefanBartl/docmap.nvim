@@ -28,12 +28,12 @@ Every stage of [`pipeline.md`](pipeline.md) that touches a source file goes
 through one lookup: `lang_registry.for_file(filename)`. The walk in
 `core/scan.lua` asks "who scans this filename" and "what marks a directory as
 owning a module here" instead of assuming there is one answer, and the
-registry hands back a `Documentation.LangBackend`.
+registry hands back a `Docmap.LangBackend`.
 
 Two rules hold that seam in place, and both are enforced rather than
 documented:
 
-- **`documentation.core` may not reach into `documentation.core.lang.*`.**
+- **`docmap.core` may not reach into `docmap.core.lang.*`.**
   A layer rule in the map's own checks catches it. `lang_registry.lua` is
   named that rather than `lang.init` precisely so the one module allowed to
   name every backend sits structurally *beside* the boundary instead of
@@ -197,8 +197,8 @@ one repository routinely mixes them.
 
 ## The contract, field by field
 
-`Documentation.LangBackend` is declared in
-[`lua/documentation/@types/init.lua`](../lua/documentation/@types/init.lua),
+`Docmap.LangBackend` is declared in
+[`lua/docmap/@types/init.lua`](../lua/docmap/@types/init.lua),
 which carries the full rationale per field. What follows is the working
 summary — what a backend must decide, and what happens when it decides wrong.
 
@@ -525,7 +525,7 @@ Both are regression-tested in `TESTS/markers_spec.lua`.
 
 ## Owning scope
 
-`Documentation.FunctionInfo.owner` names the class, `impl` block, trait,
+`Docmap.FunctionInfo.owner` names the class, `impl` block, trait,
 receiver type or inline module a function is declared in, and `owner_kind`
 says which of those it is. Both are set at the record site, where the parse
 tree still exists — the same place the qualified `name` is built, from the
@@ -534,7 +534,7 @@ same local.
 **The kind is the construct as the language names it**, not a normalised
 "type". Rust settled that: `Widget::new`, `Doer::go` and `inner::helper` are
 written identically and are an inherent method, a trait method and an inline
-module's function. `Documentation.ScopeKind` therefore has `impl`, `trait`
+module's function. `Docmap.ScopeKind` therefore has `impl`, `trait`
 and `module` as separate values, plus `receiver` for Go — which has no
 enclosing block at all, because the owner is written on each method.
 
@@ -596,7 +596,7 @@ open half of `MULTILANG.md`'s Phase 0 ("one file, many modules"), unchanged.
 What the owner closes is attribution: members are attributed to the thing that
 owns them instead of lying beside their neighbours.
 
-The grouping itself is derived, not stored — `documentation.core.scopes` for
+The grouping itself is derived, not stored — `docmap.core.scopes` for
 Lua-side consumers, and the same grouping in JavaScript on the generated page.
 `module_map.json` carries `owner`/`owner_kind` and nothing built from them.
 
@@ -631,7 +631,7 @@ See [`DEVELOPMENT.md`](DEVELOPMENT.md) for the rest of the local loop.
 
 ## Adding a backend
 
-1. Write `lua/documentation/core/lang/<name>.lua`, registering itself with
+1. Write `lua/docmap/core/lang/<name>.lua`, registering itself with
    `lang_registry.register` at the bottom of the file.
 2. Add one line to `KNOWN_BACKENDS` in `core/lang_registry.lua`.
 3. Add the grammar to `scripts/build_engine_release.sh`.

@@ -18,7 +18,7 @@ return function(H)
   local function falsy(v, msg)
     return ok(not v, msg)
   end
-  local sg = require("documentation.core.startup_graph")
+  local sg = require("docmap.core.startup_graph")
 
   local MINIMAL = '<?xml version="1.0" encoding="UTF-8"?>\n'
     .. '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">'
@@ -108,8 +108,7 @@ return function(H)
   pcall(os.remove, bad)
 
   -- ── the page: emitted only when there is a graph ────────────────────────
-  local html_src_path = (vim.fn.getcwd():gsub("\\", "/"))
-    .. "/lua/documentation/core/render/html.lua"
+  local html_src_path = (vim.fn.getcwd():gsub("\\", "/")) .. "/lua/docmap/core/render/html.lua"
   local f = assert(io.open(html_src_path, "rb"), "startup graph spec: html.lua must be readable")
   local src = f:read("*a")
   f:close()

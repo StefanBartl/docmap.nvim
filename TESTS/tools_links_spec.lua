@@ -15,10 +15,10 @@
 -- (The size bound is checked with a stand-in for `io.open`, put back after.)
 return function(H)
   local eq, ok = H.eq, H.ok
-  local config = require("documentation.config")
-  local docmap = require("documentation")
-  local tools = require("documentation.core.tools")
-  local safe_fs = require("documentation.core.safe_fs")
+  local config = require("docmap.config")
+  local docmap = require("docmap")
+  local tools = require("docmap.core.tools")
+  local safe_fs = require("docmap.core.safe_fs")
 
   local base = (vim.fn.tempname():gsub("\\", "/")) .. "_tools_links"
   local root = base .. "/repo"

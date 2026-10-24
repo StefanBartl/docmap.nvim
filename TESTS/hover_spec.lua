@@ -18,7 +18,7 @@
 -- current forever. That is covered separately from the file case.
 
 return function(H)
-  local hover = require("documentation.hover")
+  local hover = require("docmap.hover")
 
   -- ---------------------------------------------------------- dotted name --
   H.eq(
@@ -79,7 +79,7 @@ return function(H)
 
   hover._reset()
   H.ok(hover.setup(), "setup registers")
-  H.eq(captured.name, "documentation.nvim", "under this plugin's name")
+  H.eq(captured.name, "docmap.nvim", "under this plugin's name")
   H.ok(type(captured.contribution.positions) == "table", "as a position preview")
 
   local answer = captured.contribution.positions[1]

@@ -29,7 +29,7 @@
 --- argument list stays purely `cli.run`'s:
 ---
 ---   DOCMAP_ACTION_ROOT      the repository to map (default: cwd)
----   DOCMAP_ACTION_PLUGIN    documentation.nvim's own checkout
+---   DOCMAP_ACTION_PLUGIN    docmap.nvim's own checkout
 ---   DOCMAP_ACTION_LIB       lib.nvim's checkout
 ---   DOCMAP_ACTION_SOURCE    opts.source, `,`-separated for several roots
 ---   DOCMAP_ACTION_TITLE     opts.title
@@ -124,7 +124,7 @@ local notify = {
   end,
 }
 
-local opts = require("documentation.config").build(root, {
+local opts = require("docmap.config").build(root, {
   source = source(),
   title = env("DOCMAP_ACTION_TITLE"),
   out_dir = env("DOCMAP_ACTION_OUT_DIR"),
@@ -144,5 +144,5 @@ local opts = require("documentation.config").build(root, {
 -- repository it just cloned. A repository that wants its own checks has
 -- outgrown "adopt it in three lines" and should copy `scripts/gen_map.lua`
 -- as `docs/reuse.md` describes.
-local code = require("documentation.core.cli").run(opts, _G.arg or {})
+local code = require("docmap.core.cli").run(opts, _G.arg or {})
 vim.cmd("cq " .. code)

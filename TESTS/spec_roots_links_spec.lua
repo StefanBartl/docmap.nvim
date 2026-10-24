@@ -1,4 +1,4 @@
--- TESTS/spec_roots_links_spec.lua -- the spec files `documentation.testing`
+-- TESTS/spec_roots_links_spec.lua -- the spec files `docmap.testing`
 -- looks for are found and read through `core/safe_fs.lua`.
 --
 -- `testing/specs.lua` used to stat the tests directory and every `spec_roots`
@@ -13,11 +13,11 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local config = require("documentation.config")
-  local docmap = require("documentation")
-  local safe_fs = require("documentation.core.safe_fs")
-  local specs = require("documentation.testing.specs")
-  local testing = require("documentation.testing")
+  local config = require("docmap.config")
+  local docmap = require("docmap")
+  local safe_fs = require("docmap.core.safe_fs")
+  local specs = require("docmap.testing.specs")
+  local testing = require("docmap.testing")
 
   local base = (vim.fn.tempname():gsub("\\", "/")) .. "_spec_roots_links"
   local root = base .. "/repo"

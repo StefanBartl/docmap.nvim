@@ -3,7 +3,7 @@
 -- `IDEAS.md` §9's payload-contract test, written after the trap it exists
 -- for caught a sixth field.
 --
--- The trap: `Documentation.Node` and `documentation.to_json`'s field list are
+-- The trap: `Docmap.Node` and `docmap.to_json`'s field list are
 -- maintained separately, by hand, in two files. A field added to the first
 -- and forgotten in the second produces a scan that is completely correct and
 -- an artifact that silently lacks the data — which `--check` then cannot see
@@ -22,7 +22,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
+  local docmap = require("docmap")
 
   ---Fields a node legitimately carries and the artifact deliberately omits.
   ---
@@ -58,7 +58,7 @@ return function(H)
   )
   write("lua/core/helper.lua", "---@module 'core.helper'\n--- A helper.\nreturn {}\n")
 
-  local ir = require("documentation.core.scan").scan(require("documentation.config").build(root))
+  local ir = require("docmap.core.scan").scan(require("docmap.config").build(root))
   local doc = vim.json.decode(docmap.to_json(ir), { luanil = { object = true, array = true } })
 
   local emitted = {}

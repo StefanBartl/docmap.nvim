@@ -14,17 +14,17 @@
 -- shape rather than a stand-in for a real repository.
 --
 -- Measured before this existed: 18 external requires under `lib` from
--- documentation.nvim and 23 from runtime-analysis.nvim, all 41 resolving
+-- docmap.nvim and 23 from runtime-analysis.nvim, all 41 resolving
 -- against lib.nvim's own map — zero findings, which is what a healthy
 -- ecosystem produces. So the positive control below is what proves the
 -- check works; its silence on real repositories proves nothing.
 
 return function(H)
-  local fmsg = require("documentation.core.findings").format
+  local fmsg = require("docmap.core.findings").format
   local eq, ok = H.eq, H.ok
-  local scan = require("documentation.core.scan")
-  local check = require("documentation.core.check")
-  local tagfiles = require("documentation.core.tagfiles")
+  local scan = require("docmap.core.scan")
+  local check = require("docmap.core.check")
+  local tagfiles = require("docmap.core.tagfiles")
 
   local dr = H.tmpfile("_tag_requires")
   local function dwrite(rel, lines)

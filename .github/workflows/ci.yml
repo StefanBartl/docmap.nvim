@@ -93,7 +93,7 @@ jobs:
       # ui.nvim: editor/browse/init.lua requires ui.kit/ui.contextmenu
       # unconditionally at module load (moved out of lib.nvim in the
       # 2026-09 migration), and several specs require
-      # documentation.editor.browse/.pick directly. It is in the `deps` of
+      # docmap.editor.browse/.pick directly. It is in the `deps` of
       # `.testing.lua`.
       - uses: actions/checkout@v5
         with:
@@ -122,7 +122,7 @@ jobs:
       # this step existed, was all this job ever exercised. All three grammar
       # repos ship pre-generated `parser.c`, so only `tree-sitter build`
       # (compile), never `tree-sitter generate`, is needed. `TESTS/minimal_init.lua`
-      # reads `DOCUMENTATION_TS_PARSERS_DIR` and appends it to the rtp itself
+      # reads `DOCMAP_TS_PARSERS_DIR` and appends it to the rtp itself
       # if set — this step only has to produce the directory and export the
       # variable, not touch the test runner's own invocation.
       #
@@ -151,7 +151,7 @@ jobs:
           tree-sitter build --output .deps/ts-parsers/parser/python.so /tmp/tree-sitter-python
           git clone --depth 1 https://github.com/tree-sitter/tree-sitter-rust.git /tmp/tree-sitter-rust
           tree-sitter build --output .deps/ts-parsers/parser/rust.so /tmp/tree-sitter-rust
-          echo "DOCUMENTATION_TS_PARSERS_DIR=$(pwd)/.deps/ts-parsers" >> "$GITHUB_ENV"
+          echo "DOCMAP_TS_PARSERS_DIR=$(pwd)/.deps/ts-parsers" >> "$GITHUB_ENV"
       # Directly, not through `scripts/ci.sh tests`, so the JSON result (the
       # IR) can be written next to the log. `scripts/ci.sh tests` runs the same
       # runner for a local all-gates run.

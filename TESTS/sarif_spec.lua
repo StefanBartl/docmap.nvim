@@ -7,7 +7,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local sarif = require("documentation.core.render.sarif")
+  local sarif = require("docmap.core.render.sarif")
 
   local ir = {
     nodes = {

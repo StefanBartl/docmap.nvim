@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/api_spec.lua — `documentation.core.api`, the answers behind the
+-- TESTS/api_spec.lua — `docmap.core.api`, the answers behind the
 -- generated page's `/api/*` routes now that more than one host asks them.
 --
 -- The property under test is the contract both hosts depend on, not the
@@ -19,7 +19,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local api = require("documentation.core.api")
+  local api = require("docmap.core.api")
 
   local nowhere = { root = "/definitely/not/a/repository", out_dir = "docs/map" }
 

@@ -24,7 +24,7 @@ return function(H)
     return
   end
 
-  local backend = require("documentation.core.lang_registry").get("js")
+  local backend = require("docmap.core.lang_registry").get("js")
 
   ---@param body string
   ---@return table<string, string> name -> signature

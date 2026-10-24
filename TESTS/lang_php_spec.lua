@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_php_spec.lua — documentation.core.lang.php
+-- TESTS/lang_php_spec.lua — docmap.core.lang.php
 --
 -- Skips when the php parser is not reachable; `DOCMAP_PHP_PARSER` points at
 -- one without installing it into a runtimepath.
@@ -28,7 +28,7 @@ return function(H)
     ok_add, has_php = pcall(vim.treesitter.language.add, "php")
   end
 
-  local php = require("documentation.core.lang_registry").get("php")
+  local php = require("docmap.core.lang_registry").get("php")
   ok(php ~= nil, "the php backend must be registered")
 
   -- ---------------------------------------------------------------------
@@ -227,7 +227,7 @@ return function(H)
   -- but because that string is not PHP. The grammar was right; the question
   -- was.
   -- ---------------------------------------------------------------------
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(php.code_prelude, "<?php\n")
   eq(#markers.scan_source(php.code_prelude .. "// TODO: finish this", php), 1)
   eq(

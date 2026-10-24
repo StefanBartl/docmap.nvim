@@ -1,0 +1,889 @@
+---@meta
+---@module 'docmap.@types'
+
+---Configuration for a docmap run. Every field that could hardcode a
+---particular repo's layout is an option, so other plugins can point docmap at
+---their own tree.
+--- What `config.build` hands back: the same options, with `root` filled in --
+--- `build` takes it as its own first argument, so past that point it is no
+--- longer a question. Everything downstream of the resolve step (the handle,
+--- the `:DocMap` subcommands) takes this, not `Docmap.Opts`.
+---@class Docmap.Config : Docmap.Opts
+---@field root string
+---@field git? fun(opts: table, args: string[]): string?, string? Host-supplied git runner, installed by whoever is hosting the scan: `core/api.lua`'s history routes call it, the editor points it at a `vim.system` wrapper and the standalone build at `io.popen`. Absent means "no git here", which those routes answer with rather than error on.
+
+---@class Docmap.Opts
+---@field hover? boolean Register the position source that lets hover.nvim explain the module under the cursor from the generated map. Soft: without hover.nvim installed this does nothing. Default true.
+---@field root? string Absolute path to the repository root. Omitted in a `usrcmds.setup()` call, `:DocMap`/`:DocBrowse` resolve it **per invocation** from the current buffer's file (see `root_markers`); set it to pin every invocation to one tree, which is what a consuming plugin generating its own map wants.
+---@field root_markers? string[] `usrcmds.setup()` only, and only when `root` is absent: marker names `vim.fs.root` walks up for to find the repository containing the current buffer's file. Default `{ ".git" }` — matches a worktree's `.git` *file* as well as a normal `.git` directory. Falls back to the working directory for a buffer with no file behind it.
+---@field consumers? string Directory holding sibling checkouts whose committed maps name this project as a dependency. Enables `consumer-require-missing` and nothing else; unset (the default) leaves that check inert, which is right for the great majority of projects, since most are not libraries with a knowable consumer set. See `core/consumers.lua`.
+---@field source? string|string[] Directory or directories to scan, relative to `root`. Default: derived by `config.detect_source`. **Several** exist because a repository can hold two languages in two places (`lua/` beside `src/`, or C's `src/` beside `include/`), and one starting directory means the walk never *visits* the other — not skips it, never sees it, and reports nothing about it. A plain string still behaves exactly as it always did, including producing no synthetic parent node.
+---@field exclude? string[] Repository-relative paths the walk does not descend into and does not read. **Not a glob language, deliberately**: `scan.VENDOR_DIRS` already covers "this directory name wherever it appears" (`node_modules`, `target`, `dist`, …), which is what a wildcard would mostly be asked for; what is missing is the other shape — *this one path, in this one repository* — and a path answers it exactly. Matched as a path or a path prefix, so `src/generated` excludes the directory and everything under it while `src/gen` does not match `src/generated` — the separator is required. An excluded file is **not** counted as an unclaimed extension either: the reader declared it out of scope, and reporting it back as "a language this map contains none of" would turn their own instruction into a complaint about the repository. Default: none.
+---@field languages? string[] Backend names (`"lua"`, `"go"`, `"tsx"`, …) this scan may use; every other backend is invisible to it. `nil` or `{}` means **all of them**, which is the reading that cannot lose somebody's data — an empty selection almost always means the caller has nothing to say, and taking it as "read nothing" would produce an empty map that looks like a broken repository. Applied through `lang_registry.ENABLED`, scan-scoped and reset on every `scan()` for the same reason `snippet_max_lines` is. Filters `for_file`, `all` and the glossaries, but **not** `lang_registry.report()`: that is the capability handshake — what this *build* can read — and it must not change because one project asked for a subset. Unknown names are kept rather than dropped, so `{"golang"}` reads nothing rather than everything; `lang_registry.unknown()` is how a caller says so. Default: none.
+---@field lua_root? string Directory the Lua module path is relative to. Default "lua".
+---@field title? string Display name for the root node. Default: the source directory name.
+---@field types_dir? string Directory name holding type definitions, treated as a module attribute. Default "@types".
+---@field out_dir? string Output directory, relative to `root`. Default "docs/map".
+---@field repo_url? string Base URL used to build source links (e.g. "https://github.com/user/repo"). Auto-derived from `root`'s "origin" remote when unset and derivable (GS-16); otherwise absent from the built IR.
+---@field branch? string Branch used in source links. Auto-derived from `root`'s current branch when unset and derivable (GS-16); falls back to "main" otherwise.
+---@field extra_checks? Docmap.Check[] Repo-specific drift checks appended to the generic ones.
+---@field calls_heuristic? boolean Also emit call edges whose target was guessed by unique-name match rather than resolved through a require alias. Off by default — a wrong call graph is worse than an incomplete one. Default false.
+---@field docs_heuristic? boolean Also resolve documentation references written as a bare, tree-unique function name rather than a qualified one. Off by default, same posture as `calls_heuristic` and for the same reason — measured on this repository, the bare names doing the matching were `write`/`open`/`scan`/`add`/`esc`, all file-local helpers and all ordinary English words. Default false.
+---@field dead_code? boolean Also report *published* functions with no caller in the tree as dead-code candidates. Off by default, and that is not timidity: a library consists of functions with no internal caller by design, so this reports much of the public API on any tree that is a library. The always-on half of the check — file-local and `@internal` functions — needs no flag because there the statement holds. Default false.
+---@field layers? Docmap.LayerRule[] Module-prefix layering rules for the `layer-violation` check. Empty/absent disables the check.
+---@field luals? boolean Merge `lua-language-server --doc` output into the IR (class/alias/field detail, type-reference edges). Off by default — a full-tree run costs real seconds. Default false.
+---@field luals_timeout_ms? integer Kill the `lua-language-server --doc` run after this long. Default 60000.
+---@field git_log_timeout_ms? integer Ceiling for a `git log` over the full history (`churn`, the checklist's history pass, the MCP tool), in ms. Default 120000.
+---@field telemetry_ttl_ms? integer How long a telemetry read stays cached, in ms. Default 2000.
+---@field context_max? integer Longest stored context around a documentation mention, in bytes. Bounded because the map is a byte-deterministic artifact that is already large; raise it for more detail per reference. Default 120.
+---@field refs_per_entity? integer References kept per entity before the rest become a count. Default 20.
+---@field progress_style? "auto"|"notify"|"statusline"|"fidget"|"float"|"kit" Indicator while a long `:DocMap` runs (`full`'s LuaLS pass, `churn`'s history walk). Read by the bindings layer only — `core` stays UI-free. Needs lib.nvim, no-op without it. Default "auto".
+---@field command_name? string Passed to `docmap.command.setup`: register a user command under this name. Default "DocMap".
+---@field browse_command_name? string Passed to `docmap.command.setup`: register the editor-side map browser under this name. Default "DocBrowse".
+---@field keys? table<Docmap.Browse.KeyAction, string|string[]|false> Rebind or disable `:DocBrowse`'s keys, by action name. `false` turns an action off; a string or list replaces its left-hand sides; unlisted actions keep their defaults. Every binding is buffer-local to the browser, so a replacement only has to be free inside it. See `Docmap.Browse.KeyAction` for the list.
+---@field which_key? boolean Register `:DocBrowse`'s bindings with which-key when it is installed. Default true, and a no-op without which-key — the registration is guarded by `pcall`. Set false to keep the browser out of the which-key popup.
+---@field menu? boolean Bind `<RightMouse>` on `:DocBrowse`'s list to a context menu mirroring the cheatsheet, via nvzone/menu (soft dependency). Default true, and a no-op without nvzone/menu installed — same opt-out shape as `which_key`, and it sits beside it for the same reason: both are one switch over a surface `:DocBrowse` offers to whoever opened it.
+---@field debug? boolean Collect per-stage scan timings and report them after a `:DocMap`. Off by default. Coarse on purpose — one entry per pipeline stage, answering "which stage is slow"; anything finer is a profiler's job. Costs nothing when off: `timing.measure` is a direct call with no clock read.
+---@field watch? boolean `install()` only: rescan on `BufWritePost` under `source/**.lua`, debounced. Default false.
+---@field watch_ms? integer `install()` only: debounce interval for `watch`. Default 500.
+---@field callhierarchy? boolean `install()` only: attach a second, narrow LSP client to Lua buffers under `source/**.lua` that answers only `textDocument/prepareCallHierarchy`/`callHierarchy/incomingCalls`/`callHierarchy/outgoingCalls` and injects a caller/callee count into `textDocument/hover` — built because LuaLS itself has no call-hierarchy support at all (verified against its source and its own long-open feature request, 2026-08-10). Backed entirely by `handle.callers`/`handle.callees`, no new scan. Coexists with LuaLS rather than replacing it — Neovim's own `vim.lsp.buf.incoming_calls()`/`hover()` already query and merge every attached client. Off by default, same posture as `watch`/`pdf`. See `docmap.editor.callhierarchy`. Default false.
+---@field diagnostics? boolean `install()` only: publish `Docmap.Finding[]` as native `vim.diagnostic` entries on every open buffer under `source/**.lua` that has one, instead of only the `:DocMap check` quickfix list — the same data, a second, live-updating (via `on_change`) output. File-level granularity only, matching the quickfix list's own existing precedent (`bindings/usrcmds/generate.lua`'s `M.check` sets no `lnum` either — `Docmap.Finding` carries no line field at all, only `node`), so a diagnostic lands on the buffer's first line rather than pretending to a precision the data does not have. `info`-severity findings map to `vim.diagnostic.severity.HINT` — shown, unlike the quickfix list, which drops them. Off by default, same posture as `watch`/`callhierarchy`. See `docmap.bindings.diagnostics`. Default false.
+---@field mdview? boolean `install()` only: push a live, `core/render/mdview.lua`-shaped Markdown rendering of this root's IR to an already-running mdview.nvim session (github.com/StefanBartl/mdview.nvim, optional dependency, `pcall`-guarded — never a hard dependency) on every `on_change`. Pushes to `<root>/<out_dir>/overview.md` — the same path `generate()` writes `overview.md` to, so opening that file and running `:MDViewStart` is the whole setup. A silent no-op when mdview.nvim is not installed, or installed but no session is currently attached — never queues a doomed request or polls for a server that was never started. No Mermaid (mdview's client has no diagram renderer; see the module header for what ammonia's default sanitizer allows instead). Off by default, same posture as `watch`/`callhierarchy`/`diagnostics` — and, like them, only reacts to `on_change`, so pair with `watch = true` for it to update on every save rather than only on a manual rescan. See `docmap.editor.registry.ensure_mdview`. Default false.
+---@field tag_files? table<string, string> Doxygen `TAGFILES` equivalent: module-prefix -> another project's `docs/map`-shaped directory (must contain a committed `module_map.json`). A `requires_external` module matching the prefix resolves against that project's own artifact instead of staying an inert box. Local paths only — read synchronously during `scan_full()`, same as `opts.root` itself, so `--check` stays deterministic and offline. See `tagfiles.lua`.
+---@field external_repos? table<string, string|Docmap.ExternalRepo> `tag_files`'s sibling for the far more common case: the external module is a third-party plugin with no `docmap` artifact of its own to resolve against. module-prefix -> `"owner/repo"` (branch/lua_root default to "main"/"lua") or a full `Docmap.ExternalRepo` table. Builds a *guessed* GitHub blob URL — never verified, since that would mean a network call during `scan_full()`; see `external_repos.lua`'s header for the layout assumption behind the guess. Never overwrites an entry `tag_files` already resolved.
+---@field tests_dir? string Directory (relative to `root`) scanned for auto-derived test coverage — see `coverage.lua`. Default "TESTS". A missing directory is not an error: every function is simply left `tested = false`.
+---@field spec_roots? string[] Extra spec locations beside `tests_dir/**/*_spec.lua`: repository-relative directories or single `.lua` files. Read by `docmap.testing` (the affected-selection provider and `spec_state`); anything that is not a plain path inside the repository is refused and reported as a gap, never followed.
+---@field spec_state? boolean Show, per module, which specs require it and how the last run of them ended, in `index.html` and `overview.md`. Off by default; with it off the generated files are byte-identical to a build without this feature. The committed `module_map.json` never carries it (the last status differs per machine). See `docs/testing-contract.md`.
+---@field spec_state_file? string Host-only (a repository cannot set it): the run result to read the last status from — a testing.nvim Result-IR (`--json`) or its `runs.jsonl` history. Default: the history testing.nvim keeps under `stdpath('state')`, when present. Read as untrusted data.
+---@field quicks? Docmap.Quicks.Opts Tuning for the Quicks verdicts — thresholds and how many of each polarity to keep. Absent means the defaults in `core/quicks.lua`.
+---@field badge? boolean Write `coverage.svg` (a shields.io-shaped doc-coverage badge, see `doccoverage.lua`/`render/badge.lua`) alongside the other artifacts. Off by default — most consumers of `generate()` do not want an extra committed file they never asked for. Default false.
+---@field pdf? boolean Also write `overview.pdf` (same content as `overview.md`) via pdfport.nvim (github.com/StefanBartl/pdfport.nvim, optional dependency, soft-required — needs pandoc + a PDF engine). Off by default. Unlike the other artifacts this is asynchronous, so it is reported separately from `:DocMap`'s "wrote N artifacts" notification, not folded into it. See `docmap.write_pdf_artifact`. Default false.
+---@field telemetry_namespace? string The `runtime-analysis.telemetry` namespace to join against for the `telemetry` browse mode and dead-function suppression (ecosystem.md step 8). Default `title` — every telemetry instance in this ecosystem is namespaced by the plugin's own display name, so a caller who already sets `title` needs nothing extra; set this only when the two genuinely differ.
+---@field rules_gate? string The `rules.nvim` gate name (a `setup({ gates = {...} })` key, e.g. `"review"`) the `rules` browse mode runs live against this project's root. Unset: the mode reports "no rules gate configured" rather than guessing one — a gate name is a fact about the checked repo's own `rules.nvim` config, and unlike `telemetry_namespace` there is no `title`-shaped default to fall back to. A no-op without `rules.nvim` installed, same opt-out shape as `telemetry`/`which_key`. See `docmap.core.rules_join`.
+---@field traffic? Docmap.TrafficOpts Per-machine settings for the `traffic` browse mode, which reads github_stats.nvim's published traffic digest for this repository (soft dependency — a no-op without it, probed through `core.soft_require.probe("github_stats.digest")`, never `require("github_stats")` itself, which loads a UI). Unset: the repository is derived from `root`'s git remote and the digest directory is asked of the plugin — the usual case needs no configuration at all. See `docmap.core.traffic_join`.
+---@field telemetry? boolean Self-instrument this tree's own `require("docmap")` aggregate with `runtime-analysis.telemetry`, writing to `telemetry_namespace`/`title` — the write side of the `telemetry` browse mode above. Default true, and a no-op without runtime-analysis.nvim installed — same opt-out shape as `which_key`. Set false to keep this plugin out of its own telemetry data entirely. See `docmap.core.telemetry_self`.
+---@field godbolt? boolean **Experimental.** `generate()`/`scan_full()` only (not `install()`-only like `watch`/`callhierarchy`/`diagnostics` — this bakes into the generated page itself, so it works for anyone who opens the committed `docs/map/index.html`, no live Neovim session needed). Adds a "Compiler Explorer ↗" link next to every module and function, opening `godbolt.org` in a new tab pre-loaded with that entity's real source and Lua selected — a genuine `luac -l -l -p` bytecode disassembly, not a workaround (verified against Compiler Explorer's own API and compiler source, 2026-08-10, after an earlier roadmap assessment wrongly dismissed Lua as unsupported there). No new IR field: the link is built entirely client-side, lazily on click, from each function's already-serialized (and already-bounded) `fn.snippet` — a module's own link concatenates its functions' snippets in declaration order. The URL itself (Compiler Explorer's documented `clientstate` scheme, base64 in the URL, no API call needed to build one) is fully deterministic from the same source, so this does not put anything non-reproducible into a committed artifact. Off by default. Default false.
+---@field plugins? Docmap.PluginsOpts Plugin-spec extraction settings — see `Docmap.PluginsOpts`.
+---@field bindings? Docmap.BindingsOpts Keymap/user-command/autocmd extraction (`core/bindings.lua`). The `vim.*` APIs are always recognized and need no configuration at all; this exists only to declare a config's own wrappers, which is the common case in a real Neovim config and cannot be guessed safely.
+---@field startup_flamegraph? string Path to the startup flamegraph SVG that `runtime-analysis.nvim` writes (`:RATelemetry flamegraph`), baked into the generated page's Analysis → Startup panel. Unset: the default path `runtime-analysis.telemetry.report_file.flamegraph_path()` reports, when that plugin is installed — so the usual case needs no configuration at all, and this option exists for the one that does (a CI job pointing at an artifact it downloaded). Absent, unreadable, or not the shape a flamegraph has (`core/startup_graph.lua#M.is_safe` refuses rather than sanitises) and neither the panel nor its toolbar button is emitted. Unlike Telemetry and Loaded this is baked in rather than fetched — startup happens once per session instead of accumulating, so it is the one runtime measurement a committed artifact can carry honestly; `--check` compares it out of `index.html` on both sides, because a measurement is not a description of the source. Default: unset.
+---@field snippet_max_lines? integer Lines kept per function's embedded source snippet (`fn.snippet` — the hover-preview payload, and, when `opts.godbolt` is on, the Compiler Explorer link's own source) before the rest becomes an omitted-line count instead. Resolved once per `scan()`/`scan_full()` call into `core/snippet.lua`'s `M.MAX_LINES` — see that module's own header for why a scan-scoped override rather than a permanent global mutation. Default 40 (`core/snippet.lua`'s `M.DEFAULT_MAX_LINES`).
+---@field browse? Docmap.BrowseConfig Presentation defaults for `:DocBrowse` — layout fractions, theme, and which list it opens on. Absent means the browser's own defaults. Every field here already existed on `Docmap.Browse.Opts` and was honoured by `browse.open`; what was missing was any route from a user's spec to it, so a configured layout was reachable only by calling the Lua API by hand.
+---@field diagram? Docmap.DiagramOpts Presentation defaults for `:DocMap dot`/`:DocMap mermaid` — direction, roll-up depth, scope radius. Same situation `browse` was in: `render.dot`/`render.mermaid` read all of these and the two commands passed `{}`, so no spelling of a user's config could change a rendered graph.
+---@field checks? table<string, boolean|Docmap.Severity> Per-check policy, keyed by the `check` code a finding carries (`"undocumented-param"`, `"missing-summary"`, …). `false` switches a check off entirely; a severity string re-grades it. Unlisted checks keep the severity they are raised with. Applies to `extra_checks` results too, since those carry a `check` code like any other. See `core/check_policy.lua`.
+---@field features_dir? string|string[] Directory holding this repository's feature files — see `docs/features_format.md`. Default `{ "docs/FEATURES", "docs/features" }`, the first that exists. A repository whose prose lives under `documentation/` rather than `docs/` had no way to say so, while `tests_dir`/`out_dir`/`types_dir` were all options — this closes an inconsistency, not a feature gap.
+---@field checklist_dir? string|string[] Where the release checklist lives — see `docs/checklist_format.md`. Default `{ "docs/CHECKLIST", "docs/checklist", "docs/CHECKLIST.md", "docs/checklist.md" }`, the first that exists. A directory of `*.md` and a single file are both accepted, same as before.
+---@field install_dir? string Directory holding `install.json`/`INSTALL.md`, the declared external-tool manifest read by `core/tools.lua`. Default "docs".
+---@field theme? "light"|"dark"|"system" Theme baked into the generated page. Default "system" — follow the reader's OS, which is what the page did before this existed and what it still does when unset. `light`/`dark` stamp `data-theme` in `<head>`, the same attribute the `?theme=` query parameter sets, so a committed artifact can carry a project's own answer instead of depending on whoever opens it.
+---@field serve_port? integer Port `:DocMap serve` binds. Default 0 — the OS picks a free one, which is right for a server started on demand and closed again. Set it when the URL has to be stable enough to bookmark or to put in another tool's config.
+---@field generate_all? Docmap.GenerateAllOpts `usrcmds.setup()` only. Cross-repo project list for `:DocMap all [full]`/`:DocMapAll`/`:DocMapAllFull` — plain data a consuming plugin's own spec supplies (this file never reads a config's plugin list itself). Absent or empty `projects`: none of the three actions is registered at all. See `bindings/usrcmds/generate_all.lua`.
+
+---`opts.browse` — how `:DocBrowse` presents itself.
+---
+---A subset of `Docmap.Browse.Opts`, deliberately: the rest of that
+---class is *what to show* (`root`, `center`, `live`, `mode` per invocation),
+---which is the command's argument, not a setting. What is here is *how to
+---show it*, which is the half a person decides once.
+---@class Docmap.BrowseConfig
+---@field width? number Fraction of the editor the whole layout uses. Default 0.86.
+---@field height? number Fraction of the editor the whole layout uses. Default 0.86.
+---@field list_width? number Fraction of the layout given to the list column. Default 0.38.
+---@field theme? Ui.Kit.ThemeArg Passed through to the kit layout.
+---@field depth? integer Initial Deps walk depth. Default 2.
+---@field mode? Docmap.Browse.Mode Which list `:DocBrowse` opens on when the command names none. Default "structure". A mode given on the command line still wins.
+---@field trail_write_ms? integer Debounce before the trail file is written, in ms. The dial between "a crash loses less" and "the disk is touched less"; raise it on a network home directory. Default 400.
+
+---`opts.diagram` — how `:DocMap dot` and `:DocMap mermaid` draw.
+---
+---One table for both renderers rather than two, because every field here is
+---a picture-shaping decision a person makes once for a repository and not a
+---per-renderer one: a tree that reads well top-down reads well top-down in
+---both, and a roll-up depth that keeps one legible keeps the other legible.
+---The two renderers' own parameter names are kept (`rankdir` is Graphviz's
+---spelling, `direction` is Mermaid's) rather than unified into a third
+---vocabulary that would match neither tool's documentation.
+---@class Docmap.DiagramOpts
+---@field direction? "TB"|"TD"|"BT"|"LR"|"RL" Mermaid flowchart direction, for both `mermaid` shapes. Default "LR".
+---@field max_depth? integer Deepest node level `:DocMap mermaid tree` draws. Default 2.
+---@field deps_depth? integer Level the require graph is rolled up to in `:DocMap mermaid deps`. Default 1. Named apart from `max_depth` because the two bound different things — one is how deep the hierarchy is drawn, the other is how coarsely edges are aggregated — and one name for both would silently apply a tree depth to an edge roll-up.
+---@field rankdir? "TB"|"BT"|"LR"|"RL" Graphviz rank direction for `:DocMap dot`. Default "LR".
+---@field cluster_depth? integer Node level `:DocMap dot` draws subgraph clusters at. Default 2.
+---@field hops? integer Radius, in edges, of the neighbourhood `:DocMap dot <module>` keeps around the named module. Default 2.
+
+---`opts.generate_all` — the cross-repo project list `:DocMap all [full]`/
+---`:DocMapAll`/`:DocMapAllFull` and, when `autoload` is set, the first-load
+---check both read.
+---@class Docmap.GenerateAllOpts
+---@field projects Docmap.GenerateAll.Project[] Every project to generate for — `{root, title}` pairs, the exact shape `docmap.generate_all.run()` itself takes. A caller's own responsibility to build (typically from that caller's own plugin-list abstraction); this file never derives it.
+---@field autoload? boolean When true, `usrcmds.setup()` checks each project for an already-written `<root>/<out_dir>/module_map.json` and generates (async, non-blocking) only the ones missing — once, at `setup()` time. Off by default: writing into `docs/map` inside someone else's repository on every editor start without being asked is exactly the uninvited, hard-to-notice-until-`git status` side effect this plugin otherwise refuses to produce (see `generate_all.lua`'s own header, "Why no usercmd is registered here"). Opting in is the explicit request that default declines to infer on its own.
+
+---A repo-specific drift check.
+---@alias Docmap.Check fun(ir: Docmap.IR, opts: Docmap.Opts): Docmap.Finding[]
+
+---A source file's leading doc-comment block, parsed. What `scan.lua`'s
+---`parse_header` has always returned; named here so `Docmap.
+---LangBackend`'s `parse_header` field can point at one shape shared by every
+---language's implementation of it, not a shape only Lua's happens to match.
+---@class Docmap.Header
+---@field module string? The declared module path, however this language spells that — `---@module` for Lua, a JSDoc `@module` tag for JS/TS.
+---@field summary string
+---@field body string
+---@field tags table<string, string>
+
+---Where a language's glossary points for more than one sentence.
+---
+---One base URL per language rather than one per keyword: several hundred
+---independently rotting links are a worse bargain than one, and why the explanation in
+---`Docmap.Glossary.Entry.summary` never depends on this being alive.
+---@class Docmap.Glossary.Reference
+---@field label string Shown as the link text, e.g. "Lua 5.1 reference manual".
+---@field url string Base URL. An entry may append its own `anchor`.
+
+---What the page's tokenizer needs in order to *not* decorate a keyword that
+---is really part of a string or a comment.
+---
+---Data rather than a lexer per language: the page reads this and skips the
+---spans it describes. Deliberately approximate — every documented limit in
+---the two glossaries costs a missing decoration, never a wrong one, which is
+---the direction to fail in for a feature whose whole job is explaining.
+---@class Docmap.Glossary.Syntax
+---@field line_comment string? Prefix that comments out the rest of the line.
+---@field block_comment [string, string]? Opening and closing delimiter.
+---@field strings [string, string][] Opening/closing delimiter pairs.
+---@field escape string? Character that escapes the next one inside a string.
+---@field method_namespace string? The stdlib namespace a colon call belongs to — `"string"` for Lua, where `s:gsub(…)` *is* `string.gsub`. Set it and the page looks a single-word colon call up in that namespace; leave it unset and colon calls stay undecorated, which is what a language without one namespace of methods needs.
+
+---One keyword, and what the reader is told about it.
+---@class Docmap.Glossary.Entry
+---@field summary string One sentence, offline, never dependent on a link.
+---@field note string? A second sentence for the thing that surprises people — the `and`/`or`-return-operands class of fact. Omitted far more often than not; a note on every entry is a tutorial, which this is not.
+---@field origin string? Where the name comes from when it is not the language itself, e.g. `"Neovim"`. Shown on the card, and it also suppresses the language reference link — sending a reader to the Lua manual for `vim.split` would be a link that looks right and answers nothing.
+---@field anchor string? Appended to `Docmap.Glossary.Reference.url`. Absent until someone has actually opened the resulting link.
+
+---A language's whole glossary, as a backend exposes it.
+---@class Docmap.Glossary
+---@field reference Docmap.Glossary.Reference?
+---@field syntax Docmap.Glossary.Syntax?
+---@field keywords table<string, Docmap.Glossary.Entry>
+---@field stdlib table<string, Docmap.Glossary.Entry>? Dotted names — `table.concat`, `vim.split` — matched longest-prefix-first by the page's tokenizer. Chosen by measured use rather than by completeness: a transcription of a whole standard library is mostly entries nobody hovers, each one a line to keep true.
+
+---One supported source language, selected by file extension. See
+---`core/lang_registry.lua` for why this exists as a registry rather than an
+---if/elseif chain in `scan.lua`.
+---@class Docmap.LangBackend
+---@field name string Short identifier, e.g. `"lua"` — the same string it registers itself under, kept on the table too so `lang_registry.reset()` can re-register an already-cached backend by name without needing to re-require (and thus re-execute) its module.
+---@field module_file string? Filename that marks a directory as owning a module of its own (Lua: `"init.lua"`). `nil` for a language with no such convention, where every source file is its own node.
+---@field extensions string[]? Bare extensions this backend claims, e.g. `{"ts"}`. Redundant with `is_source` by construction and kept anyway: a predicate can answer "does this backend claim x.ts" but cannot be *enumerated*, and the page needs the list to decide which glossary a rendered snippet belongs to. Absent for a backend that would rather not say, which the page treats as "no glossary" rather than guessing.
+---@field detect_source fun(root: string): string? Where this language's sources live under `root`, relative and forward-slashed, or `nil` when this backend sees no evidence of itself. Asked by `config.detect_source` in registration order, first non-nil answer wins. **Must return `nil` rather than a guess**: a backend that answers unconditionally makes every later backend unreachable, which is exactly the bug this field was added to fix — `detect_source` used to be a Lua-only heuristic in `config/init.lua` that returned `"lua"` for every tree, so a JavaScript repository died on `source directory not found: <root>/lua`. **Looks at the disk through `core/safe_fs.lua`** (`entries`, `stat`, `is_dir`, with `root`), never with `vim.uv`/`vim.fn`/`vim.fs` directly: this runs before the scan has vetted anything, and the names it probes are the repository's to link. **A probe that recurses does not enter an entry `entries` marks `link`**, as the walk does not enter one: a directory of links back up the tree would be walked again from the top at every level, and the cost grows with the cube of their number.
+---@field glossary Docmap.Glossary? Keyword explanations for the page's in-place lookup. Optional: a backend without one decorates nothing, which is the honest degradation — falling back to another language's keywords would explain `goto` in a file where it means something else.
+---@field grammar string? Tree-sitter grammar this backend parses with, e.g. `"javascript"` for the backend named `"js"`. Named separately because the two genuinely differ: three of the four backends today have a grammar name that is not their own. `nil` for a backend that needs no parser at all — which is not the same as a backend whose grammar is merely missing, and `lang_registry.report()` keeps the two apart.
+---@field is_source fun(filename: string): boolean Whether `filename` (bare, no path) is a source file this backend scans.
+---@field line_comments string[]? Tokens that open a comment running to end of line, e.g. `{"--"}` for Lua, `{"//"}` for the ECMA family. Read by `core/markers.lua`. Absent means this backend's files are not scanned for marker comments at all — the honest default, because `#` opens a comment in Python and a preprocessor directive in C, and guessing wrong attributes a `TODO:` to a line that has none.
+---@field block_comments { [1]: string, [2]: string }[]? Opener/closer pairs for comments spanning lines, e.g. `{{"/*", "*/"}}`. Also read by `core/markers.lua`, and needed even where the opener is already covered by `line_comments` (Lua's `--[[` starts with `--`): without the closer, a marker on the third line of a commented-out region is invisible.
+---@field module_tag boolean? Whether this language has a `@module`-tag-shaped authoring convention worth `check.lua`'s `missing-module-tag` checking the absence of. Lua: `true` (its canonical module name cannot be recovered from the file path alone). A language whose module identity already is its file path (JS/TS's ESM imports resolve by path): `false` — nothing tag-shaped can be "missing." Absent/`nil` is treated as `true`, the conservative default that preserves today's behavior for a backend that never states an opinion.
+---@field code_prelude string? What a minimal file of this language must begin with for its code to *be* code. Absent for every language whose file is code from the first byte, which is all of them but one: **PHP source outside `<?php` is text**, so `// TODO: x` on its own is inline HTML and contains no comment at all — the grammar is right about that, and any tool handing this backend a bare fragment gets a correct answer to the wrong question. Read by `backend_contract_spec.lua`, which probes each backend's comment token by building the smallest file that could hold one; real callers pass whole files and never need it.
+---@field param_docs boolean? Whether this language has a per-parameter documentation convention at all — `@param`, `\param`, or an equivalent that names each parameter individually. LuaCATS, JSDoc, Javadoc and Doxygen do; Zig documents a declaration with one `///` block and has no per-parameter form, and an assembly label has no parameter list to name. Absent/`nil` is treated as `true`, the conservative default that preserves the behaviour of every backend written before this field existed. `false` makes `doccoverage.params_documented` vacuously true and silences `undocumented-param`, for the same reason `module_tag = false` silences `missing-module-tag`: a check that reports the absence of something the language cannot have produces a wrong number, not a low one. Found by `doccoverage.by_language`, which made a tree-wide average stop hiding that every Zig function scored undocumented forever.
+---@field call_scope ("file"|"package")? Where an *unqualified* call resolves. `"file"`, the default when absent, is what Lua and the ECMA family need: a bare `helper()` names something this file declares, because that is the only scope a name is visible in without a qualifier. `"package"` is Go's, and it is a language guarantee rather than a convenience — every `.go` file in one directory shares one scope, so `double(n)` in `widget.go` may name a function declared in `helper.go` beside it, with nothing at the call site saying so. Since Go has no `module_file`, those are two IR *nodes*, so a file-scoped resolver misses the majority of a Go call graph rather than a corner of it. Read by `core/calls.lua`'s `build`, which indexes a node's siblings under the same parent namespace when their backend declares this. A name two siblings both declare is dropped rather than guessed: in real Go that does not compile, so it means the directory is not one package (`foo` beside `foo_test`), and an ambiguous edge is the failure `calls_heuristic` exists to keep opt-in.
+---@field module_file_reexports boolean? Whether an import in this language's `module_file` is the package's export rather than a dependency the file uses. `true` for `python`: `from . import sub` in `__init__.py` is what makes `pkg.sub` reachable after `import pkg`, a use no search for the bound name can find. Read by `core/check.lua`'s `unused-require`, which skips such a file instead of reporting every re-export in it.
+---@field methods_need_receiver boolean? Whether a method can only be reached through a receiver or its class (`self.go()`, `Thing.go()`), never by its bare name. `true` for `python`: inside a method a bare `go()` looks in the function, the module and the builtins, never in the class body, so the method `Thing.go` is not a candidate for it. `true` for `rust` too, which needs `self.`, `Self::` or the type. Read by `core/calls.lua`'s `build`, which then indexes a function that has an `owner` under its declared name only, not under its bare one — without that, every bare call named like some method of the file became an edge to that method — and gives such a language no bare-name fallback for `Thing.x` either. Absent keeps the old indexing, which is what a language where a bare call does reach the enclosing class's methods (Java, C++, C#) needs.
+---@field emits_calls boolean? Whether this backend's `scan_file` returns call sites — the second slot of its eight-value tuple. `true` for `lua`, `js`, `ts`, `tsx`, `go`, `python` and `rust`; absent (and therefore false) for the other sixteen, which return `{}` there. **Declared so a host can say why a panel is empty**, which is the whole reason it exists: the Calls and Module Calls views, `:DocMap why`, the call-hierarchy integration and `dead-function`'s call tier all render empty for a Rust or Java project, and "this project has no calls" and "this build has no call extraction for this language" are different facts that look identical on screen. Nothing in those languages makes calls impossible; this field describes what is built, not what is possible, and it goes away as backends gain the capability. Verified rather than trusted: `backend_contract_spec.lua` runs each backend over its own parity fixture and fails a backend whose flag disagrees with what it actually returned.
+---@field parse_header fun(path: string): Docmap.Header
+---@field scan_file fun(path: string): Docmap.FunctionInfo[], Docmap.RawCall[], Docmap.RawRequire[], Docmap.SymbolInfo[], table[], Docmap.EndpointSpec[], integer, Docmap.BindingSpec[] Same eight-value shape `functions.lua`'s `scan_file` already returns. The fifth (`plugins`), sixth (`endpoints`) and eighth (`bindings`) are ecosystem-specific — see `docs/framework_conventions.md`/`docs/ecosystem.md` on why each is a layer *above* language support, not part of this contract — and a backend with no equivalent convention returns `{}` there, not `nil`. `bindings` sits after `lines` rather than beside its two siblings on purpose: this tuple is destructured positionally by every caller, so appending is additive where inserting would silently shift `lines`.
+
+---One layering rule: modules whose `@module` starts with `from` may not
+---require modules whose `@module` starts with `to`. Both are plain prefixes,
+---not patterns — `lib.vim` matches `lib.vim.buffer` but never `lib.vimx`.
+---
+---Second form, `siblings`: no direct child of that prefix may require another
+---direct child (`x.a.*` may not reach `x.b.*`), so "no backend requires
+---another" is one rule instead of one pair per two backends. A rule carries
+---either `from`/`to` or `siblings`; `allow` exempts shared targets in both.
+---@class Docmap.LayerRule
+---@field from string? Module prefix of the requiring side (pair form).
+---@field to string? Module prefix that side must not reach into (pair form).
+---@field siblings string? Module prefix whose direct children may not require each other (sibling form).
+---@field allow string[]? Module prefixes that may be required anyway — the shared modules the layering is designed around.
+---@field why string? Appended to the finding message.
+
+---@alias Docmap.Severity "error"|"warn"|"info"
+
+---@alias Docmap.Kind
+---| "module"    # A directory containing init.lua
+---| "namespace" # A directory without init.lua, grouping others
+---| "file"      # A non-init.lua Lua file
+
+---One node of the map.
+---@class Docmap.Node
+---@field id string Stable identifier — the repo-relative path.
+---@field kind Docmap.Kind
+---@field name string Display name (directory or file name).
+---@field path string Repo-relative path to the directory or file.
+---@field language string? Which language backend read this node, by its registered name (`lua`, `js`, `ts`, `tsx`). `nil` for a grouping namespace that has no module file of any language — guessing one from its children would make a directory holding both look like whichever child came first. Absent throughout an artifact of schema < 3, which is a different fact and why the schema was bumped.
+---@field source string? Repo-relative path to the Lua source backing this node.
+---@field module string? The declared `---@module` path.
+---@field summary string One-sentence description, from the header block.
+---@field body string Remaining header prose.
+---@field readme string? Repo-relative path to a sibling README.md.
+---@field types string[] Repo-relative paths of the module's type files.
+---@field export ("function"|"table"|"other"|"none")? Export shape of the source file.
+---@field parent string? Parent node id.
+---@field depth integer Distance from the root node.
+---@field children string[] Child node ids, directories first, then files.
+---@field types_detail Docmap.TypeInfo[]? `@class`/`@alias` detail for this node's `types` files, from `lua-language-server --doc`. `nil` when LuaLS enrichment did not run; `{}` is a real "ran, found nothing here" result.
+---@field markers Docmap.MarkerNote[] Marker comments (`-- TODO:`, `// FIXME:`) found in this node's own source file, in line order. Always an array. Empty for a namespace with no module file of any language, and for a backend that declares no comment syntax — see `Docmap.LangBackend.line_comments`. Absent throughout an artifact of schema < 4.
+---@field functions Docmap.FunctionInfo[] Documented functions found in this node's own source file (not its `@types/` files). Always an array, never nil — unlike `types_detail`, this runs unconditionally as part of `scan()`, no LuaLS required.
+---@field plugins Docmap.PluginSpec[] Plugin-manager (lazy.nvim-shaped) spec entries found in this node's own source — see `core/plugins.lua`. Always an array, empty for a source file that is not a plugin-spec file, which is nearly all of them; runs unconditionally as part of `scan()`, no configuration required.
+---@field bindings Docmap.BindingSpec[] Keymaps, user commands and autocmds registered in this node's own source — see `core/bindings.lua`. Always an array. The `vim.*` APIs are recognized unconditionally; a config registering through its own wrapper (`map(...)`, the common case) needs `opts.bindings.wrappers` to declare it, which is why this can legitimately be empty for a file that visibly binds keys.
+---@field endpoints Docmap.EndpointSpec[] Call-based route registrations (Express/Fastify/Koa-shaped) found in this node's own source — see `core/endpoints.lua`. Always an array, empty for a source file with no route registrations (nearly all of them, and every non-JS/TS file); runs unconditionally as part of `scan()`.
+---@field requires string[] Node ids this node requires, sorted. Derived from `ir.edges`; an index for convenience, not a second source of truth.
+---@field required_by string[] Node ids that require this node, sorted. Same derivation.
+---@field requires_external string[] Module paths this node requires that resolve to nothing in the scanned tree — other plugins, or anything outside `source`. Plain strings, not invented nodes: the map only claims to describe what it scanned. The Deps view can draw them on request.
+---@field calls_external? Docmap.ExternalCall[] Which functions of an external module (from `requires_external`) this node actually calls, and how often — see `core/calls.lua`. Always an array, sorted by module then member; empty when this node requires external modules but never calls into them (a require for its side effects alone, or one this parser's four resolvable call shapes cannot see — see that module's header for what is genuinely invisible to it).
+---@field requires_raw Docmap.RawRequire[] Unresolved `require` occurrences. Internal to the scan pipeline (`deps`/`calls` consume it); deliberately not serialized into `module_map.json`.
+---@field calls_raw Docmap.RawCall[] Unresolved call sites. Internal, same as `requires_raw`.
+---@field symbols Docmap.SymbolInfo[] Module-scope tables, constants and bindings in this node's own source. Always an array; runs unconditionally as part of `scan()`.
+---@field stats Docmap.Stats Counts over this node and everything below it.
+
+---A single `@class`/`@alias` parsed from `lua-language-server --doc` output,
+---attached to whichever node owns the file it's defined in.
+---@class Docmap.TypeInfo
+---@field name string Fully-qualified type name, e.g. "Docmap.Node".
+---@field kind "class"|"alias"
+---@field desc string
+---@field file string Repo-relative file the type is defined in.
+---@field fields Docmap.TypeField[] Empty for aliases and field-less classes.
+---@field extends string[] Parent class names as written in `---@class Child : A, B`, in source order. Always an array (empty when the class has no parent, and for every alias). Names are kept even when the parent is not declared anywhere in the tree — those simply produce no `"extends"` edge, the same way `requires_external` keeps a require whose target lives outside the map.
+
+---@class Docmap.TypeField
+---@field name string
+---@field view string Raw LuaCATS type text, e.g. "table<string, Docmap.Node>".
+---@field desc string
+
+---One `---@param` on a documented function.
+---@class Docmap.ParamInfo
+---@field name string
+---@field type string Raw LuaCATS type text.
+---@field optional boolean Declared as `name?`.
+---@field desc string
+
+---One `---@return` on a documented function. LuaLS allows a bare type with no
+---name (`---@return boolean`); `name` is nil in that case.
+---@class Docmap.ReturnInfo
+---@field type string Raw LuaCATS type text.
+---@field name string?
+---@field desc string
+
+---One `---@overload` on a documented function: an additional way the same
+---function may be called, expressed as a LuaCATS `fun(...)` type literal
+---rather than a second function definition — Lua has no true overloading,
+---so `@overload` documents alternative call shapes of the *one* function
+---below it, not alternative implementations.
+---@class Docmap.OverloadInfo
+---@field raw string The `@overload` value exactly as written, e.g. `fun(x: string): boolean`. Always present, even when `params`/`returns` below are empty because the value did not parse as `fun(...)`.
+---@field params Docmap.ParamInfo[] Parsed from inside the parens. `desc` is always `""` — a `fun()` type literal carries no per-parameter prose, only `name: type`. `optional` and `name` behave as they do on `Docmap.ParamInfo`.
+---@field returns Docmap.ReturnInfo[] Parsed from after the parens. `name`/`desc` are always nil/`""` for the same reason as `params`.
+
+---What a `Docmap.FunctionInfo.owner` *is*. Deliberately the construct
+---as the language names it rather than a normalised "type": an `impl` block
+---and a `class` group methods for different reasons, and flattening both to
+---"class" would throw away the one thing the reader of a Rust file is looking
+---for. `receiver` is Go's, which has no block at all — the owner is written
+---on each method instead.
+---@alias Docmap.ScopeKind
+---| "class"     # Python `class`, ECMA `class`, PHP/Java/Kotlin/Scala/Swift/Dart/C# classes.
+---| "interface" # Java/C#/PHP/Kotlin interfaces, and Go's `interface` method sets.
+---| "trait"     # Rust `trait`, PHP `trait`, Scala `trait`.
+---| "impl"      # Rust `impl Type` and `impl Trait for Type`.
+---| "struct"    # C#/Swift `struct`, and Rust's inherent members when written as one.
+---| "enum"      # Java/C#/Swift/Kotlin `enum` bodies that declare methods.
+---| "object"    # Kotlin `object`/`companion object`, Scala `object`, Ruby singleton classes.
+---| "extension" # Swift `extension`, Kotlin extension receivers, C# extension classes.
+---| "protocol"  # Swift `protocol`.
+---| "receiver"  # A Go method's receiver type — an owner with no enclosing block.
+---| "module"    # An inline module: Rust `mod x { … }`, Elixir `defmodule`, Ruby `module`.
+---| "namespace" # C++ `namespace` and the C-family `A::B` qualification it produces.
+
+---One owning scope of a node's source file, with the functions it owns.
+---Derived by `docmap.core.scopes` from `Docmap.FunctionInfo.owner`
+---— **not** a serialised IR field, because it is exactly the grouping of data
+---the artifact already carries and a second copy would be one more thing that
+---can disagree with itself. Consumers that want the grouping call for it; the
+---page does the same grouping in JavaScript, from the same field.
+---@class Docmap.ScopeInfo
+---@field name string The owner's name, as `Docmap.FunctionInfo.owner` carries it.
+---@field kind Docmap.ScopeKind
+---@field functions Docmap.FunctionInfo[] The scope's own functions, in the order the scan found them. Never empty — a scope exists here because a function named it.
+
+---A single documented function, extracted via `docmap.core.functions`
+---(a `vim.treesitter` query, not `lua-language-server --doc` — see that
+---module's header for why). Attached to whichever node owns the file it's
+---defined in.
+---@class Docmap.FunctionInfo
+---@field name string Qualified name as written, e.g. "M.scan_full" or "M.bar".
+---@field signature string Name + parameter list, e.g. "scan_full(opts)".
+---@field summary string One-line prose from the doc block, if any.
+---@field line integer 1-based line the function definition starts on.
+---@field line_end integer 1-based line the function definition ends on (the `end` keyword). With `line`, the span `docmap.history` maps a diff hunk's changed lines onto.
+---@field params Docmap.ParamInfo[]
+---@field returns Docmap.ReturnInfo[]
+---@field generic string[] `@generic` type names, if any.
+---@field deprecated string? `@deprecated` text; nil when not deprecated.
+---@field async boolean
+---@field nodiscard boolean
+---@field local_refs integer How often this function's bare name is mentioned elsewhere in its own file. Answers the one question call edges cannot: a function passed as a *value* (`vim.system(cmd, on_exit)`) is used but never appears at a call site. Deliberately coarse — an unrelated `x.read` counts toward a local `read` — because over-counting errs toward "used", which is the safe direction.
+---@field complexity integer Cyclomatic complexity (McCabe): 1 + one per `if`/`elseif`/`while`/`for`/`repeat`/`and`/`or`, counted over the function's own subtree including nested anonymous closures. Always computed, unconditionally — unlike `tested`/`documented`, there is no later resolve step that could derive it from the IR alone.
+---@field shape string Structural fingerprint: a hash of the treesitter node *types* over this function's whole subtree, never their text — so two functions differing only in identifier and literal names share one. What `duplicates.lua` groups by. Computed during the scan for the same reason as `complexity`: only there does the parse tree exist.
+---@field shape_size integer Node count behind `shape`. The duplicate detector's size floor applies to this: below it a shared shape means nothing, because every tree has a dozen one-line accessors that match each other.
+---@field internal boolean Declared `---@internal`: part of the implementation, not of the module's published surface. Sharpens every question of the form "is this used" — `undocumented-param` skips it, the diff counts it as a helper, and a dead-function report can trust it.
+---@field tested boolean Set by `coverage.resolve` (R2): this function's bare name is mentioned somewhere under `opts.tests_dir`. `false` until `coverage.resolve` has run, and even then means "not found by name in a spec" rather than "definitely untested" — see that module's header for the blind spot.
+---@field documented boolean Set by `doccoverage.resolve` (R4): a non-empty summary plus fully, correctly documented parameters. `false` for `@internal` functions regardless — an internal function's documentation bar is the author's own, and folding it into a "published API" number would answer a question nobody asked.
+---@field see string[] Raw `@see` targets, unresolved — `docmap.check` validates them.
+---@field overload Docmap.OverloadInfo[] Additional call signatures, each parsed the same way the function's own `params`/`returns` are — see `Docmap.OverloadInfo`.
+---@field todo string[] `@todo` entries, one per occurrence. Collected into the Notes tab's aggregate list, the way Doxygen's `\todo` feeds its Todo List.
+---@field bug string[] `@bug` entries, one per occurrence.
+---@field test string[] `@test` entries, one per occurrence.
+---@field example string? `@example` block text, if any.
+---@field since string? `@since` text, if any.
+---@field owner string? Name of the scope that owns this function — the class, `impl` block, trait, receiver type or inline module it is declared inside, written exactly as it appears at the front of `name`. `nil` for a free function, and `nil` throughout a language that has no such construct (Lua, C, assembly, Erlang). This is the fact behind the qualified name rather than a second copy of it: `Class.helper` at module scope and `helper` inside `Class` produce the same `name`, and only this field tells them apart. Absent throughout an artifact of schema < 6, where a consumer sees every function as unowned — which is the same shape a Lua or C tree has and therefore degrades into a flat list rather than into an error.
+---@field owner_kind Docmap.ScopeKind? What the owner is. Set and unset together with `owner` — never one without the other.
+---@field is_hook boolean? True when this function's name matches React's own hook convention (`^use[A-Z]`, the same signal `eslint-plugin-react-hooks` relies on) — set by `core/lang/ecma.lua`, `nil` for languages with no such convention (Lua never sets it).
+---@field snippet string? This function's own source, bounded to `core/snippet.lua`'s `MAX_LINES` — the embeddable tier of `docs/ecosystem.md` §3.5's hover preview. `nil` for an empty/invalid span, a real absence rather than an empty string standing in for one.
+---@field snippet_omitted integer Lines cut off past the cap; `0` when the whole function fit.
+
+---What kind of relationship an edge in `ir.edges` records. One array with a
+---discriminator rather than three parallel arrays, so layout, filtering and
+---drawing exist once each instead of once per relationship.
+---@alias Docmap.EdgeKind
+---| "type"    # A `---@field` on one class names another class.
+---| "extends" # One class inherits from another (`---@class Child : Parent`).
+---| "require" # One file calls `require` on another module in the tree.
+---| "call"    # One function calls another.
+
+---What a module-scope binding turned out to be. Deliberately coarse: the
+---distinction that matters when reading a module is "lookup table" vs "tuned
+---number" vs "something computed at load time", not a type.
+---@alias Docmap.SymbolKind
+---| "table"    # Bound to a table constructor.
+---| "constant" # Bound to a literal number, string or boolean.
+---| "binding"  # Anything else evaluated at load time.
+
+---One module-scope table, constant or binding, from `docmap.core.symbols`.
+---Functions and `require` bindings are excluded — `docmap.functions` and
+---`docmap.deps` own those.
+---@class Docmap.SymbolInfo
+---@field name string As written, e.g. "CACHE" or "M.defaults".
+---@field kind Docmap.SymbolKind
+---@field detail string Short right-hand-side summary: "12 fields" for a table, the literal for a constant, a condensed expression otherwise.
+---@field summary string One-line prose from the doc block above it, if any.
+---@field line integer 1-based line the binding starts on.
+
+---Keymap/user-command/autocmd extraction settings — see
+---`core/bindings.lua`'s header for why wrappers are declared rather than
+---detected, and for the measurement that made wrapper support the primary
+---case rather than a refinement.
+---Plugin-spec extraction settings.
+---
+---**Declared, never detected**, the same choice `Docmap.BindingsOpts`
+---makes for keymaps and for the same reason: a helper that takes the spec
+---array as its first argument is declarable, one that reorders or builds it
+---from something else is not, and guessing which is which is how a scanner
+---starts inventing plugins.
+---@class Docmap.PluginsOpts
+---@field wrappers? table<string, true> The caller's own spec-registering helpers, by the call text exactly as written (`"plugins.add"`, `"add"`). `core/plugins.lua` reads the **first table argument** of each such call as a lazy.nvim spec array, resolving the single-spec-versus-array ambiguity exactly as it does for a bare `return { … }`. Empty by default, so nothing changes for a config that does not declare one. Without it a config registering through a helper contributes no plugins at all — measured at more than half of one real config, hidden in a single 906-line file, while `core/plugins.lua`'s own header still claimed every real spec file used the direct form.
+
+---@class Docmap.BindingsOpts
+---@field wrappers? table<string, "keymap"|"keymap_buf"|"usercmd"|"usercmd_buf"|"autocmd"> The caller's own registration helpers, `callee -> argument layout`. The key is the call text exactly as written (`"map"`, `"usercmd.create"`, `"nvim_create_autocmd"` for a bare `local` alias — all three are real shapes from one config). The value names one of the built-in argument layouts, so only a wrapper that preserves the wrapped API's argument order is declarable; one that reorders is out of scope rather than mis-parsed.
+
+---One keymap / user command / autocmd registration found in the source —
+---see `core/bindings.lua`'s header for which callees are recognized (the
+---`vim.*` APIs always; caller-declared wrappers via `opts.bindings.wrappers`)
+---and why a wrapper has to be declared rather than guessed.
+---@class Docmap.BindingSpec
+---@field kind "keymap"|"usercmd"|"autocmd" What the binding is, independent of which callee registered it.
+---@field callee string The dotted call text exactly as written (`"vim.keymap.set"`, `"map"`, `"usercmd.create"`) — provenance for a row, and what a caller matches against when a wrapper's rows look wrong. Never resolved to what an identifier points at.
+---@field line integer 1-based line the registering call starts on.
+---@field lhs string? Keymap left-hand side, when it is a string literal. `nil` for a non-literal (`prefix .. "x"`) — never a guessed value.
+---@field name string? User command name, same literal-only rule.
+---@field modes string[] Keymap mode(s), normalised to an array whether declared as one string or a `{ "n", "v" }` list. Empty for non-keymaps.
+---@field events string[] Autocmd event(s), same normalisation. Empty for non-autocmds.
+---@field desc string? The `desc` field of the options table, when set — the human answer to "what does this do", collected instead of the right-hand side (see the module header for why the rhs is deliberately not captured).
+---@field buffer boolean Buffer-local registration — either the `nvim_buf_*` variant or an explicit `buffer` in the options table.
+
+---One plugin-manager spec entry — currently lazy.nvim's shape only, see
+---`core/plugins.lua`'s header for why packer/vim-plug are a separate,
+---unbuilt extractor rather than a bent version of this one.
+---@class Docmap.PluginSpec
+---@field repo string The "author/repo" shorthand, or the `name`/`dir`/`url` fallback when no positional string is given.
+---@field line integer 1-based line the spec entry starts on.
+---@field lazy boolean? Explicit `lazy = true|false`; `nil` when unstated — lazy.nvim's own default is true when any trigger field is present, false otherwise, which this does not attempt to re-derive.
+---@field event string[] `event` trigger(s), normalised to an array whether declared as one string or several.
+---@field cmd string[] `cmd` trigger(s), same normalisation.
+---@field ft string[] `ft` trigger(s), same normalisation.
+---@field keys string[] Left-hand sides of `keys` trigger entries — what the mapping does is not collected, only when it makes the plugin load.
+---@field dependencies string[] Dependency repo shorthands, one level of nested-spec-table unwrapped.
+---@field enabled boolean? Explicit `enabled = true|false`; `nil` when absent or set to a function (dynamic — not evaluated).
+---@field priority integer?
+---@field branch string?
+---@field version string?
+---@field dir string?
+---@field url string?
+---@field has_opts boolean Whether the spec sets `opts` at all, not what it contains.
+---@field has_config boolean Whether the spec sets `config` (a table, `true`, or a function) at all.
+
+---One call-based route registration — `app.get("/path", handler)`-shaped,
+---see `core/endpoints.lua`'s header for exactly what is and is not
+---recognized, and why file-based routing (Next.js/SvelteKit/Nuxt/Remix) is
+---a separate, unbuilt concept rather than a bent version of this one.
+---@class Docmap.EndpointSpec
+---@field method string HTTP method, lowercase, as written (`"get"`, `"post"`, ... or `"all"`).
+---@field path string Route path as written, including any Express-style params (`":id"`).
+---@field handler string? The handler's declared name, when it is a named reference; `nil` for an inline function/arrow expression with nothing to name.
+---@field line integer 1-based line the route registration call sits on.
+---@field framework string? Recognized from this file's own imports (`express`/`fastify`/`koa`/`connect`/`restify`/`hapi`); `nil` when the call shape matched but no known routing package was imported in this file.
+---@field documented boolean Whether the handler (when named) is one of this file's own functions with a non-empty summary; `false` for an inline handler or an unresolved name.
+
+---Counts over a node and everything below it. Aggregated rather than own-only:
+---the question a directory answers is "how big is this part of the tree".
+---@class Docmap.Stats
+---@field modules integer Directories with an `init.lua`.
+---@field namespaces integer Directories without one.
+---@field files_lua integer `.lua` files, including `init.lua` and `@types/`.
+---@field files_md integer Markdown files, including READMEs.
+---@field files_other integer Everything else that is not a directory.
+---@field lines integer Lines of Lua.
+---@field functions integer Documented top-level functions.
+---@field symbols integer Module-scope tables, constants and bindings.
+---@field types integer `@class`/`@alias` definitions — only non-zero once LuaLS enrichment ran.
+
+---A directed edge between two nodes. Which of the optional fields are set is
+---determined by `kind` — see each field. `ir.edges` is always an array, empty
+---when nothing produced edges, so renderers never need a presence check.
+---@class Docmap.Edge
+---@field kind Docmap.EdgeKind
+---@field from string Node id of the referencing/requiring/calling side.
+---@field to string Node id of the referenced/required/called side.
+---@field from_class string? `kind="type"|"extends"`: fully-qualified name of the referencing/inheriting class.
+---@field to_class string? `kind="type"|"extends"`: fully-qualified name of the referenced/inherited class.
+---@field via string? `kind="type"`: field name that carries the reference. Absent for `"extends"`, where nothing mediates the relationship.
+---@field to_module string? `kind="require"`: the module path as written in the `require` call.
+---@field deferred boolean? `kind="require"`: every occurrence sits inside a function body, so this is a lazy load rather than a load-time dependency. Absent means at least one load-time require.
+---@field from_fn string? `kind="call"`: declared name of the calling function, e.g. "M.generate".
+---@field to_fn string? `kind="call"`: declared name of the called function.
+---@field line integer? `kind="require"|"call"`: 1-based line of the call site.
+---@field confidence Docmap.Confidence? `kind="call"`: how the target was determined.
+
+---How a call edge's target was determined. `"exact"` means the callee was
+---resolved through a `require` alias, the module's own export table, or a
+---file-local function — a syntactic fact. `"heuristic"` means the name matched
+---exactly one function in the whole tree and nothing else pinned it down; only
+---produced when `opts.calls_heuristic` is set, and drawn differently.
+---@alias Docmap.Confidence "exact"|"heuristic"
+
+---One `require(...)` occurrence as found in a source file, before it is
+---resolved against the map. `alias` is set for the `local x = require("y")`
+---form, which is what makes call resolution possible at all.
+---@class Docmap.RawRequire
+---@field module string The module path as written.
+---@field alias string? Local name it was bound to, if any.
+---@field member string? Trailing field access, as in `local x = require("y").z`.
+---@field names table<string, string>? Bare names this import binds, mapped to the member each refers to — `import { a, b as c }` gives `{ a = "a", c = "b" }`. JS binds an imported function directly into scope, so a call to it looks like a file-local one and has nothing for the alias-then-member model to resolve through; this is what `calls.lua` matches a bare callee against. Absent for every shape that binds no such name, including a *default* import, which names the default export rather than the module object.
+---@field deferred boolean? The call sits inside a function body — a lazy load, not a load-time dependency.
+---@field line integer
+
+---One call site as found in a source file, before it is resolved against the
+---map. `callee` is the raw text of the called expression (`fs.read`, `M.foo`,
+---`helper`), `from_fn` the declared name of the top-level function it sits in.
+---@class Docmap.RawCall
+---@field callee string
+---@field from_fn string?
+---@field line integer
+
+---One resolved call into a module outside the scanned tree — the same
+---question `requires_external` answers about *requiring* a module, asked
+---about actually *calling into* it: not just "plenary is a dependency" but
+---"because of `plenary.async.run` (2×)". See `core/calls.lua`'s header for
+---how this is counted in the same pass that resolves internal call edges,
+---never a second traversal.
+---@class Docmap.ExternalCall
+---@field module string The required module path, exactly as `requires_external` already reports it, e.g. "plenary.async".
+---@field member string? The dotted member actually called, e.g. "run"; `nil` when the module itself was called with no member access at all (rare, but not impossible — a callable-table require).
+---@field count integer How many call sites in this node resolved to this exact `module`/`member` pair.
+
+---One added or removed require edge in a `Docmap.Diff`.
+---@class Docmap.DiffEdge
+---@field edge string `"<from id> -> <to id>"`.
+---@field deferred boolean? The edge is a lazy require.
+---@field changed boolean? The edge existed before but stopped being lazy — a load-time dependency that did not exist previously, which is how initialisation cycles get introduced.
+
+---What one revision changed about the *shape* of the tree, from
+---`docmap.core.diff`.
+---@class Docmap.Diff
+---@field nodes_added string[] Node ids, sorted.
+---@field nodes_removed string[]
+---@field functions_added string[] `"<node id>#<declared name>"`, sorted.
+---@field functions_removed string[]
+---@field deps_added Docmap.DiffEdge[]
+---@field deps_removed Docmap.DiffEdge[]
+---@field deps_comparable boolean False when the older map predates the dependency graph, in which case the dependency, cycle and impact sections are empty because they are unknowable, not because nothing changed.
+---@field cycles_added string[] Load-time cycles introduced.
+---@field cycles_removed string[]
+---@field impact_changed { id: string, before: integer, after: integer }[] Sorted by how much the blast radius moved.
+
+---One classified change to a published function, from `docmap.core.diff.surface`.
+---@class Docmap.SurfaceChange
+---@field key string `"<node id>#<declared name>"`.
+---@field kind string `removed`, `internalised`, `params`, `returns`, `narrowed`, `widened`, `added` or `type`.
+---@field detail string What changed, as a short sentence.
+
+---What a revision did to the published surface, from `docmap.core.diff.surface`.
+---@class Docmap.Surface
+---@field breaking Docmap.SurfaceChange[] Changes that can break a caller; what a CI gate fails on.
+---@field additive Docmap.SurfaceChange[] Changes that cannot.
+---@field unclassified Docmap.SurfaceChange[] Changes that could not be judged (a side typed `any` or not at all).
+---@field guessed_visibility integer Published functions of the older map whose visibility came from the shape of the name, not from `@internal`.
+
+---A drift finding.
+---A finding travels as data and becomes a sentence at the edge that shows
+---it — see `core/findings.lua` for why (in one line: a sentence assembled
+---inside the check cannot be reordered for a language that puts its pieces
+---in a different order).
+---@class Docmap.Finding
+---@field severity Docmap.Severity
+---@field check string Stable check identifier, e.g. "missing-summary". Also the message-catalog key, unless `params.variant` is set.
+---@field node string? Node id the finding attaches to.
+---@field params table<string, any>? Values for the catalog template. `variant` selects a sub-template rather than being printed — `dead-function` reports three genuinely different facts and each is its own entry. Absent on a finding that carries `message` instead.
+---@field message string? Prose, already rendered. **Only for `opts.extra_checks`**, whose findings come from another repository's own code and have no entry in this catalog; such a finding passes through `findings.format` untouched. Every built-in check carries `params` and leaves this nil.
+
+---Metadata about a scan. Deliberately carries no timestamp: a generated-at
+---field would make every regeneration a diff even when nothing changed, which
+---defeats `--check`.
+---@class Docmap.Meta
+---@field title string
+---@field source string The directory the scan started from. Stays a string even with several source roots, where it is the repository root they share -- a field that is sometimes a string and sometimes a list is worse than one that is always the honest single answer.
+---@field sources string[]? Every directory walked, present **only** when there was more than one. Absent means `source` alone describes the scan, which is what it did before this field existed -- so a single-root map is byte-identical to the ones generated before multi-root support.
+---@field unclaimed table<string, integer>? Extensions seen *inside* the scanned roots that no backend claimed, and how many of each. Mostly READMEs in a healthy repository, which is why the CLI does not print it — it is here for a surface that can rank it. Absent when empty.
+---@field outside table<string, integer>? Files a backend *can* read that sit outside every source root, counted by backend name. Unambiguously a coverage gap, unlike `unclaimed`: something exists that could have read them and never saw them. Absent when empty, which is the common and the good case.
+---@field claimed table<string, integer>? Files each backend actually read, by backend name. What separates a language merely *partly* outside the source roots (a `scripts/` beside `lua/` -- ordinary and intentional) from one entirely outside them, which is the real gap. Absent when empty.
+---@field types_dir string
+---@field repo_url string?
+---@field branch string
+---@field schema integer IR schema version.
+---@field counts table<string, integer> Node counts per kind.
+
+---A `requires_external` module resolved to somewhere a reader can actually
+---go — from either of two independent resolvers into the same `ir.tag_links`
+---table. `tagfiles.lua` (Doxygen `TAGFILES` equivalent, `opts.tag_files`)
+---sets `html` to a **local path** into another checked-out project's own
+---generated page, a bare `#<node id>` fragment, the same shorthand a
+---hand-typed or shared link uses. `external_repos.lua` (`opts.external_repos`)
+---sets it to a **guessed absolute GitHub blob URL** instead, for a
+---third-party plugin with no `docmap` artifact of its own. Both shapes reach
+---the same consumer unchanged (`window.open(link.html, "_blank")` in the
+---generated page), so nothing downstream needs to know which resolver an
+---entry came from.
+---What `tagfiles.resolve` could *not* do, so a check can say it out loud.
+---
+---`nil` when `opts.tag_files` is unset — the same "never ran" contract
+---`types_detail` has, and the reason it is not simply an empty table:
+---`ir.tag_links` is set unconditionally, so its presence says nothing about
+---whether anything was configured, and a check must stay silent rather than
+---report a clean bill for a question nobody asked.
+---@class Docmap.TagAudit
+---@field missing Docmap.TagMiss[] Requires whose target project's own map loaded and does not declare them.
+---@field unavailable { prefix: string, dir: string }[] Configured tag files whose `module_map.json` could not be read at all, once per directory. **Expected rather than exceptional in this ecosystem**: every plugin here but `docmap.nvim` gitignores `docs/map/`, because a committed map is stale the moment anything it describes changes and only this repository gates that in CI. So a fresh clone has no artifact to resolve against, and the honest report is "this was not checked", never "this is fine".
+
+---One `requires_external` module that a configured tag file's own artifact
+---does not declare.
+---@class Docmap.TagMiss
+---@field module string The required module, e.g. "lib.nvim.fs.gone".
+---@field prefix string The `tag_files` prefix that claimed it.
+---@field dir string Resolved directory of the map that was read.
+---@field nodes string[] Node ids of the files requiring it, in `ir.order`.
+
+---@class Docmap.TagLink
+---@field title string The link's display title — the resolved node's `module`/`name` for a `tag_files` entry, the bare required module string for an `external_repos` one.
+---@field html string Either shape described above.
+
+---One `opts.external_repos` entry, full form — a bare `"owner/repo"` string
+---is shorthand for this with `branch = "main"`, `lua_root = "lua"`, no
+---`local_path`.
+---@class Docmap.ExternalRepo
+---@field repo string `"owner/repo"` GitHub shorthand.
+---@field branch? string Default "main".
+---@field lua_root? string The target repo's own Lua root, for the guessed path — `<lua_root>/<module, dots as slashes>.lua`. Default "lua".
+---@field name? string The sibling's repository *directory* name, when it differs from the module prefix this entry is keyed by (`docmap.nvim` against a `docmap` key). Set it together with `local_path` to have `sibling-reference-missing` resolve `<name>/<path>` citations against that checkout; a prefix that already equals the directory name still needs it stated, because the check only considers names somebody declared.
+---@field local_path? string Path to a local checkout of the same repo, when one happens to exist. Absolute, or relative to `opts.root` (`"../lib.nvim"`) so a committed `.docmap.json` stays true on every machine; an absent checkout is silence, never a finding (this ecosystem's own sibling-repos-under-one-directory layout, for instance). When set, the path is *verified* against the checkout on disk — both the flat `<module>.lua` and the directory `<module>/init.lua` shape are real, common conventions (lib.nvim itself uses the directory shape almost everywhere), and guessing wrong produces a working link to a 404. Absent, the flat shape is assumed unverified — see `external_repos.lua`'s header. **Setting this obliges every machine that runs `--check` to have the checkout too:** the verified shape goes into the byte-compared artifact, so a machine without it generates not a worse map but a different one, and the gate then reports a tree nobody touched as stale.
+
+---One file's changed line ranges, parsed out of `git diff --unified=0` by
+---`docmap.history`. `old_path`/`new_path` are nil on the `/dev/null` side of
+---an added or deleted file, and differ from each other on a rename.
+---@class Docmap.History.FileDiff
+---@field old_path string? Path in the parent revision.
+---@field new_path string? Path in the revision itself.
+---@field old { first: integer, last: integer }[] Changed line ranges, parent side.
+---@field new { first: integer, last: integer }[] Changed line ranges, this side.
+
+---A function a diff's changed lines fall inside.
+---@class Docmap.History.Touched
+---@field node string Node id owning the function.
+---@field fn string Declared function name.
+---@field line integer 1-based line the function starts on.
+---@field signature string
+
+---One call site targeting a touched function.
+---@class Docmap.History.Caller
+---@field node string Node id the call is written in.
+---@field fn string Declared name of the calling function.
+---@field line integer? 1-based line of the call site.
+
+---What one diff radiates to — see `docmap.history`.
+---@class Docmap.History.Impact
+---@field files string[] Every changed path the diff named, sorted.
+---@field touched Docmap.History.Touched[] Functions whose span the changed lines fall inside.
+---@field callers table<string, Docmap.History.Caller[]> Keyed `"<node>#<fn>"`: direct callers of each touched function.
+---@field calling_modules string[] Distinct nodes containing at least one of those call sites — the precise answer.
+---@field impacted_modules string[] Transitive `required_by` closure of the touched nodes (`deps.impact`) — the coarser answer.
+---@field unattributed string[] Changed paths that produced no function attribution: not a scanned node, an IR without functions, or lines outside every function.
+---@field approximate boolean True when at least one attribution came from an artifact without `line_end`, so function spans had to be approximated from the next function's start. Over-attributes rather than under-attributes; a UI should say so.
+
+---The intermediate representation every renderer and check reads.
+--- One entry in the name -> entity index `docs.lua` resolves mentions
+--- against. `fn` is set only for `kind = "function"`.
+---@class Docmap.Docs.Entity
+---@field kind "module"|"function"
+---@field node string Node id.
+---@field fn string? Declared function name, e.g. "M.scan_full".
+
+--- A resolved mention: an entity plus how confidently it was placed. Same
+--- vocabulary as `Docmap.Confidence` on a call edge, for the same
+--- reason — `"heuristic"` here means a bare name that exactly one module in
+--- the tree owns, and nothing else pinned it down.
+---@class Docmap.Docs.Target : Docmap.Docs.Entity
+---@field confidence Docmap.Confidence
+
+--- Built once per scan by `docs.build_index`. `bare` deliberately holds only
+--- names owned by exactly one function in the whole tree; a name owned twice
+--- is removed rather than resolved to a winner.
+---@class Docmap.Docs.Index
+---@field exact table<string, Docmap.Docs.Entity> Module paths, declared function names, and qualified `module.bare` forms.
+---@field bare table<string, Docmap.Docs.Entity> Unqualified function names that are unique tree-wide.
+---@field modules table<string, string> Module path -> node id.
+---@field fns_by_module table<string, table<string, string>> Module path -> bare name -> declared name.
+
+--- One documentation file in the corpus.
+---@class Docmap.Docs.File
+---@field path string Repo-relative.
+---@field title string First `#` heading, or the filename when there is none.
+---@field refs integer Mentions in this file that resolved to something.
+
+--- One place a doc mentions an entity.
+---@class Docmap.Docs.Ref
+---@field doc string Repo-relative path of the mentioning file.
+---@field line integer 1-based line of the mention.
+---@field text string The code span exactly as written.
+---@field context string The surrounding line, whitespace-collapsed and length-bounded.
+---@field confidence Docmap.Confidence
+
+--- A code span whose longest dotted prefix is a real module but whose
+--- remainder names nothing in it — prose describing a function that has been
+--- renamed or removed. See `docs.lua`'s header for why the rule is this
+--- narrow.
+---@class Docmap.Docs.Missing
+---@field doc string
+---@field line integer
+---@field text string The span as written.
+---@field module string The module path that did resolve.
+---@field node string? Node id of that module, so a finding can be attributed without rebuilding the index.
+---@field missing string The remainder that did not.
+
+--- `ir.docs`. Keys of `refs` are node ids for modules and `nodeId#fnName`
+--- for functions — the same key shape `calls.lua` and the rendered page
+--- already use.
+---@class Docmap.Docs.Result
+---@field files Docmap.Docs.File[] Sorted by path.
+---@field refs table<string, Docmap.Docs.Ref[]> Each list sorted by doc then line, capped, with a `more` count when it overflowed.
+---@field missing Docmap.Docs.Missing[] Sorted by doc, line, text.
+
+---One verdict about the tree — see `core/quicks.lua`.
+---@class Docmap.Quick
+---@field id string Stable identifier, e.g. "test-coverage". What a threshold override is keyed by (underscores for hyphens).
+---@field polarity "good"|"bad"
+---@field value number The measured number itself.
+---@field unit "percent"|"count"
+---@field n integer? The numerator behind a percentage — the 45 in "45 of 72". Absent for a `count`.
+---@field total integer? The denominator behind a percentage. Absent for a `count`.
+---@field detail string The number rendered for display, e.g. "62.5% — 45 of 72". **Page only**: interface text, stripped from `module_map.json` (schema 5), where `value`/`n`/`total` carry the same fact without phrasing it in English.
+---@field headline string The sentence. Phrased for the polarity it landed on. **Page only**, same as `detail`.
+---@field basis string What the number actually measured, including its blind spots. Required, not optional — see the module header for why. **Page only**, same as `detail`.
+---@field weight integer Ranking weight within a polarity.
+---@field distance number How far past its own threshold the value sits; the tie-break under `weight`.
+---@field tab string Page tab holding the rows behind this number.
+---@field atool string? Analysis panel within `tab`, when the rows live in one.
+---@field evidence string[]? Bounded list of `"<node id>#<fn>"` keys behind a negative verdict, in the same key scheme the page's compare marks use. Absent on a positive verdict and whenever the number has no per-function evidence.
+
+---@class Docmap.Quicks.Result
+---@field good Docmap.Quick[] Capped at `limit_good`, best first.
+---@field bad Docmap.Quick[] Capped at `limit_bad`, worst first.
+---@field total_good integer Before the cap.
+---@field total_bad integer Before the cap.
+
+---Tuning for `core/quicks.lua`.
+---@class Docmap.Quicks.Opts
+---@field thresholds? table<string, { good: number, bad: number }> Per-verdict cut points, merged over `quicks.DEFAULT_THRESHOLDS`. Keyed by the verdict `id` with hyphens written as underscores (`test_coverage`).
+---@field limit_good? integer How many positive verdicts to keep. Default 5.
+---@field limit_bad? integer How many negative verdicts to keep. Default 5.
+
+--- One declared external tool, straight off `lib.nvim.deps.spec`'s own
+--- `Lib.Deps.Tool` shape (`bin`/`why`/`pkg` required, `required`/`see`
+--- optional) — not redefined here, since lib.nvim is already what parses it.
+---@alias Docmap.Tools.Tool Lib.Deps.Tool
+
+--- One malformed manifest entry — same shape as `Lib.Deps.Error`.
+---@alias Docmap.Tools.Error Lib.Deps.Error
+
+--- `ir.tools` — this repo's own `docs/install.json`/`docs/INSTALL.md`, as
+--- declared, never as probed. See `core/tools.lua`.
+---@class Docmap.Tools.Result
+---@field source string Repo-relative path of the spec file that was read, e.g. "docs/install.json".
+---@field tools Docmap.Tools.Tool[] Validated entries.
+---@field errors Docmap.Tools.Error[] Malformed entries, never nil — a manifest can be partly valid.
+
+--- One `- **Key:** value` metadata bullet under a feature — see
+--- `docs/features_format.md`. No fixed vocabulary: `key` is whatever the
+--- author wrote (`Module`, `Keymaps`, one-off labels like `Scope-aware`),
+--- captured in the order written.
+---@class Docmap.Features.Meta
+---@field key string
+---@field value string
+
+--- One `## <name>` section inside a theme file.
+---@class Docmap.Features.Entry
+---@field name string As written after `## ` — free text, not an identifier.
+---@field line integer 1-based line of the `## ` heading, in its own file.
+---@field summary string? The leading run of prose before the first metadata bullet. Absent when a feature is metadata-only or intro-only — see the format doc for why that is a valid state, not a parse failure.
+---@field meta Docmap.Features.Meta[] In writing order; empty when the feature has none. Never includes a `Tab` bullet — that one is a control directive, consumed into `tab` below, not descriptive metadata to display.
+---@field tab boolean True when the feature carries a `- **Tab:** true` bullet — promoted to its own top-level tab instead of a card in the Features list. See `docs/features_format.md` "Promoting a feature to its own tab".
+---@field body string? Raw Markdown of everything after the metadata block, up to the next `## ` (or end of file) — only captured when `tab` is true, since a card never renders it. `nil` when nothing follows the metadata block (a promoted feature can be title+summary+metadata only, same as an ordinary card).
+
+--- One theme file under `docs/FEATURES/` (or `docs/features/`).
+---@class Docmap.Features.File
+---@field path string Repo-relative, e.g. "docs/FEATURES/UI.md".
+---@field theme string Filename without extension, exactly as the author named it.
+---@field intro string? Prose before the first `## `, skipping a leading `# Title` line if present.
+---@field entries Docmap.Features.Entry[]
+
+--- `ir.features` — this repo's own `docs/FEATURES/` (or `docs/features/`)
+--- folder. See `core/features.lua` and `docs/features_format.md`.
+---@class Docmap.Features.Result
+---@field folder string Which candidate resolved, e.g. "docs/FEATURES".
+---@field intro string? The folder's own `README.md`/`readme.md`, when present — never itself a theme file.
+---@field files Docmap.Features.File[] Sorted by filename.
+
+---- One `<!-- @tag value -->` comment on a checklist item whose tag is
+---- neither `@ref` nor `@verified`. Kept rather than dropped — a hand-written
+---- corpus grows a vocabulary the parser did not anticipate.
+---@class Docmap.Checklist.Meta
+---@field key string Tag name, without the `@`.
+---@field value string
+
+---- One `- [ ]` / `- [x]` line, with whatever metadata comments follow it.
+---@class Docmap.Checklist.Item
+---@field done boolean `- [x]` (any case) vs `- [ ]`.
+---@field text string The item's own text, as written.
+---@field line integer 1-based line of the item, in its own file.
+---@field file string Repo-relative path of the checklist file the item is in.
+---@field ref string? Repo-relative path this item's verdict was read off, from `<!-- @ref path[:line] -->`. Absent for an item that cites nothing — a real state (a fact about the project rather than about a line of code), not a defect: such an item simply can never go stale.
+---@field ref_line integer? 1-based line from the same `@ref`, when written. Never used to decide staleness (that is per file) — carried so a flagged item is somewhere to jump to rather than a file to re-read from the top.
+---@field verified string? Date from `<!-- @verified YYYY-MM-DD -->`, exactly as written. A date rather than a commit hash on purpose: nobody hand-writes a hash, and requiring one would force a command to check an item off. See `core/checklist.lua`.
+---@field meta Docmap.Checklist.Meta[] Unrecognized tags, in writing order. Empty for most items.
+
+---- One `## <name>` section inside a checklist file.
+---@class Docmap.Checklist.Section
+---@field name string As written after `## `. Empty string for the synthetic section holding items that appear before any heading.
+---@field line integer 1-based line of the `## ` heading. `0` for the synthetic section, which corresponds to no line at all.
+---@field items Docmap.Checklist.Item[]
+
+---- One `.md` file of the checklist corpus.
+---@class Docmap.Checklist.File
+---@field path string Repo-relative, e.g. "docs/CHECKLIST/keybindings.md".
+---@field name string Filename without extension, exactly as the author named it.
+---@field sections Docmap.Checklist.Section[]
+
+---- `ir.checklist` — this repo's own hand-verified ledger. See
+---- `core/checklist.lua` and `docs/checklist_format.md`. Carries no staleness
+---- verdict: that needs git, and git data cannot enter the committed artifact
+---- (`--check` byte-compares). `core/checklist.lua`'s own `status()` computes it live, off a table the command layer produces.
+---@class Docmap.Checklist.Result
+---@field source string Which candidate resolved, e.g. "docs/CHECKLIST" or "docs/CHECKLIST.md".
+---@field files Docmap.Checklist.File[] Sorted by filename.
+---@field total integer Items across every file.
+---@field done integer Of those, how many are `- [x]`.
+---@field cited integer Of those, how many carry an `@ref`. The rest can never be flagged stale.
+
+---- One item paired with the staleness verdict computed for it. Never part of
+---- the IR — see `core/checklist.lua`'s `status()`.
+---@class Docmap.Checklist.Status
+---@field item Docmap.Checklist.Item
+---@field state "stale"|"current"|"unverified"|"uncited" `stale`: the cited file has commits newer than `@verified`. `current`: it does not. `unverified`: cited, but no `@verified` date to compare against. `uncited`: no `@ref` at all, so staleness is not a question that applies.
+---@field commits integer Commits to the cited file since `@verified`. `0` unless `state == "stale"`.
+---@field last_commit string? ISO date of the newest commit to the cited file, when one exists.
+
+---@class Docmap.IR
+---@field meta Docmap.Meta
+---@field quicks Docmap.Quicks.Result? Verdicts over this tree — see `quicks.lua`. Set by `scan_full`, so a bare `scan()` leaves it nil.
+---@field root string Root node id.
+---@field order string[] All node ids in deterministic walk order.
+---@field nodes table<string, Docmap.Node>
+---@field edges Docmap.Edge[] Type-reference edges from LuaLS enrichment. Always an array, empty when `opts.luals` did not run.
+---@field duplicates? Docmap.Duplicates.Result Functions grouped by structural shape — see `duplicates.lua`. Set by `scan_full`, so a bare `scan()` leaves it nil; serialised into the artifact because the grouping needs `fn.shape`, and a page reading the artifact has no parse tree to redo it with.
+---@field docs Docmap.Docs.Result? Which prose file mentions which module or function — see `docs.lua`. Set by `scan_full`, so a bare `scan()` leaves it nil.
+---@field tools Docmap.Tools.Result? This repo's declared `lib.nvim.deps` tools — see `core/tools.lua`. Set by `scan_full`; nil when lib.nvim.deps is unavailable or this repo ships no manifest.
+---@field features Docmap.Features.Result? This repo's own `docs/FEATURES/` — see `core/features.lua`. Set by `scan_full`; nil when this repo ships no such folder.
+---@field checklist Docmap.Checklist.Result? This repo's own `docs/CHECKLIST/` ledger of hand-verified facts — see `core/checklist.lua`. Set by `scan_full`; nil when this repo ships no checklist. Carries no staleness verdict: that needs git, which cannot enter a byte-compared artifact.
+---@field tag_audit Docmap.TagAudit? What `opts.tag_files` resolution could not do — `nil` when it was never configured. Read by `tag-require-missing`/`tag-file-unavailable` in `check.lua`.
+---@field tag_links? table<string, Docmap.TagLink> `requires_external` modules resolved through `opts.tag_files`. Always a table, empty when `opts.tag_files` is unset or nothing resolved — unlike `types_detail`, resolving is local and cheap, so there is no "did this run" question worth a nil.
+---@field spec_state Docmap.Testing.SpecState? Which modules have specs and how the last run ended — set by `scan_full` only when `opts.spec_state` is on, read by the HTML and Markdown renderers. Deliberately **not** serialised into `module_map.json`: the last status differs per machine and run, and `--check` byte-compares.
+---@field timing Docmap.Timing? Per-stage durations, set by `scan_full` when `opts.debug` is on. Deliberately **not** serialised into the artifact: a duration differs on every machine and `--check` byte-compares, so embedding one would make the map invalidate itself.
+
+---A live handle returned by `docmap.install()`. Keeps a scanned IR in memory
+---and, optionally, keeps it fresh — the object-in-source-code counterpart to
+---the file-based `generate()`/`:DocMap` path.
+---@class Docmap.Handle
+---@field root string The root this handle was installed for; the registry key.
+---@field cfg Docmap.Config The resolved config this handle was installed with.
+---@field ir fun(): Docmap.IR Current IR (already scanned; never triggers a scan itself).
+---@field findings fun(): Docmap.Finding[] Current drift findings.
+---@field node fun(id: string): Docmap.Node? Single node lookup on the current IR.
+---@field requires fun(id: string): Docmap.Edge[] Require edges out of this node.
+---@field required_by fun(id: string): Docmap.Edge[] Require edges into this node.
+---@field callees fun(fn_key: string): Docmap.Edge[] Call edges out of a function, keyed `"<node id>#<declared name>"` — the same id scheme the HTML map uses.
+---@field callers fun(fn_key: string): Docmap.Edge[] Call edges into a function, same key scheme.
+---@field scanned fun(): boolean Has the tree been scanned yet? False only for a lazy install (what `setup()` registers) that nothing has read: `ir()`, `findings()`, the graph queries and `node()` scan on first use, so a cheap caller such as completion asks this first instead of paying for the scan.
+---@field rescan fun(opts?: { luals?: boolean }): Docmap.IR, Docmap.Finding[] Force a rescan now; notifies `on_change` subscribers same as a watch-triggered one.
+---@field on_change fun(cb: fun(ir: Docmap.IR, findings: Docmap.Finding[])): fun() Subscribe; returns an unsubscribe function.
+---@field uninstall fun() Equivalent to `docmap.uninstall(handle)`.
+
+---@class Docmap
+---@field scan fun(opts: Docmap.Opts): Docmap.IR
+---@field check fun(ir: Docmap.IR, opts: Docmap.Opts): Docmap.Finding[]
+---@field scan_full fun(opts: Docmap.Opts): Docmap.IR, Docmap.Finding[] `scan` + optional LuaLS merge (`opts.luals`) + `check`, in one call. What `generate()` and `install()` both build on.
+---@field generate fun(opts: Docmap.Opts): Docmap.IR, Docmap.Finding[], string[]
+---@field install fun(opts: Docmap.Opts): Docmap.Handle
+---@field uninstall fun(handle: Docmap.Handle|string): boolean Accepts a handle or a root path.
+---@field render table
+
+return {}
+
+---One marker comment — `-- TODO:`, `// FIXME(stefan):`, `-- PERF:` —
+---found in source text by `core/markers.lua`.
+---
+---Deliberately not merged with the `---@todo` annotations already on
+---`Docmap.FunctionInfo`. Those are attached to a function and are
+---shown beside its signature; these are attached to a line and often sit
+---nowhere near a function. Folding the two into one list would produce
+---entries whose `function` field is sometimes a lie.
+---@class Docmap.MarkerNote
+---@field kind string Canonical keyword — one of `core/markers.lua`'s `KEYWORDS` names (`TODO`, `FIX`, `HACK`, `WARN`, `PERF`, `NOTE`, `TEST`).
+---@field word string The spelling the author actually used, e.g. `FIXME` for kind `FIX`. Kept because `todo-comments.nvim` highlights the written word and a map that renamed it would not match the buffer.
+---@field author string? From the `KEYWORD(author):` form. `nil` for the plain form.
+---@field text string The rest of the line after the colon, trimmed. May be empty — a bare `-- TODO:` is a real marker and dropping it would undercount.
+---@field line integer 1-based line number within the file it was found in.

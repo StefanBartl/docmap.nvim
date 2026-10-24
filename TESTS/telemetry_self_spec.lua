@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/telemetry_self_spec.lua — documentation.core.telemetry_self, the
+-- TESTS/telemetry_self_spec.lua — docmap.core.telemetry_self, the
 -- write side of the telemetry join `browse_telemetry_spec.lua` already
 -- covers the read side of.
 --
@@ -16,7 +16,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local telemetry_self = require("documentation.core.telemetry_self")
+  local telemetry_self = require("docmap.core.telemetry_self")
 
   -- opts.telemetry == false is a hard opt-out, checked before anything else
   -- — true regardless of whether runtime-analysis.nvim is even installed,
@@ -57,7 +57,7 @@ return function(H)
     -- private state.
     do
       telemetry_self._reset_for_test()
-      local ns = "documentation-nvim-self-telemetry-spec-override"
+      local ns = "docmap-nvim-self-telemetry-spec-override"
       store.clear(ns, { dir = cache_dir })
       local inst = assert(
         telemetry_self.setup({ title = "wrong-name", telemetry_namespace = ns }),
@@ -69,12 +69,12 @@ return function(H)
     end
 
     -- Idempotency: a second call before the namespace changes returns the
-    -- SAME instance rather than creating a duplicate "documentation.nvim"
+    -- SAME instance rather than creating a duplicate "docmap.nvim"
     -- namespace writer (which `telemetry.new`'s own "already has a live
     -- instance" warning exists specifically to catch).
     do
       telemetry_self._reset_for_test()
-      local ns = "documentation-nvim-self-telemetry-spec-idempotent"
+      local ns = "docmap-nvim-self-telemetry-spec-idempotent"
       store.clear(ns, { dir = cache_dir })
       local first =
         assert(telemetry_self.setup({ title = ns }), "setup: first call returns a real instance")
@@ -87,38 +87,35 @@ return function(H)
       store.clear(ns, { dir = cache_dir })
     end
 
-    -- The real end-to-end path: `main = "documentation"` actually wraps
+    -- The real end-to-end path: `main = "docmap"` actually wraps
     -- this repo's own already-loaded modules, a real call is counted, and
     -- it survives a flush + telemetry.load() the way the browse telemetry
     -- mode itself reads it back.
     do
       telemetry_self._reset_for_test()
-      local ns = "documentation-nvim-self-telemetry-spec-e2e"
+      local ns = "docmap-nvim-self-telemetry-spec-e2e"
       store.clear(ns, { dir = cache_dir })
 
-      -- `documentation.core.telemetry_self` is itself already loaded (this
-      -- spec just required it) and lives under the `documentation.` prefix
-      -- `main = "documentation"` wraps — calling its own already-defined
+      -- `docmap.core.telemetry_self` is itself already loaded (this
+      -- spec just required it) and lives under the `docmap.` prefix
+      -- `main = "docmap"` wraps — calling its own already-defined
       -- `_reset_for_test` through the wrapped table is exactly the kind of
       -- already-loaded call `M.setup`'s own honest-limits note describes.
       local inst = telemetry_self.setup({ title = ns })
       ok(inst ~= nil, "setup (e2e): a real instance")
 
       -- A function on the resolved module map — resolved_modules() proves
-      -- at least one real `documentation.*` path actually got wrapped,
-      -- not just the bare require("documentation") facade table itself.
+      -- at least one real `docmap.*` path actually got wrapped,
+      -- not just the bare require("docmap") facade table itself.
       local resolved = inst.resolved_modules()
-      local any_documentation_module = false
+      local any_docmap_module = false
       for _, path in pairs(resolved) do
-        if path:find("^documentation%.") or path == "documentation" then
-          any_documentation_module = true
+        if path:find("^docmap%.") or path == "docmap" then
+          any_docmap_module = true
           break
         end
       end
-      ok(
-        any_documentation_module,
-        "setup (e2e): resolved_modules() names at least one real documentation.* path"
-      )
+      ok(any_docmap_module, "setup (e2e): resolved_modules() names at least one real docmap.* path")
 
       inst.flush()
       inst.stop()

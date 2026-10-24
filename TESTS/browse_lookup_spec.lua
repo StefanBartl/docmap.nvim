@@ -21,12 +21,12 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local L = require("documentation.editor.browse.lookup")
+  local L = require("docmap.editor.browse.lookup")
 
   -- ---------------------------------------------------------------------
   -- The glossary comes from the language registry, by extension.
   -- ---------------------------------------------------------------------
-  local gl = L.glossary_for("lua/documentation/init.lua")
+  local gl = L.glossary_for("lua/docmap/init.lua")
   ok(gl ~= nil, "lookup: a .lua path finds the Lua glossary")
   ---@cast gl -nil
   eq(L.glossary_for("README.md"), nil, "lookup: a language with no glossary is nil, not an error")
@@ -134,7 +134,7 @@ return function(H)
   -- Checked against the source because `KEYS` is a local table: the failure
   -- being guarded is somebody typing the four characters, and that is a fact
   -- about the file.
-  local path = (vim.fn.getcwd():gsub("\\", "/")) .. "/lua/documentation/editor/browse/init.lua"
+  local path = (vim.fn.getcwd():gsub("\\", "/")) .. "/lua/docmap/editor/browse/init.lua"
   local fd = assert(io.open(path, "rb"), "lookup spec: browse/init.lua must be readable")
   local src = fd:read("*a")
   fd:close()

@@ -1,5 +1,5 @@
--- TESTS/browse_traffic_spec.lua — `documentation.core.traffic_join` and the
--- Traffic mode in `documentation.editor.browse.view`.
+-- TESTS/browse_traffic_spec.lua — `docmap.core.traffic_join` and the
+-- Traffic mode in `docmap.editor.browse.view`.
 --
 -- Same shape `browse_rules_spec.lua` already established for a soft
 -- dependency: the pure logic (repo resolution, disk read, entry shaping)
@@ -17,10 +17,10 @@
 return function(H)
   local eq, ok = H.eq, H.ok
   local fs_json = require("lib.nvim.fs.json")
-  local traffic_join = require("documentation.core.traffic_join")
-  local view = require("documentation.editor.browse.view")
+  local traffic_join = require("docmap.core.traffic_join")
+  local view = require("docmap.editor.browse.view")
 
-  ---@return Documentation.IR
+  ---@return Docmap.IR
   local function fake_ir()
     return { order = {}, nodes = {}, edges = {} }
   end

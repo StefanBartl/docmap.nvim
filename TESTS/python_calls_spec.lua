@@ -26,7 +26,7 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local registry = require("documentation.core.lang_registry")
+  local registry = require("docmap.core.lang_registry")
   local py = registry.get("python")
   ok(py ~= nil, "python: the backend must be registered")
   eq(py.emits_calls, true, "python: this backend returns call sites")
@@ -68,7 +68,7 @@ return function(H)
       },
       edges = {},
     }
-    local added = require("documentation.core.calls").build(ir, {})
+    local added = require("docmap.core.calls").build(ir, {})
     eq(#added, 1, "python: only the qualified call resolves")
     eq(added[1].from_fn, "other")
     eq(added[1].to_fn, "Box.go", "python: `Box.go()` reaches the method by its declared name")
@@ -89,8 +89,8 @@ return function(H)
   local root = (vim.fn.getcwd():gsub("\\", "/")) .. "/TESTS/fixtures/pycalls"
   ok(vim.fn.isdirectory(root) == 1, "python_calls: the fixture tree is checked in")
 
-  local opts = require("documentation.config").build(root)
-  local ir = require("documentation.core.scan").scan(opts)
+  local opts = require("docmap.config").build(root)
+  local ir = require("docmap.core.scan").scan(opts)
 
   local calls, n = {}, 0
   local requires = {}
@@ -156,7 +156,7 @@ return function(H)
   -- `unused-require`: the deliberately unused `import json` is found, the
   -- re-export `from . import sub` in `__init__.py` is not.
   local unused = {}
-  for _, f in ipairs(require("documentation.core.check").run(ir, opts)) do
+  for _, f in ipairs(require("docmap.core.check").run(ir, opts)) do
     if f.check == "unused-require" then
       unused[#unused + 1] = f
     end

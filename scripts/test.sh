@@ -124,4 +124,4 @@ if [[ "${1:-}" == "conformance" ]]; then
   exec nvim -n -i NONE --headless -u NONE -l "$DRIVER" conformance . "$@"
 fi
 
-exec nvim -n -i NONE --headless -u NONE -l "$DRIVER" run . --sentinel 'DOCUMENTATION_TESTS_OK' "$@"
+exec nvim -n -i NONE --headless -u NONE -l "$DRIVER" run . --sentinel 'DOCMAP_TESTS_OK' "$@"

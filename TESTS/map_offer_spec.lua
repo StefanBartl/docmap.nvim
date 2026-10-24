@@ -4,8 +4,8 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local open = require("documentation.bindings.usrcmds.open")
-  local ask = require("documentation.ask")
+  local open = require("docmap.bindings.usrcmds.open")
+  local ask = require("docmap.ask")
 
   ---@return table cfg
   ---@return string target

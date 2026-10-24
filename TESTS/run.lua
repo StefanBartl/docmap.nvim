@@ -1,4 +1,4 @@
--- TESTS/run.lua — spec ORDER MANIFEST for documentation.nvim (and the old headless runner).
+-- TESTS/run.lua — spec ORDER MANIFEST for docmap.nvim (and the old headless runner).
 --
 -- The specs run on testing.nvim now (`bash scripts/test.sh`), which reads the order of the `specs`
 -- list below from this file. The order no longer matters for correctness (the spec that used
@@ -56,7 +56,7 @@ add_lib_nvim()
 -- unconditionally at module load (moved out of lib.nvim.ui.kit/
 -- lib.nvim.contextmenu in the 2026-09 migration), and several specs
 -- (browse_*_spec.lua, docmap_browse_spec.lua, pick_spec.lua) require
--- documentation.editor.browse/.pick directly -- same candidate order as
+-- docmap.editor.browse/.pick directly -- same candidate order as
 -- add_lib_nvim above.
 local function add_ui_nvim()
   if pcall(require, "ui.kit") then
@@ -94,11 +94,8 @@ add_ui_nvim()
 -- treesitter grammar). CI builds real grammars from source into a directory
 -- and points here via this variable so that spec's real assertions run
 -- instead of its skip path — see `.github/workflows/ci.yml`.
-if
-  vim.env.DOCUMENTATION_TS_PARSERS_DIR
-  and vim.fn.isdirectory(vim.env.DOCUMENTATION_TS_PARSERS_DIR) == 1
-then
-  vim.opt.rtp:append(vim.env.DOCUMENTATION_TS_PARSERS_DIR)
+if vim.env.DOCMAP_TS_PARSERS_DIR and vim.fn.isdirectory(vim.env.DOCMAP_TS_PARSERS_DIR) == 1 then
+  vim.opt.rtp:append(vim.env.DOCMAP_TS_PARSERS_DIR)
 end
 
 -- Same shape, same reason: `browse_endpoints_spec.lua`'s `gs` (send a
@@ -294,4 +291,4 @@ if failed > 0 then
   os.exit(1)
 end
 
-say("\nDOCUMENTATION_TESTS_OK")
+say("\nDOCMAP_TESTS_OK")

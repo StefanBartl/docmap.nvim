@@ -13,7 +13,7 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local dc = require("documentation.core.doccoverage")
+  local dc = require("docmap.core.doccoverage")
 
   ---One function, documented or not. `signature` is not decoration:
   ---`params_documented` reads the declared parameter list out of it, so a

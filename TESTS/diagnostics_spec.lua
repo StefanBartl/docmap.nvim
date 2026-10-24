@@ -1,5 +1,5 @@
 -- TESTS/diagnostics_spec.lua — `bindings/diagnostics.lua`, which publishes
--- `Documentation.Finding[]` as native `vim.diagnostic` entries.
+-- `Docmap.Finding[]` as native `vim.diagnostic` entries.
 --
 -- Driven end to end, the same "assumed untestable headlessly at first,
 -- which was wrong" pattern `docmap_spec.lua`'s own live-watch test and
@@ -10,7 +10,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
+  local docmap = require("docmap")
 
   local function dwrite(root, rel, lines)
     local abs = root .. "/" .. rel
