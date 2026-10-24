@@ -8,8 +8,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local scan = require("documentation.core.scan")
-  local annotate = require("documentation.core.annotate")
+  local scan = require("docmap.core.scan")
+  local annotate = require("docmap.core.annotate")
 
   local dr = H.tmpfile("_annotate")
   local function dwrite(rel, lines)
@@ -306,7 +306,7 @@ return function(H)
       )
 
       -- A name that cannot be looked at is not taken to be a plain one.
-      local safe_fs = require("documentation.core.safe_fs")
+      local safe_fs = require("docmap.core.safe_fs")
       local real_lstat = safe_fs.host.lstat
       safe_fs.host.lstat = function(path)
         if path:find("/denied/init.lua.annot.lua", 1, true) then
@@ -400,7 +400,7 @@ return function(H)
       },
     }
 
-    require("documentation.bindings.usrcmds.annotate").run(ctx, "--write")
+    require("docmap.bindings.usrcmds.annotate").run(ctx, "--write")
     local settled = vim.wait(5000, function()
       return done_msg ~= nil
     end)

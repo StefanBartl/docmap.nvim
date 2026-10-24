@@ -84,4 +84,4 @@ git worktree add --detach "$WORKTREE" >/dev/null
 
 echo "Published $BRANCH from $SHA."
 echo "Enable Pages for this branch once, then the map is served at:"
-echo "  https://<user>.github.io/documentation.nvim/"
+echo "  https://<user>.github.io/docmap.nvim/"

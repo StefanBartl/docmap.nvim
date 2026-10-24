@@ -10,12 +10,12 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local config = require("documentation.config")
-  local docmap = require("documentation")
-  local docs = require("documentation.core.docs")
-  local features = require("documentation.core.features")
-  local checklist = require("documentation.core.checklist")
-  local artifact = require("documentation.core.artifact")
+  local config = require("docmap.config")
+  local docmap = require("docmap")
+  local docs = require("docmap.core.docs")
+  local features = require("docmap.core.features")
+  local checklist = require("docmap.core.checklist")
+  local artifact = require("docmap.core.artifact")
 
   local base = (vim.fn.tempname():gsub("\\", "/")) .. "_readers_links"
   local root = base .. "/repo"

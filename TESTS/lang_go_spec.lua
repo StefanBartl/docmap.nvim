@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_go_spec.lua — documentation.core.lang.go
+-- TESTS/lang_go_spec.lua — docmap.core.lang.go
 --
 -- Skips when the go parser is not reachable; `DOCMAP_GO_PARSER` points at one
 -- without installing it into a runtimepath.
@@ -25,7 +25,7 @@ return function(H)
     ok_add, has_go = pcall(vim.treesitter.language.add, "go")
   end
 
-  local go = require("documentation.core.lang_registry").get("go")
+  local go = require("docmap.core.lang_registry").get("go")
   ok(go ~= nil, "the go backend must be registered")
 
   -- ---------------------------------------------------------------------
@@ -250,6 +250,6 @@ return function(H)
   eq(#tfns, 2, "they stay in the map: Go puts tests beside the code by design")
   eq(tby["TestAdd"].summary, "TestAdd checks Add.", "and they keep their documentation")
 
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(#markers.scan_source("// TODO: finish this", go), 1)
 end

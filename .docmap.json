@@ -1,29 +1,29 @@
 {
   "$schema": "./docs/docmap.schema.json",
-  "repo_url": "https://github.com/StefanBartl/documentation.nvim",
+  "repo_url": "https://github.com/StefanBartl/docmap.nvim",
   "branch": "main",
   "layers": [
     {
-      "from": "documentation.core",
-      "to": "documentation.editor",
+      "from": "docmap.core",
+      "to": "docmap.editor",
       "why": "the pipeline has to stay runnable without an editor"
     },
     {
-      "from": "documentation.core",
-      "to": "documentation.bindings",
+      "from": "docmap.core",
+      "to": "docmap.bindings",
       "why": "the pipeline knows nothing about commands or keys"
     },
     {
-      "from": "documentation.core",
-      "to": "documentation.core.lang",
+      "from": "docmap.core",
+      "to": "docmap.core.lang",
       "why": "language backends are reached through core/lang_registry.lua, never directly"
     },
     {
-      "siblings": "documentation.core.lang",
+      "siblings": "docmap.core.lang",
       "allow": [
-        "documentation.core.lang.ecma",
-        "documentation.core.lang.cfamily",
-        "documentation.core.lang.glossary"
+        "docmap.core.lang.ecma",
+        "docmap.core.lang.cfamily",
+        "docmap.core.lang.glossary"
       ],
       "why": "a backend stands alone; what two backends share lives in a shared module, not in one of them"
     }

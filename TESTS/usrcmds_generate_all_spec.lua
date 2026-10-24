@@ -5,12 +5,12 @@
 -- TESTS/usrcmds_generate_all_spec.lua — bindings.usrcmds.generate_all and
 -- the opts.generate_all wiring in bindings.usrcmds itself.
 --
--- The subprocess mechanism (documentation.editor.generate_all.run() —
+-- The subprocess mechanism (docmap.editor.generate_all.run() —
 -- real headless Neovim per project) already has its own thorough,
 -- real-subprocess coverage in generate_all_spec.lua. What THIS layer adds
 -- is thin glue: reading opts.generate_all, deciding whether :DocMapAll
 -- gets registered at all, and (for autoload) which projects are actually
--- missing a map. Stubbing documentation.generate_all.run rather than
+-- missing a map. Stubbing docmap.generate_all.run rather than
 -- spawning real subprocesses again tests exactly that glue, not something
 -- already proven elsewhere.
 
@@ -18,8 +18,8 @@ return function(H)
   local eq, ok = H.eq, H.ok
 
   local repo_root = (debug.getinfo(1, "S").source:sub(2):match("(.*)[/\\]TESTS[/\\]")) or "."
-  local usrcmds_generate_all = require("documentation.bindings.usrcmds.generate_all")
-  local docmap = require("documentation")
+  local usrcmds_generate_all = require("docmap.bindings.usrcmds.generate_all")
+  local docmap = require("docmap")
 
   ---A minimal fake ctx/notify — `generate_all.lua`'s `M.run` only ever
   ---reads `ctx.generate_all` and `ctx.notify`, never `ctx.cfg`/`ctx.handle`.
@@ -59,7 +59,7 @@ return function(H)
   end
 
   -- --------------------------------------------- configured -> delegates
-  -- Stubs documentation.generate_all.run (the real subprocess orchestrator,
+  -- Stubs docmap.generate_all.run (the real subprocess orchestrator,
   -- already covered by generate_all_spec.lua) to check THIS layer calls it
   -- with the right projects and wires on_progress/on_done to notify/progress
   -- correctly -- without spawning a real subprocess a second time.
@@ -221,7 +221,7 @@ return function(H)
   -- above). `:DocMapAllFull` is registered alongside `:DocMapAll`, same
   -- gate, same both-or-neither shape.
   do
-    local usrcmds = require("documentation.bindings.usrcmds")
+    local usrcmds = require("docmap.bindings.usrcmds")
     local fixture = repo_root .. "/.deps/generate-all-cmdreg-fixture"
     os.execute(('rm -rf "%s"'):format(fixture))
     vim.fn.mkdir(fixture .. "/lua", "p")

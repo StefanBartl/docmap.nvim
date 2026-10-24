@@ -1,5 +1,5 @@
 ---@module 'standalone.vim_shim'
---- A closed-scope polyfill of the small `vim.*` surface documentation.nvim's
+--- A closed-scope polyfill of the small `vim.*` surface docmap.nvim's
 --- `core/*.lua` pipeline (and the two `lib.nvim.fs.*` helpers it calls into,
 --- `read`/`collect_recursive`) actually touches during a **parser-less**
 --- scan/check/render pass — see `docs/FEATURE_LOG.md`s "standalone CLI, MVP"

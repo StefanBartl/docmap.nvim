@@ -5,14 +5,14 @@ costing nothing when that plugin is absent.
 
 ## Context menu
 
-`documentation.integrations.menu` contributes context-aware entries in the
-shape [nvzone/menu](https://github.com/nvzone/menu) expects. documentation.nvim
+`docmap.integrations.menu` contributes context-aware entries in the
+shape [nvzone/menu](https://github.com/nvzone/menu) expects. docmap.nvim
 has **no** dependency on `menu` and never opens a context menu itself; a host —
 typically your own `<RightMouse>` dispatcher — composes these entries into its
 own menu:
 
 ```lua
-local items = require("documentation.integrations.menu").items()
+local items = require("docmap.integrations.menu").items()
 -- prepend or append `items` to your own menu table, then menu.open(composed)
 ```
 

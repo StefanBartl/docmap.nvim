@@ -10,7 +10,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local artifact = require("documentation.core.artifact")
+  local artifact = require("docmap.core.artifact")
 
   -- decode(): three ways to be broken, one way to succeed.
   local ir_empty, err_empty = artifact.decode("")

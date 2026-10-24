@@ -3,7 +3,7 @@
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
 -- The chains built inline below carry only `confidence`: the rule under test
--- is how the weakest hop colours the whole chain, and a full `Documentation.Edge`
+-- is how the weakest hop colours the whole chain, and a full `Docmap.Edge`
 -- per hop would say nothing more about it.
 ---@diagnostic disable: missing-fields
 -- TESTS/call_path_spec.lua — `core/calls.lua`'s `path` and
@@ -32,9 +32,9 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local scan = require("documentation.core.scan")
-  local calls = require("documentation.core.calls")
-  local deps = require("documentation.core.deps")
+  local scan = require("docmap.core.scan")
+  local calls = require("docmap.core.calls")
+  local deps = require("docmap.core.deps")
 
   ---@param root string
   ---@param rel string

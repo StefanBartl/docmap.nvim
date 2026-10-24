@@ -1,9 +1,9 @@
 -- Test code: a nil from a fixture read or a decode must crash the spec and name
 -- it; the nil guards LuaLS asks for would hide the failure being tested.
 ---@diagnostic disable: need-check-nil, undefined-field, param-type-mismatch, assign-type-mismatch
--- TESTS/testing_provider_spec.lua -- documentation.testing (the affected-selection provider)
+-- TESTS/testing_provider_spec.lua -- docmap.testing (the affected-selection provider)
 --
--- A real project is generated with `documentation.generate` (so the contract
+-- A real project is generated with `docmap.generate` (so the contract
 -- is checked against what `core/deps.lua` really writes, not against a map
 -- the spec made up), committed with git, and queried:
 --
@@ -21,7 +21,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local testing = require("documentation.testing")
+  local testing = require("docmap.testing")
 
   local function write(path, text)
     vim.fn.mkdir(vim.fs.dirname(path), "p")
@@ -92,8 +92,8 @@ return function(H)
     write(root .. "/TESTS/fixtures/x_spec.lua", "local a = require('p.a')\n")
     write(root .. "/README.md", "# p\n")
     git(root, "init", "-q")
-    local documentation = require("documentation")
-    documentation.generate({ root = root, source = "lua/p", title = "p", luals = false })
+    local docmap = require("docmap")
+    docmap.generate({ root = root, source = "lua/p", title = "p", luals = false })
     commit_all(root, "init")
     return root
   end
@@ -256,7 +256,7 @@ return function(H)
   })
   eq(drifted.graph.stale, true, "verify: a map that differs from a fresh scan stays stale")
   eq(drifted.graph.verified, nil, "...and is not marked verified")
-  require("documentation").generate({ root = root, source = "lua/p", title = "p", luals = false })
+  require("docmap").generate({ root = root, source = "lua/p", title = "p", luals = false })
   local map_path = root .. "/docs/map/module_map.json"
   local fd = assert(io.open(map_path, "rb"))
   local map_text = fd:read("*a")
@@ -270,7 +270,7 @@ return function(H)
   -- Outside git the age cannot be established: stale, with the reason.
   local nogit = tmpdir() .. "/q"
   write(nogit .. "/lua/p/a.lua", "---@module 'p.a'\n--- A.\nreturn {}\n")
-  require("documentation").generate({ root = nogit, source = "lua/p", title = "q", luals = false })
+  require("docmap").generate({ root = nogit, source = "lua/p", title = "q", luals = false })
   local ng = testing.affected_specs({ root = nogit, changed = { "lua/p/a.lua" } })
   eq(ng.graph.stale, true, "no git: the graph is reported stale, never fresh")
   ok(ng.graph.stale_reason:find("no git", 1, true), "...with the reason")
@@ -405,7 +405,7 @@ return function(H)
   )
   write(lib .. "/TESTS/x_spec.lua", "local x = require('l.x')\n")
   git(lib, "init", "-q")
-  require("documentation").generate({ root = lib, source = "lua/l", title = "lib", luals = false })
+  require("docmap").generate({ root = lib, source = "lua/l", title = "lib", luals = false })
   commit_all(lib, "lib")
 
   -- measured consumer: one module requires l.y, one spec covers that module, one requires l.x directly
@@ -423,14 +423,14 @@ return function(H)
   write(c1 .. "/TESTS/direct_spec.lua", "local x = require('l.x')\n")
   write(c1 .. "/TESTS/other_spec.lua", "local o = require('c1.other')\n")
   git(c1, "init", "-q")
-  require("documentation").generate({ root = c1, source = "lua/c1", title = "c1", luals = false })
+  require("docmap").generate({ root = c1, source = "lua/c1", title = "c1", luals = false })
   commit_all(c1, "c1")
 
   -- uncovered consumer: affected, no spec
   local c2 = base .. "/consumer2"
   write(c2 .. "/lua/c2/m.lua", "---@module 'c2.m'\n--- m.\nlocal x = require('l.x')\nreturn {}\n")
   git(c2, "init", "-q")
-  require("documentation").generate({ root = c2, source = "lua/c2", title = "c2", luals = false })
+  require("docmap").generate({ root = c2, source = "lua/c2", title = "c2", luals = false })
   commit_all(c2, "c2")
 
   -- not measured: a Lua checkout without a map, one with a corrupt map
@@ -443,7 +443,7 @@ return function(H)
   write(base .. "/loose.txt", "x")
   -- a measured consumer that does not use the library: not listed
   write(base .. "/innocent/lua/i/a.lua", "---@module 'i.a'\n--- i.\nreturn {}\n")
-  require("documentation").generate({
+  require("docmap").generate({
     root = base .. "/innocent",
     source = "lua/i",
     title = "i",
@@ -567,7 +567,7 @@ return function(H)
   ok(weird, "a non-string status_file does not break the answer")
 
   -- the standard history location is derived from the project like testing.nvim does
-  local status = require("documentation.testing.status")
+  local status = require("docmap.testing.status")
   local hdir = status.history_dir(root, "/state")
   ok(
     hdir:match("^/state/testing/p%-%x%x%x%x%x%x%x%x%x%x%x%x$"),
@@ -586,7 +586,7 @@ return function(H)
       { root = r, source = "lua/g", title = "g", luals = false },
       opts or {}
     )
-    require("documentation").generate(o)
+    require("docmap").generate(o)
     local function read(p)
       local f = assert(io.open(r .. "/docs/map/" .. p, "rb"))
       local t = f:read("*a")
@@ -648,7 +648,7 @@ return function(H)
   end
 
   -- ------------------------------------------------ the spec scanner
-  local specs = require("documentation.testing.specs")
+  local specs = require("docmap.testing.specs")
   local mods, prefixes, dynamic = specs.scan_text([[
 local a = require("x.a")
 local b = require 'x.b'
@@ -673,7 +673,7 @@ local e = require("x.dialect." .. name)
   eq(specs.clean_rel("/a"), nil, "clean_rel refuses an absolute path")
   eq(specs.clean_rel("a\0b"), nil, "clean_rel refuses a NUL byte")
 
-  local gitq = require("documentation.testing.git")
+  local gitq = require("docmap.testing.git")
   eq(gitq.valid_rev("HEAD~3"), true, "a plain revision is accepted")
   eq(gitq.valid_rev("origin/main@{1}"), true, "a reflog revision is accepted")
   eq(gitq.valid_rev("--upload-pack=x"), false, "an option-shaped revision is refused")
@@ -681,7 +681,7 @@ local e = require("x.dialect." .. name)
   eq(gitq.valid_rev("a..b"), false, "a range is refused")
   eq(gitq.valid_rev(string.rep("a", 201)), false, "an overlong revision is refused")
 
-  local fresh_mod = require("documentation.testing.freshness")
+  local fresh_mod = require("docmap.testing.freshness")
   eq(
     list(fresh_mod.source_pathspecs({ source = { "lua/x", "../y", "-z", "/abs", 5, "C:/w" } })),
     "lua,lua/x",

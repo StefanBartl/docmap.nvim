@@ -7,7 +7,7 @@
 -- turn off in the first week.
 
 return function(H)
-  local fmsg = require("documentation.core.findings").format
+  local fmsg = require("docmap.core.findings").format
   local eq = H.eq
 
   local root = (vim.fn.tempname():gsub("\\", "/"))
@@ -29,10 +29,10 @@ return function(H)
         fd:close()
       end
     end
-    local opts = require("documentation.config").build(abs)
-    local ir = require("documentation.core.scan").scan(opts)
+    local opts = require("docmap.config").build(abs)
+    local ir = require("docmap.core.scan").scan(opts)
     local out = {}
-    for _, f in ipairs(require("documentation.core.check").run(ir, opts)) do
+    for _, f in ipairs(require("docmap.core.check").run(ir, opts)) do
       if f.check == "binding-conflict" then
         out[#out + 1] = fmsg(f)
       end

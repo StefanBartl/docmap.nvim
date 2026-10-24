@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/StefanBartl/documentation.nvim/main/docs/docmap.schema.json",
+  "$id": "https://raw.githubusercontent.com/StefanBartl/docmap.nvim/main/docs/docmap.schema.json",
   "title": ".docmap.json",
-  "description": "Options a repository states about itself, read by documentation.nvim's config.build. Every key here is a fact about the tree; options that belong to whoever opens the repository (keys, commands, watchers, telemetry) are deliberately absent — see lua/documentation/config/file.lua.",
+  "description": "Options a repository states about itself, read by docmap.nvim's config.build. Every key here is a fact about the tree; options that belong to whoever opens the repository (keys, commands, watchers, telemetry) are deliberately absent — see lua/docmap/config/file.lua.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -27,7 +27,7 @@
     "out_dir": { "type": "string", "description": "Where the artifacts are written, relative to the root. Default \"docs/map\"." },
     "tests_dir": { "type": "string", "description": "Directory scanned for auto-derived test coverage. Default \"TESTS\"." },
     "spec_roots": {
-      "description": "Extra spec locations beside tests_dir/**/*_spec.lua, read by documentation.testing (docs/testing-contract.md): repository-relative directories or single .lua files. Anything that is not a plain path inside the repository is refused and reported as a gap.",
+      "description": "Extra spec locations beside tests_dir/**/*_spec.lua, read by docmap.testing (docs/testing-contract.md): repository-relative directories or single .lua files. Anything that is not a plain path inside the repository is refused and reported as a gap.",
       "type": "array",
       "items": { "type": "string" }
     },

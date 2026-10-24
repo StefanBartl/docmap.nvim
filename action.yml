@@ -4,7 +4,7 @@
 # which is the right answer for a repository that wants its own layer rules
 # or extra checks. This is the version that requires copying nothing:
 #
-#     - uses: StefanBartl/documentation.nvim@main
+#     - uses: StefanBartl/docmap.nvim@main
 #       with:
 #         source: lua/myplugin
 #
@@ -22,10 +22,10 @@
 # and cost a pull on every run; a composite one reuses whatever the adopter's
 # runner already caches.
 
-name: "documentation.nvim map check"
+name: "docmap.nvim map check"
 description: >-
   Verify that a repository's committed module map still matches its code.
-  Runs documentation.nvim's own `--check` gate: regenerates the map in
+  Runs docmap.nvim's own `--check` gate: regenerates the map in
   memory and compares it byte for byte against what is committed.
 author: "Stefan Bartl"
 
@@ -107,7 +107,7 @@ inputs:
     default: "stable"
   ref:
     description: >-
-      Which documentation.nvim to run. Defaults to the ref this action was
+      Which docmap.nvim to run. Defaults to the ref this action was
       resolved from, so `@v1` runs v1's engine — **a generated map is a
       snapshot of the engine that wrote it**, so the engine that checks it
       has to be the engine that would write it.
@@ -119,12 +119,12 @@ runs:
     # `path:` under the runner temp dir, not inside the workspace: a checkout
     # into `$GITHUB_WORKSPACE` would put two extra repositories inside the
     # tree being scanned, and the walk would map them.
-    - name: Check out documentation.nvim
+    - name: Check out docmap.nvim
       uses: actions/checkout@v5
       with:
-        repository: StefanBartl/documentation.nvim
+        repository: StefanBartl/docmap.nvim
         ref: ${{ inputs.ref || github.action_ref || 'main' }}
-        path: ${{ runner.temp }}/docmap-engine/documentation.nvim
+        path: ${{ runner.temp }}/docmap-engine/docmap.nvim
 
     - name: Check out lib.nvim
       uses: actions/checkout@v5
@@ -143,7 +143,7 @@ runs:
       working-directory: ${{ github.workspace }}
       env:
         DOCMAP_ACTION_ROOT: ${{ github.workspace }}
-        DOCMAP_ACTION_PLUGIN: ${{ runner.temp }}/docmap-engine/documentation.nvim
+        DOCMAP_ACTION_PLUGIN: ${{ runner.temp }}/docmap-engine/docmap.nvim
         DOCMAP_ACTION_LIB: ${{ runner.temp }}/docmap-engine/lib.nvim
         DOCMAP_ACTION_SOURCE: ${{ inputs.source }}
         DOCMAP_ACTION_TITLE: ${{ inputs.title }}
@@ -160,7 +160,7 @@ runs:
         DOCMAP_LANGUAGES: ${{ inputs.languages }}
       run: |
         set -euo pipefail
-        engine="${{ runner.temp }}/docmap-engine/documentation.nvim"
+        engine="${{ runner.temp }}/docmap-engine/docmap.nvim"
 
         # Built as an array so an empty input contributes nothing, rather
         # than an empty string that `cli.run` would see as an unknown flag.

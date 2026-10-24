@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/docs_spec.lua — documentation.core.docs
+-- TESTS/docs_spec.lua — docmap.core.docs
 --
 -- Its own file rather than a block in docmap_spec.lua, for the reason that
 -- file's own header gives: it already sits at Lua's 200-local ceiling.
@@ -17,7 +17,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docs = require("documentation.core.docs")
+  local docs = require("docmap.core.docs")
 
   -- A miniature IR, hand-built: these functions take an IR, not a tree, so a
   -- real scan would only make the fixtures harder to read.

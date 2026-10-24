@@ -37,12 +37,12 @@ return function(H)
   -- are what every *other* part of the tool reads to decide whether a panel
   -- is empty because the project has no calls or because this build cannot
   -- see them.
-  local go = require("documentation.core.lang_registry").get("go")
+  local go = require("docmap.core.lang_registry").get("go")
   ok(go ~= nil, "go: the backend must be registered")
   eq(go.emits_calls, true, "go: this backend returns call sites")
   eq(go.call_scope, "package", "go: an unqualified call resolves in the directory, not the file")
 
-  local lua = require("documentation.core.lang_registry").get("lua")
+  local lua = require("docmap.core.lang_registry").get("lua")
   eq(
     lua.call_scope,
     nil,
@@ -58,14 +58,14 @@ return function(H)
   local root = (vim.fn.getcwd():gsub("\\", "/")) .. "/TESTS/fixtures/gocalls"
   ok(vim.fn.isdirectory(root) == 1, "go_calls: the fixture tree is checked in")
 
-  local opts = require("documentation.config").build(root)
+  local opts = require("docmap.config").build(root)
   eq(
     type(opts.source) == "table" and opts.source[1] or opts.source,
     ".",
     "go_calls: `go.mod` beside the sources means the module root is the source root"
   )
 
-  local ir = require("documentation.core.scan").scan(opts)
+  local ir = require("docmap.core.scan").scan(opts)
 
   local calls = {}
   for _, e in ipairs(ir.edges or {}) do

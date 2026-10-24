@@ -24,8 +24,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local scan = require("documentation.core.scan")
-  local check = require("documentation.core.check")
+  local scan = require("docmap.core.scan")
+  local check = require("docmap.core.check")
 
   ---@param root string
   ---@param rel string
@@ -39,7 +39,7 @@ return function(H)
   end
 
   ---Every `sibling-reference-missing` target the check reported, sorted.
-  ---@param findings Documentation.Finding[]
+  ---@param findings Docmap.Finding[]
   ---@return string[]
   local function targets(findings)
     local out = {}

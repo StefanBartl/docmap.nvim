@@ -4,7 +4,7 @@
 -- as running the specs).
 return {
   -- Lua module root of the project.
-  plugin = "documentation",
+  plugin = "docmap",
   -- How the spec files are run: "auto" = sniffed per file, "h" = on the project's own TESTS/harness.lua,
   -- "script" = a self-running script in its own process.
   dialect = "h",

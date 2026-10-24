@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_ruby_spec.lua — documentation.core.lang.ruby
+-- TESTS/lang_ruby_spec.lua — docmap.core.lang.ruby
 --
 -- Skips when the ruby parser is not reachable; `DOCMAP_RUBY_PARSER` points at
 -- one without installing it into a runtimepath.
@@ -26,7 +26,7 @@ return function(H)
     ok_add, has_rb = pcall(vim.treesitter.language.add, "ruby")
   end
 
-  local rb = require("documentation.core.lang_registry").get("ruby")
+  local rb = require("docmap.core.lang_registry").get("ruby")
   ok(rb ~= nil, "the ruby backend must be registered")
 
   -- ---------------------------------------------------------------------
@@ -217,6 +217,6 @@ return function(H)
   }, "\n"))
   eq(rb.parse_header(magic).summary, "", "a magic comment documents nothing")
 
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(#markers.scan_source("# TODO: finish this", rb), 1)
 end

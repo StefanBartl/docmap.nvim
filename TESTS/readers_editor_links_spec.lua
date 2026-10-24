@@ -14,10 +14,10 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local config = require("documentation.config")
-  local safe_fs = require("documentation.core.safe_fs")
-  local source = require("documentation.editor.browse.source")
-  local hover = require("documentation.hover")
+  local config = require("docmap.config")
+  local safe_fs = require("docmap.core.safe_fs")
+  local source = require("docmap.editor.browse.source")
+  local hover = require("docmap.hover")
   local uv = vim.uv
 
   local base = (vim.fn.tempname():gsub("\\", "/")) .. "_readers_editor_links"
@@ -295,14 +295,14 @@ return function(H)
 
   -- ...and the same value out of a project the editor has installed.
   local function with_registry(root, out_dir, fn)
-    local real = package.loaded["documentation.editor.registry"]
-    package.loaded["documentation.editor.registry"] = {
+    local real = package.loaded["docmap.editor.registry"]
+    package.loaded["docmap.editor.registry"] = {
       get = function(dir)
         return dir == root and { cfg = { out_dir = out_dir } } or nil
       end,
     }
     local ran, failure = pcall(fn)
-    package.loaded["documentation.editor.registry"] = real
+    package.loaded["docmap.editor.registry"] = real
     if not ran then
       error(failure, 0)
     end
@@ -387,7 +387,7 @@ return function(H)
     end
     local saved = {
       health = rawget(vim, "health"),
-      module = package.loaded["documentation.editor.health"],
+      module = package.loaded["docmap.editor.health"],
       deps = package.loaded["lib.nvim.deps.health"],
       cwd = vim.fn.getcwd(),
     }
@@ -398,15 +398,15 @@ return function(H)
       error = sink("error"),
       info = sink("info"),
     }
-    package.loaded["documentation.editor.health"] = nil
+    package.loaded["docmap.editor.health"] = nil
     package.loaded["lib.nvim.deps.health"] = { report_for = function() end }
     local ran, failure = pcall(function()
       vim.fn.chdir(root)
-      require("documentation.editor.health").check()
+      require("docmap.editor.health").check()
     end)
     vim.fn.chdir(saved.cwd)
     vim.health = saved.health
-    package.loaded["documentation.editor.health"] = saved.module
+    package.loaded["docmap.editor.health"] = saved.module
     package.loaded["lib.nvim.deps.health"] = saved.deps
     if not ran then
       error(failure, 0)

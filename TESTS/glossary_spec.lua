@@ -8,7 +8,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local registry = require("documentation.core.lang_registry")
+  local registry = require("docmap.core.lang_registry")
   local glossaries = registry.glossaries()
 
   eq(

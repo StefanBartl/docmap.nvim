@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_csharp_spec.lua — documentation.core.lang.csharp
+-- TESTS/lang_csharp_spec.lua — docmap.core.lang.csharp
 --
 -- Skips when the c_sharp parser is not reachable, the precedent
 -- `lang_js_spec.lua` set. `DOCMAP_CSHARP_PARSER` points at one without
@@ -26,7 +26,7 @@ return function(H)
     ok_add, has_cs = pcall(vim.treesitter.language.add, "c_sharp")
   end
 
-  local cs = require("documentation.core.lang_registry").get("csharp")
+  local cs = require("docmap.core.lang_registry").get("csharp")
   ok(cs ~= nil, "the csharp backend must be registered")
 
   -- ---------------------------------------------------------------------
@@ -296,6 +296,6 @@ return function(H)
   eq(cnames["Legacy"], true, "and the type in the #else branch, because both are maintained")
   eq(#cfns, 2, "one method from each branch")
 
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(#markers.scan_source("// TODO: finish this", cs), 1)
 end

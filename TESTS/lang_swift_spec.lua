@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_swift_spec.lua — documentation.core.lang.swift
+-- TESTS/lang_swift_spec.lua — docmap.core.lang.swift
 --
 -- Skips when the swift parser is not reachable; `DOCMAP_SWIFT_PARSER` points
 -- at one without installing it into a runtimepath.
@@ -24,7 +24,7 @@ return function(H)
     ok_add, has_sw = pcall(vim.treesitter.language.add, "swift")
   end
 
-  local sw = require("documentation.core.lang_registry").get("swift")
+  local sw = require("docmap.core.lang_registry").get("swift")
   ok(sw ~= nil, "the swift backend must be registered")
 
   eq(sw.is_source("Widget.swift"), true)
@@ -188,6 +188,6 @@ return function(H)
   eq(sym["Widget.max"].summary, "How many.")
   eq(sym["Widget.count"].kind, "binding")
 
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(#markers.scan_source("// TODO: finish this", sw), 1)
 end

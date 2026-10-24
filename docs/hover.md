@@ -123,7 +123,7 @@ project finds no map.
 
 The cost is one narrow kind of staleness: a map that **appears** where there
 was none — generated during the session, or arriving with a branch — is not
-noticed until `documentation.hover._reset()` or a restart. A map that is
+noticed until `docmap.hover._reset()` or a restart. A map that is
 *regenerated* is unaffected, because the cached answer is the path and the
 parse is keyed on its mtime.
 
@@ -156,7 +156,7 @@ screen.
 ## Turning it off
 
 ```lua
-require("documentation").setup({ hover = false })
+require("docmap").setup({ hover = false })
 ```
 
 Or from hover.nvim's side, which silences every registered position preview:

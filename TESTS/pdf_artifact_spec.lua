@@ -1,4 +1,4 @@
--- TESTS/pdf_artifact_spec.lua — documentation.write_pdf_artifact
+-- TESTS/pdf_artifact_spec.lua — docmap.write_pdf_artifact
 --
 -- overview.pdf via pdfport.nvim (optional dependency, soft-required). All
 -- three cases stub package.loaded["pdfport"] rather than depending on a real
@@ -20,7 +20,7 @@ return function(H)
   fd:write("---@module 'demo'\nlocal M = {}\nfunction M.run() end\nreturn M\n")
   fd:close()
 
-  local docmap = require("documentation")
+  local docmap = require("docmap")
   local opts = { root = tmp, source = "lua", out_dir = "docs/map" }
   local ir, findings = docmap.scan_full(opts)
 

@@ -1,4 +1,4 @@
--- TESTS/out_dir_traversal_spec.lua — `documentation.write_artifacts` refuses
+-- TESTS/out_dir_traversal_spec.lua — `docmap.write_artifacts` refuses
 -- an `opts.out_dir` that would write outside `opts.root` (SEC-42).
 --
 -- `out_dir` is repository input (`.docmap.json`'s `REPO_KEYS.out_dir`), so a
@@ -8,7 +8,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
+  local docmap = require("docmap")
 
   local root = H.tmpfile("_out_dir_traversal")
   vim.fn.mkdir(root .. "/lua/t", "p")

@@ -13,7 +13,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local registry = require("documentation.core.lang_registry")
+  local registry = require("docmap.core.lang_registry")
 
   -- `M.all` forces every backend in `KNOWN_BACKENDS` to register, which the
   -- registry otherwise defers until first use.
@@ -94,7 +94,7 @@ return function(H)
   -- above while finding nothing.
   -- ---------------------------------------------------------------------
   do
-    local markers = require("documentation.core.markers")
+    local markers = require("docmap.core.markers")
     for _, backend in ipairs(all) do
       local name = backend.name
       local token = (backend.line_comments or {})[1]

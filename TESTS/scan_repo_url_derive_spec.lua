@@ -19,8 +19,8 @@
 
 return function(H)
   local eq = H.eq
-  local cfg = require("documentation.config")
-  local scan = require("documentation.core.scan")
+  local cfg = require("docmap.config")
+  local scan = require("docmap.core.scan")
 
   local root_dir = (vim.fn.tempname():gsub("\\", "/"))
 

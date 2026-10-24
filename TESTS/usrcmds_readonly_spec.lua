@@ -22,9 +22,9 @@ return function(H)
   ---A minimal fake ctx: every command here reads at most cfg/handle/notify/
   ---find_node/open_map, never registry state — so a literal IR closed over by
   ---`handle.ir()` is the whole fixture.
-  ---@param ir Documentation.IR
+  ---@param ir Docmap.IR
   ---@param cfg table? Merged over the default {root, out_dir, lua_root}.
-  ---@return Documentation.Bindings.Ctx ctx
+  ---@return Docmap.Bindings.Ctx ctx
   ---@return table calls {info=string[], warn=string[], opened=string?[]}
   local function fake_ctx(ir, cfg)
     local calls = { info = {}, warn = {}, opened = {} }
@@ -46,7 +46,7 @@ return function(H)
         end,
       },
       find_node = function(ir2, name, lua_root)
-        return require("documentation.core.find").node(ir2, name, lua_root)
+        return require("docmap.core.find").node(ir2, name, lua_root)
       end,
       open_map = function(hash)
         calls.opened[#calls.opened + 1] = hash
@@ -66,9 +66,9 @@ return function(H)
 
   -- ================================================================= why
   do
-    local why = require("documentation.bindings.usrcmds.why")
+    local why = require("docmap.bindings.usrcmds.why")
 
-    ---@return Documentation.IR
+    ---@return Docmap.IR
     local function why_ir()
       return {
         root = "a",
@@ -213,9 +213,9 @@ return function(H)
 
   -- ============================================================== graph
   do
-    local graph = require("documentation.bindings.usrcmds.graph")
+    local graph = require("docmap.bindings.usrcmds.graph")
 
-    ---@return Documentation.IR
+    ---@return Docmap.IR
     local function graph_ir()
       return {
         root = "root",
@@ -273,9 +273,9 @@ return function(H)
 
   -- ================================================================= dot
   do
-    local dot = require("documentation.bindings.usrcmds.dot")
+    local dot = require("docmap.bindings.usrcmds.dot")
 
-    ---@return Documentation.IR
+    ---@return Docmap.IR
     local function dot_ir()
       return {
         root = "root",
@@ -342,9 +342,9 @@ return function(H)
 
   -- ============================================================= mermaid
   do
-    local mermaid = require("documentation.bindings.usrcmds.mermaid")
+    local mermaid = require("docmap.bindings.usrcmds.mermaid")
 
-    ---@return Documentation.IR
+    ---@return Docmap.IR
     local function mermaid_ir()
       return {
         root = "root",
@@ -415,7 +415,7 @@ return function(H)
 
   -- =============================================================== tools
   do
-    local tools = require("documentation.bindings.usrcmds.tools")
+    local tools = require("docmap.bindings.usrcmds.tools")
 
     do
       clear_qf()
@@ -466,7 +466,7 @@ return function(H)
 
   -- ============================================================ bindings
   do
-    local bindings_cmd = require("documentation.bindings.usrcmds.bindings")
+    local bindings_cmd = require("docmap.bindings.usrcmds.bindings")
 
     do
       clear_qf()
@@ -588,7 +588,7 @@ return function(H)
 
   -- ============================================================= plugins
   do
-    local plugins_cmd = require("documentation.bindings.usrcmds.plugins")
+    local plugins_cmd = require("docmap.bindings.usrcmds.plugins")
 
     do
       clear_qf()
@@ -697,7 +697,7 @@ return function(H)
 
   -- =========================================================== endpoints
   do
-    local endpoints_cmd = require("documentation.bindings.usrcmds.endpoints")
+    local endpoints_cmd = require("docmap.bindings.usrcmds.endpoints")
 
     do
       clear_qf()
@@ -788,8 +788,8 @@ return function(H)
   -- load` itself (never directly exercised anywhere) and the command's own
   -- directory handling.
   do
-    local consumers_cmd = require("documentation.bindings.usrcmds.consumers")
-    local docmap = require("documentation")
+    local consumers_cmd = require("docmap.bindings.usrcmds.consumers")
+    local docmap = require("docmap")
 
     do
       local ctx, calls = fake_ctx({ order = {}, nodes = {} })

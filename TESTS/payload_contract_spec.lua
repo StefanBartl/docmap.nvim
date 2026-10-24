@@ -17,7 +17,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
+  local docmap = require("docmap")
 
   ---IR fields the page deliberately does not receive.
   ---
@@ -33,7 +33,7 @@ return function(H)
   ---    collected only under `opts.debug`, reported by
   ---    `bindings/usrcmds/generate.lua`. Putting it in the page would make two
   ---    renders of an unchanged tree differ, which is the same reason
-  ---    `Documentation.Meta` deliberately carries no timestamp.
+  ---    `Docmap.Meta` deliberately carries no timestamp.
   local NOT_IN_PAYLOAD = {
     order = true,
     timing = true,
@@ -70,7 +70,7 @@ return function(H)
     "# Checklist\n\n- [x] something verified — `lua/r/init.lua`\n"
   )
 
-  local opts = require("documentation.config").build(root)
+  local opts = require("docmap.config").build(root)
   local ir, findings = docmap.scan_full(opts)
   local html = docmap.render.html(ir, findings, opts)
 

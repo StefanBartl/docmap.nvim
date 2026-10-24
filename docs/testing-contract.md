@@ -2,7 +2,7 @@
 
 A test runner that wants to run only the specs a change can affect needs three
 things the module map already holds: which file is which module, who requires
-whom, and which specs require what. `require("documentation.testing")` answers
+whom, and which specs require what. `require("docmap.testing")` answers
 that in one call, and says out loud what it could **not** work out, because a
 selection that silently leaves a spec out is worse than running everything.
 
@@ -23,7 +23,7 @@ machine-readable form of everything below.
 ## The call
 
 ```lua
-local res, err = require("documentation.testing").affected_specs({
+local res, err = require("docmap.testing").affected_specs({
   root = "/path/to/repo",           -- required
   changed = { "lua/x/a.lua" },      -- repository-relative, or absolute inside root
   since = "origin/main",            -- optional: also the files changed since a revision
@@ -144,7 +144,7 @@ The consumer's `specs` are relative to the consumer's own root.
 
 ## Specs in the map
 
-`require("documentation.testing").spec_state({ root = ... })` is the opposite
+`require("docmap.testing").spec_state({ root = ... })` is the opposite
 question: which modules have specs, and how did the last run of them end.
 
 ```lua

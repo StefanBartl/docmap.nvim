@@ -22,7 +22,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local check = require("documentation.core.check")
+  local check = require("docmap.core.check")
 
   local opts = {
     root = "/fake",
@@ -34,7 +34,7 @@ return function(H)
 
   ---Two modules under one root: `used` is required by another node, `orphan`
   ---is required by nothing — the only difference the check can see.
-  ---@return Documentation.IR
+  ---@return Docmap.IR
   local function fake_ir()
     ---@param id string
     ---@param module string
@@ -226,7 +226,7 @@ return function(H)
   -- ---------------------------------------------------------------------
   -- `loaded_modules` itself.
   -- ---------------------------------------------------------------------
-  local loaded_diff = require("documentation.core.loaded_diff")
+  local loaded_diff = require("docmap.core.loaded_diff")
 
   with_loaded(
     fake_loaded({ { name = "now", saved_at = 2 } }, { now = { ["x.a"] = {}, ["x.b"] = {} } }),

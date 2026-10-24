@@ -1,0 +1,159 @@
+---@meta
+---@module 'docmap.editor.browse.@types'
+
+---Options for `docmap.browse.open`. `root` is the only required field; the
+---rest mirror `Docmap.Opts` where they overlap so a caller can pass its
+---existing docmap opts table straight through.
+---@class Docmap.Browse.Opts
+---@field root string Absolute path to the repository root.
+---@field source? string|string[] Source directory or directories relative to `root`, for the staleness check. Default "lua". A list for the same reason `Docmap.Opts.source` takes one -- the browser forwards whatever the config holds, and `config.sources` is what reads it.
+---@field lua_root? string Directory Lua module paths are relative to, used to resolve `center` against namespaces that declare no `@module`. Default "lua".
+---@field out_dir? string Where the artifact lives, relative to `root`. Default "docs/map".
+---@field live? boolean Install a watching `docmap.install()` handle instead of reading the artifact — costs a full scan up front, but the view then updates on write. Default false.
+---@field center? string Node id or `@module` path to open centered on. Default: the map's root.
+---@field mode? Docmap.Browse.Mode Which list to open on. Default "structure".
+---@field title? string Display name for the root node — the same field `Docmap.Opts.title` is, forwarded here because `telemetry` mode's join (ecosystem.md step 8) needs it as the default `runtime-analysis.telemetry` namespace. Not needed for anything else the browser does.
+---@field telemetry_namespace? string Overrides `title` as the namespace `telemetry` mode joins against — see `Docmap.Opts.telemetry_namespace`'s own doc-comment for when the two genuinely differ.
+---@field rules_gate? string The `rules.nvim` gate name (a `setup({ gates = {...} })` key in the checked repo's own config, e.g. "review") the `rules` mode joins against — see `Docmap.Opts.rules_gate`'s own doc-comment. No default: unlike `telemetry_namespace`, a gate name cannot be guessed from `title`.
+---@field traffic? Docmap.TrafficOpts github_stats.nvim's per-repository traffic digest for the `traffic` mode — see `Docmap.Opts.traffic`'s own doc-comment. See `docmap.core.traffic_join`.
+---@field depth? integer Initial Deps walk depth. Default 2.
+---@field theme? Ui.Kit.ThemeArg Passed through to the kit layout.
+---@field width? number Fraction of the editor the whole layout uses. Default 0.86.
+---@field height? number Default 0.86.
+---@field list_width? number Fraction of the layout given to the list column. Default 0.38.
+---@field keys? table<Docmap.Browse.KeyAction, string|string[]|false> Rebind or disable the browser's keys, by action. A string or list of strings replaces that action's left-hand sides; `false` disables it (the action stays in the `?` cheatsheet, marked off, so a missing key is explained rather than mysterious). Unlisted actions keep their defaults. All bindings are buffer-local to the browser, so a replacement only has to be free *inside* it. An unknown action name is reported, not ignored.
+---@field which_key? boolean Register the resolved bindings with which-key when it is installed. Default true — a no-op when which-key is absent, since registration is guarded by `core.soft_require.probe("which-key")`. Set false to keep the browser out of which-key entirely.
+---@field menu? boolean Bind a `<RightMouse>` context menu (nvzone/menu, soft dependency; entries from `docmap.integrations.menu`) mirroring the resolved bindings, same list-buffer scope as `which_key`. Default true — a no-op when nvzone/menu is absent, degrading to a single notify rather than an error. Set false to keep the browser out of it entirely.
+
+---A rebindable action in the browser. The `id` of an entry in the `KEYS`
+---table in `browse/init.lua`, which is the only place these are defined.
+---
+---The mode-switch keys `1`…`6` are deliberately **not** here: they are
+---generated from `MODES` and are positional by nature (`3` means "the third
+---list"), so rebinding them individually would produce a numbering that no
+---longer matches what the status line shows.
+---@alias Docmap.Browse.KeyAction
+---| "move"         # j/k — documented, deliberately left native
+---| "enter"        # descend a level, or follow the edge
+---| "up"           # up a level
+---| "back"         # back through the visit history
+---| "forward"      # forward through the visit history
+---| "dir_in"       # direction: incoming edges
+---| "dir_out"      # direction: outgoing edges
+---| "depth_inc"    # depth +1
+---| "depth_dec"    # depth -1
+---| "goto_source"  # open the source at the line
+---| "quickfix"     # current list into the quickfix list
+---| "impact"       # blast radius into the quickfix list
+---| "open_page"    # open the generated HTML page
+---| "send_request" # endpoints: send a request to the route under the cursor (needs runtime-analysis.nvim)
+---| "commit_diff"  # the opened commit's diff
+---| "pin"          # pin / unpin the entry under the cursor
+---| "unpin"        # unpin, in Trail
+---| "trail_save"   # save this trail under a name
+---| "trail_load"   # load a saved trail
+---| "trail_delete" # forget a saved trail
+---| "filter"       # filter this list in place
+---| "search"       # fuzzy jump across modules and functions
+---| "detail"       # into the detail pane, where it can be scrolled
+---| "detail_back"  # detail pane: back to the list
+---| "lookup"       # detail pane: the glossary card for the word under the cursor
+---| "help"         # the `?` cheatsheet
+---| "close"        # close the browser
+
+---Which list a browser state is showing.
+---@alias Docmap.Browse.Mode
+---| "structure" # Children and functions of the centered node.
+---| "deps"      # Require edges, walked to `depth` in `dir`.
+---| "calls"     # Call edges touching the centered node/function.
+---| "types"     # `@class`/`@alias` declared by the centered node.
+---| "history"   # Commits, and the functions each one's diff touches.
+---| "trail"     # Pinned positions, in the order they were pinned.
+---| "endpoints" # Call-based route registrations across the whole tree, not centered on any one node — see `core/endpoints.lua`.
+---| "telemetry" # The static x runtime join against `runtime-analysis.telemetry` — not centered on any one node — see `core/telemetry_join.lua`.
+---| "loaded"    # Diff loaded-vs-declared against `runtime-analysis.loaded` — not centered on any one node — see `core/loaded_diff.lua`.
+---| "rules"     # `rules.nvim`'s catalog for a configured gate — not centered on any one node — see `core/rules_join.lua`.
+---| "traffic"   # github_stats.nvim's traffic digest for this repository — not centered on any one node — see `core/traffic_join.lua`.
+
+---One row of the list. Everything the row can *do* — navigate, open source,
+---go into the quickfix list — is a field here rather than something re-derived
+---from the rendered text, so the label stays purely presentational.
+---@class Docmap.Browse.Entry
+---@field kind "node"|"function"|"type"|"external"|"message"|"commit"|"endpoint"|"telemetry"|"loaded_diff"|"rules"|"traffic"
+---@field sha string? Full commit hash, for `kind="commit"`.
+---@field commit table? The `{ sha, short, author, date, subject }` record behind a `kind="commit"` row.
+---@field callers Docmap.History.Caller[]? Direct callers of a touched function, in History mode — carried on the entry so the detail pane needs no second lookup against an IR that may not describe that revision.
+---@field label string Rendered text, including any indent/icon.
+---@field id string? Node id this row refers to.
+---@field fn string? Declared function name, for `kind="function"`.
+---@field type_name string? Type name, for `kind="type"`.
+---@field line integer? 1-based line in `source` to jump to.
+---@field source string? Repo-relative source path.
+---@field site_line integer? `kind="function"` in Calls: line of the call site, which lives in `site_source`, not `source`.
+---@field site_source string? Repo-relative path of the file the call site is in.
+---@field pin Docmap.Browse.Pin? The pin behind a Trail row. Its presence is what makes `<CR>` restore a whole view (mode and axes) rather than just re-center — see `browse.enter`.
+---@field pin_index integer? 1-based position in the trail, for `d`.
+---@field detail string? One-line hint shown when the row has no richer detail.
+---@field telemetry_row Docmap.TelemetryJoin.Row? The join row behind a `kind="telemetry"` entry — `nil` for a function `runtime-analysis.telemetry` has no data for, distinct from a row with `calls = 0`.
+---@field spec Docmap.EndpointSpec? The route behind a `kind="endpoint"` entry -- what the row renders (method, path, handler) and what `gs` sends. Carried on the entry so neither the detail pane nor the send path has to find the node again.
+---@field endpoint_sends RA.History.Entry[]? The static x runtime join behind a `kind="endpoint"` entry with `runtime-analysis.nvim` — `nil` when no history data exists for this project at all, an empty list when history exists but never matched this route.
+---@field loaded_diff_row Docmap.LoadedDiff.Row? The join row behind a `kind="loaded_diff"` entry with `runtime-analysis.nvim`.
+---@field rules_row Rules.Result? The `rules.nvim` result behind a `kind="rules"` entry — one rule's `{rule, status, findings, waiver_reason?}`, see `rules.nvim`'s own `lua/rules/engine/runner.lua`.
+---@field traffic_row Docmap.TrafficJoin.Row? The row behind a `kind="traffic"` entry — see `docmap.core.traffic_join` and `Docmap.TrafficJoin.Row`.
+
+---@class Docmap.Browse
+---@field open fun(opts: Docmap.Browse.Opts): boolean
+---@field close fun()
+---@field toggle fun(opts: Docmap.Browse.Opts)
+---@field is_open fun(): boolean
+
+---One parsed term of an `f` filter query.
+---@class Docmap.Browse.FilterTerm
+---@field text string Lower-cased needle; matched as a plain substring.
+---@field negated boolean A row containing this is excluded.
+
+---A parsed `f` filter query.
+---@class Docmap.Browse.Filter
+---@field raw string The query as typed, for the status line.
+---@field terms Docmap.Browse.FilterTerm[] Never empty — `parse` returns nil instead.
+
+---One pinned position in a trail.
+---
+---A pin records a *view* — the mode and the axes it was taken in — not just a
+---subject, because half-restoring is what makes bookmarks feel unreliable.
+---Identity is deliberately narrower than the record: `dir`/`depth` travel on
+---the pin but are not part of its key, so the same node at two depths is one
+---bookmark rather than two near-duplicates.
+---@class Docmap.Browse.Pin
+---@field mode string The mode the pin was taken in; restored on jump.
+---@field id string? IR node id.
+---@field fn string? Declared function name, when the pin is a function.
+---@field sha string? Commit, when the pin was taken in History mode.
+---@field dir "in"|"out"|nil Edge direction in force when pinned; restored on jump.
+---@field depth integer? Deps walk depth in force when pinned; restored on jump.
+---@field label string Display text.
+---@field detail string? Secondary display text.
+---@field source string? Repo-relative source path, for `gd`/`gq`.
+---@field line integer? Declaration line, same.
+
+---One row of Traffic mode. A digest is a handful of aggregate numbers for
+---one repository, not a per-node list, so unlike `rules_row`/`loaded_diff_row`
+---(one row per rule/function) a row here is one *section* of the digest:
+---one of the two metrics' windowed summary, or one referrer, or one top
+---page. `digest` is carried on every row, not only `"summary"`, so the
+---detail pane can show span/fetched context for a referrer/path row too
+---without a second lookup.
+---@class Docmap.TrafficJoin.Row
+---@field section "summary"|"referrer"|"path"
+---@field digest GHStats.Digest The digest this row was built from.
+---@field metric "views"|"clones"? Set when `section == "summary"`: which of `digest.views`/`digest.clones` this row summarizes.
+---@field referrer GHStats.Digest.Referrer? Set when `section == "referrer"`.
+---@field path GHStats.Digest.Path? Set when `section == "path"`.
+
+---Per-machine settings for the `traffic` browse mode — see
+---`docmap.core.traffic_join`.
+---@class Docmap.TrafficOpts
+---@field repo? string Override for the "owner/repo" this mode reads traffic for. Default: derived from `root`'s git "origin" remote, the same derivation `repo_url` uses (GS-16) — set this only when the two differ (a fork, a mirror, a remote named something other than "origin").
+---@field digest_dir? string Override for where github_stats.nvim's digest lives, honored the same way that plugin's own discovery chain's first step is ("an explicit setting of the reader") — see `docs/FEATURES/DIGEST.md` in github_stats.nvim. Default: ask the plugin itself, `github_stats.digest.digest_dir()`, which works even before its `setup()` has run.
+
+return {}

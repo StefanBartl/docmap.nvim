@@ -94,9 +94,9 @@ every diagnostic — including `vim.notify` — is pinned to stderr.
 
 | File | Role |
 |---|---|
-| `lua/documentation/mcp/tools.lua` | The tool catalogue. The only place that knows what a `Documentation.Handle` can answer. |
-| `lua/documentation/mcp/protocol.lua` | JSON-RPC 2.0 dispatch. No stdio, so tests drive the whole protocol in-process. |
-| `lua/documentation/mcp/init.lua` | The transport: install the handle, read lines, write lines. |
+| `lua/docmap/mcp/tools.lua` | The tool catalogue. The only place that knows what a `Docmap.Handle` can answer. |
+| `lua/docmap/mcp/protocol.lua` | JSON-RPC 2.0 dispatch. No stdio, so tests drive the whole protocol in-process. |
+| `lua/docmap/mcp/init.lua` | The transport: install the handle, read lines, write lines. |
 | `scripts/mcp_server.lua` | This repository's entry point. |
 | `TESTS/mcp_spec.lua` | Handshake, every tool, every error path — driven through `protocol.dispatch` with real JSON on both sides. |
 

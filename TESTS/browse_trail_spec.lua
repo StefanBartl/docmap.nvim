@@ -1,4 +1,4 @@
--- TESTS/browse_trail_spec.lua — documentation.editor.browse.trail
+-- TESTS/browse_trail_spec.lua — docmap.editor.browse.trail
 --
 -- `trail.list(root)` deliberately hands back the live array, not a copy (see
 -- its own docstring): `browse/init.lua` caches that exact reference on
@@ -10,7 +10,7 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local trail = require("documentation.editor.browse.trail")
+  local trail = require("docmap.editor.browse.trail")
   trail.reset()
 
   local root = "trail-spec-root"

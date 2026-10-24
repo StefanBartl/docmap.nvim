@@ -13,7 +13,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local scan = require("documentation.core.scan")
+  local scan = require("docmap.core.scan")
 
   local function write(root, rel, lines)
     local abs = root .. "/" .. rel

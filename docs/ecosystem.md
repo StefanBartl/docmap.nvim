@@ -12,7 +12,7 @@
 > different states.
 >
 > Cite it from another repository as
-> `documentation.nvim/docs/ecosystem.md`, never as a bare `docs/ecosystem.md`
+> `docmap.nvim/docs/ecosystem.md`, never as a bare `docs/ecosystem.md`
 > — that path resolves to nothing anywhere but here, and nothing in CI would
 > report it (`dead-readme-link` strips code spans by design and resolves links
 > only within one repository).
@@ -33,9 +33,9 @@
     - [Seam B — artifact vs. serve](#seam-b--artifact-vs-serve)
   - [2. The feature list, sorted](#2-the-feature-list-sorted)
   - [3. Feature by feature](#3-feature-by-feature)
-    - [3.1 API endpoint inventory — static, documentation.nvim](#31-api-endpoint-inventory--static-documentationnvim)
+    - [3.1 API endpoint inventory — static, docmap.nvim](#31-api-endpoint-inventory--static-documentationnvim)
     - [3.2 API request runner — runtime, and the reason a new plugin is justified](#32-api-request-runner--runtime-and-the-reason-a-new-plugin-is-justified)
-    - [3.3 Docs cross-references — static, documentation.nvim, genuinely new data](#33-docs-cross-references--static-documentationnvim-genuinely-new-data)
+    - [3.3 Docs cross-references — static, docmap.nvim, genuinely new data](#33-docs-cross-references--static-documentationnvim-genuinely-new-data)
     - [3.4 Docs-only view / filter — cheap, once 3.3 exists](#34-docs-only-view--filter--cheap-once-33-exists)
     - [3.5 Hover previews — three different features wearing one name](#35-hover-previews--three-different-features-wearing-one-name)
     - [3.6 Three more in the same spirit](#36-three-more-in-the-same-spirit)
@@ -80,7 +80,7 @@ Written in response to a feature list (API endpoint inventory, a
 Postman-lite request runner, docs cross-references with previews, a
 docs-only view, file/snippet hover previews) plus the questions that came
 with it: *is a separate plugin worth it, what form should it take, and could
-documentation.nvim gain a tab that appears when it is installed?*
+docmap.nvim gain a tab that appears when it is installed?*
 
 This answers **where each thing belongs and why**, not how to build it. A
 per-step implementation concept follows separately, keeping cost analysis and
@@ -89,8 +89,8 @@ task breakdown apart the same way the language work does.
 **Decisions taken (§4–§8):** the plugin is worth it, named
 **`runtime-analysis.nvim`** and already created; it is a **Neovim plugin**,
 not a binary or an Electron app; the two plugins meet **in the editor
-first**, never by injecting into documentation.nvim's committed artifact;
-and the **work order is documentation.nvim first** — sequencing steps 1–4
+first**, never by injecting into docmap.nvim's committed artifact;
+and the **work order is docmap.nvim first** — sequencing steps 1–4
 before the new plugin's step 5.
 
 ---
@@ -114,7 +114,7 @@ mixed, so here is the split.
 - Docs are currently modelled as a **path and a count only** — `node.readme`
   (a path) and `own.files_md` (a counter, `scan.lua`). No `.md` file's
   *content* is read anywhere in this codebase.
-- `Documentation.Edge` is a discriminated union on `kind`
+- `Docmap.Edge` is a discriminated union on `kind`
   (`type`/`extends`/`require`/`call`) and already carries a `confidence`
   field for `call`.
 - `lib.nvim.net.curl` **already exists**: builds a curl argv from
@@ -124,7 +124,7 @@ mixed, so here is the split.
   lib.nvim surface is `autocmd`, `cache.disk`, `fs.mkdirp`, `git`, `notify`,
   `usercmd`, and `ui.kit` (pcall-guarded) — plus exactly **one**
   lib.nvim-specific coupling: `wrap_lib()` via `lib.strategies.control`.
-- documentation.nvim's own lib.nvim surface is `autocmd`, `fs.mkdirp`,
+- docmap.nvim's own lib.nvim surface is `autocmd`, `fs.mkdirp`,
   `notify`, `usercmd`, `ui.kit`, `map`, `debounce`, `fs.read`,
   `fs.collect_recursive`, `fs.is_subpath`, `cross.open_default`,
   `cross.uv.spawn_capture` — a superset of telemetry's.
@@ -147,7 +147,7 @@ feature in the list lands on one side or the other of each.
 ### Seam A — static vs. runtime
 
 The telemetry-documentation bridge already names it:
-documentation.nvim knows what **exists and is documented**; telemetry knows
+docmap.nvim knows what **exists and is documented**; telemetry knows
 what **actually ran**. Its whole argument is that neither can produce the
 other's evidence, and that crossing them is where the value is.
 
@@ -173,13 +173,13 @@ a 58-file repository. lib.nvim, at ~288 files, would be far worse.
 
 | Feature | Seam A | Needs new extraction? | Needs a runtime? | Home |
 |---|---|---|---|---|
-| API endpoint inventory | static | **yes** (layer-2 recognizer) | no | documentation.nvim |
+| API endpoint inventory | static | **yes** (layer-2 recognizer) | no | docmap.nvim |
 | API request runner | **runtime** | no | **yes** | new plugin |
-| Docs cross-references | static | **yes** (docs corpus is unread today) | no (bounded previews) | documentation.nvim |
-| Docs-only view / filter | static | falls out of the above | no | documentation.nvim |
-| Signature popup | static | **no — data already in the IR** | no | documentation.nvim |
-| Snippet preview (path:line) | static | bounded snippets only | no | documentation.nvim |
-| Full-file hover preview | static | no | **yes** (or a big artifact) | documentation.nvim (serve) |
+| Docs cross-references | static | **yes** (docs corpus is unread today) | no (bounded previews) | docmap.nvim |
+| Docs-only view / filter | static | falls out of the above | no | docmap.nvim |
+| Signature popup | static | **no — data already in the IR** | no | docmap.nvim |
+| Snippet preview (path:line) | static | bounded snippets only | no | docmap.nvim |
+| Full-file hover preview | static | no | **yes** (or a big artifact) | docmap.nvim (serve) |
 
 The single row that sits alone in the "runtime" column is the request runner.
 That is the whole plugin question in one line, and section 4 returns to it.
@@ -190,7 +190,7 @@ That is the whole plugin question in one line, and section 4 returns to it.
 
 ---
 
-### 3.1 API endpoint inventory — static, documentation.nvim
+### 3.1 API endpoint inventory — static, docmap.nvim
 
 This is a **layer-2 convention recognizer** in `framework_conventions.md`'s
 own vocabulary: a second pass over a parse tree the language backend already
@@ -259,10 +259,10 @@ socket, no token, no new security posture — and `lib.nvim.net.curl` plus
 `ui.kit` cover most of it. The browser version is strictly the more
 expensive one and should follow, not lead.
 
-**Where it lives:** the runner *executes*; documentation.nvim *knows the
+**Where it lives:** the runner *executes*; docmap.nvim *knows the
 endpoints*. Split along that line — execution and request history in the new
 plugin, the endpoint list and the panel that offers "send a request to this
-one" in documentation.nvim, wired as a **soft dependency**: the panel is
+one" in docmap.nvim, wired as a **soft dependency**: the panel is
 absent when the runtime plugin is not installed. That is the pattern this
 ecosystem already uses in three places (`progress`→fidget,
 `telemetry`→mdview, `check.lua`→lua-language-server) and it needs no new
@@ -270,7 +270,7 @@ mechanism.
 
 ---
 
-### 3.3 Docs cross-references — static, documentation.nvim, genuinely new data
+### 3.3 Docs cross-references — static, docmap.nvim, genuinely new data
 
 **The gap is real and larger than it looks.** Documentation files are, today,
 a path (`node.readme`) and a counter (`files_md`). No `.md` content is read
@@ -289,18 +289,18 @@ Three pieces:
 
 **The matching problem is the same one solved twice already in this
 ecosystem**, and it gets the same answer. How do you know a `` `scan_full` ``
-in prose means `documentation.core.scan#scan_full`? Exactly as `calls.lua`
+in prose means `docmap.core.scan#scan_full`? Exactly as `calls.lua`
 resolves a callee and as `lib.nvim.telemetry` resolves a wrapped key to a
 module path:
 
-- a **qualified** name in a code span (`documentation.core.deps.build`) →
+- a **qualified** name in a code span (`docmap.core.deps.build`) →
   exact;
 - a **bare** name that is unique in the whole tree → heuristic, marked as
   such;
 - a bare name that is ambiguous, or an ordinary English word that happens to
   match → **not a match**, and never rendered as one.
 
-`Documentation.Edge` already carries `confidence` for precisely this
+`Docmap.Edge` already carries `confidence` for precisely this
 distinction, and its `kind` is already a discriminated union — a `doc_ref`
 kind fits the existing shape without widening it.
 
@@ -387,10 +387,10 @@ Telemetry is **2 915 lines** with **one** genuinely lib.nvim-specific
 coupling: `wrap_lib()`, which instruments the `require("lib")` aggregate
 through `lib.strategies.control`. Everything else it uses from lib.nvim —
 `autocmd`, `cache.disk`, `fs.mkdirp`, `git`, `notify`, `usercmd`, `ui.kit` —
-is generic infrastructure that **documentation.nvim already depends on
+is generic infrastructure that **docmap.nvim already depends on
 too**, as a plain runtime dependency.
 
-So a new plugin would consume lib.nvim exactly the way documentation.nvim
+So a new plugin would consume lib.nvim exactly the way docmap.nvim
 already does. There is no new dependency shape to invent, and no vendoring
 question: `FEATURES.md`'s own extraction entry settled that — *"lib.nvim
 stays a runtime dependency. Vendoring buys a standalone plugin at the price
@@ -401,7 +401,7 @@ of a second maintenance site for code that already exists."*
 ### The precedent is exact
 
 `lib.nvim.docmap` grew inside lib.nvim, proved itself, and became
-documentation.nvim. That extraction was, in its own words, **"a rename
+docmap.nvim. That extraction was, in its own words, **"a rename
 rather than a rewrite, which is the whole point of the result"** — cheap
 *because the decoupling had already happened as a design discipline*
 (`opts.root`/`opts.source` meant nothing knew lib.nvim's layout). Telemetry
@@ -416,7 +416,7 @@ was still moving, and extraction buys identity, not capability.
 
 **That was the right answer for telemetry alone. The feature list changes
 it**, for one specific reason: the API request runner is a *second* runtime
-feature, and it has nowhere good to live. It does not fit documentation.nvim
+feature, and it has nowhere good to live. It does not fit docmap.nvim
 (a static analyzer whose one deliberate runtime concession is a GET-only,
 whitelist-everything server) and it does not fit lib.nvim (a library of
 helpers, not a place for a feature with its own UI, state and history).
@@ -443,7 +443,7 @@ With a sequencing that keeps it honest:
 Four pieces, each with one sentence's worth of job:
 
 - **lib.nvim** — the shared library everything else consumes.
-- **documentation.nvim** — static truth: what exists, what is documented,
+- **docmap.nvim** — static truth: what exists, what is documented,
   how it connects. *All five docs features above live here.*
 - **the new plugin** — runtime truth: what actually ran (telemetry), and
   what an endpoint actually returns (request runner).
@@ -462,12 +462,12 @@ real boundary and not one invented to justify a new repository.
 runtime-analysis.nvim`, empty but for an `init` commit, pushed to GitHub).
 
 Recorded for the next reader, since the alternatives were live options:
-`analysis.nvim` was rejected as too broad — documentation.nvim performs
+`analysis.nvim` was rejected as too broad — docmap.nvim performs
 analysis too, and a reader could not tell the two apart by name.
 `runtime.nvim` was rejected because `runtime` is heavily loaded vocabulary
 in Neovim (`runtimepath`, `:h runtime`), so `require("runtime")` reads like
 core plumbing. `runtime-analysis.nvim` is longer, and pairs unambiguously
-with documentation.nvim — which is the property that matters, because
+with docmap.nvim — which is the property that matters, because
 naming the pair correctly is what makes the boundary legible.
 
 ---
@@ -502,7 +502,7 @@ Measured against what already exists, not in the abstract:
 |---|---|
 | Performance | Telemetry's hot path is **0.014 µs/call**, measured. Report building runs over a few hundred KB of JSON. Nothing here is compute-bound. |
 | A process that outlives Neovim | Already solved: counts persist to disk, `telemetry.load()` reads a namespace with no live instance, and mdview's `standalone` mode already outlives `:qa` by design. |
-| A rich browser UI | Already solved **twice in-house**: documentation.nvim generates a self-contained interactive HTML page (4 083 lines of Lua emitting HTML+JS, no CDN, no build step), and mdview.nvim ships a Go relay plus a prebuilt web client. |
+| A rich browser UI | Already solved **twice in-house**: docmap.nvim generates a self-contained interactive HTML page (4 083 lines of Lua emitting HTML+JS, no CDN, no build step), and mdview.nvim ships a Go relay plus a prebuilt web client. |
 | A local HTTP server for a browser-side request runner | The one genuine case — and mdview's relay is *already* a Go binary that serves a web client behind a per-session token. Extending that beats writing a second one. |
 
 ---
@@ -522,11 +522,11 @@ Node toolchain, to reach a browser this ecosystem can already reach.
 ### Answer
 
 **runtime-analysis.nvim is a Neovim plugin.** Lua, lib.nvim as a runtime
-dependency, exactly the shape documentation.nvim already has.
+dependency, exactly the shape docmap.nvim already has.
 
 If a browser tier is ever wanted beyond what mdview already renders, the
 honest options are (a) generate a self-contained page the way
-documentation.nvim already does, or (b) reuse mdview's relay. **Not** a new
+docmap.nvim already does, or (b) reuse mdview's relay. **Not** a new
 runtime. This is a decision that can be revisited cheaply later precisely
 *because* the plugin is Lua — nothing about starting here forecloses adding
 a binary if a real need for one ever shows up, whereas starting with
@@ -536,7 +536,7 @@ Electron forecloses being a normal Neovim plugin.
 
 ## 7. How the two plugins meet
 
-Also raised: could documentation.nvim gain a tab that appears when
+Also raised: could docmap.nvim gain a tab that appears when
 runtime-analysis.nvim is installed? **Yes — but not the obvious way, and the
 reason is a constraint this repository already enforces on itself.**
 
@@ -544,14 +544,14 @@ reason is a constraint this repository already enforces on itself.**
 
 ### The naive integration is architecturally excluded
 
-documentation.nvim's primary output is a **committed, byte-deterministic
+docmap.nvim's primary output is a **committed, byte-deterministic
 artifact**. The `map` CI job regenerates it in memory and byte-compares
 (`scripts/ci.sh map` → `gen_map.lua --check`). Therefore:
 
 > The artifact's content must not depend on what happens to be installed on
 > the machine that generated it.
 
-If documentation.nvim embedded runtime data at generation time, a machine
+If docmap.nvim embedded runtime data at generation time, a machine
 with runtime-analysis.nvim installed would produce a different `index.html`
 than CI — which has no such plugin — and the gate would fail. Committing the
 runtime data instead does not rescue it: telemetry counts change on every
@@ -596,7 +596,7 @@ silently changes the committed artifact is not.
 
 ### Direction of the dependency
 
-**documentation.nvim must not hard-depend on runtime-analysis.nvim.**
+**docmap.nvim must not hard-depend on runtime-analysis.nvim.**
 `pcall(require, …)`, mode absent when unavailable — the bridge document
 already states this rule, and the ecosystem already applies it in three
 places (`progress`→fidget, `telemetry`→mdview, `check.lua`→lua-language-
@@ -623,7 +623,7 @@ only the module path this paragraph itself named as an example.
 
 ## 8. Sequencing
 
-**Agreed work order: documentation.nvim first, runtime-analysis.nvim after.**
+**Agreed work order: docmap.nvim first, runtime-analysis.nvim after.**
 That is steps 1–4 below, all of which land in this repository and none of
 which need the new plugin to exist. `runtime-analysis.nvim` stays an empty
 repository until step 5, which is the correct state for it — an empty repo
@@ -632,7 +632,7 @@ before its shape is settled.
 
 Ordered so each step is independently useful and nothing is a big-bang.
 
-**In documentation.nvim:**
+**In docmap.nvim:**
 
 1. ~~**Signature popup.** Data already in the IR. Smallest possible proof
    that the "surface what we already know" direction pays off.~~
@@ -706,7 +706,7 @@ Ordered so each step is independently useful and nothing is a big-bang.
    against a hermetic `vim.uv` TCP server, no external test dependency.
    See `runtime-analysis.nvim`'s own README and `lib.nvim`'s
    `lua/lib/nvim/net/curl/README.md`.
-6. ~~**documentation.nvim's endpoint panel gains "send a request"**, soft
+6. ~~**docmap.nvim's endpoint panel gains "send a request"**, soft
    dependency on step 5.~~ **Done (2026-08-03)** — not the *static* HTML
    Analysis panel (a browser page cannot `pcall(require, ...)` a Neovim
    plugin — nonsensical outside an editor), but a new **Endpoints mode in
@@ -761,11 +761,11 @@ Ordered so each step is independently useful and nothing is a big-bang.
    future reader is not confused by the mismatch between this document's
    number and the array position telemetry actually gets.~~ **Done
    (2026-08-04)** — landed as the design doc specified, at position 8 as
-   predicted. `documentation.core.check.used_keys(ir)` (extracted from
+   predicted. `docmap.core.check.used_keys(ir)` (extracted from
    `check_dead_functions`'s own body, unchanged logic, so the check and the
    mode can never quietly disagree about what "has a static caller" means)
    crossed against `runtime-analysis.telemetry.load(namespace)` in a new
-   `documentation.core.telemetry_join` module — soft dependency throughout,
+   `docmap.core.telemetry_join` module — soft dependency throughout,
    `nil` treated as "no data" at every call site, never as evidence.
    `opts.telemetry_namespace` (new, `opts.title` by default — every
    telemetry instance in this ecosystem is already namespaced by the
@@ -797,10 +797,10 @@ Ordered so each step is independently useful and nothing is a big-bang.
    **Extended (2026-08-10): the write side.** Step 8 as originally shipped
    was read-only — the telemetry mode and dead-function suppression could
    join against *some* namespace, but nothing made this tree itself write
-   to one; a caller had to hand-instrument `require("documentation")` with
+   to one; a caller had to hand-instrument `require("docmap")` with
    runtime-analysis.telemetry to get anything to read back at all. New
-   module, `documentation.core.telemetry_self`: self-instruments this
-   tree's own aggregate on `documentation.setup()`, on by default, opt-out
+   module, `docmap.core.telemetry_self`: self-instruments this
+   tree's own aggregate on `docmap.setup()`, on by default, opt-out
    via `opts.telemetry = false` — the same `~= false` shape `opts.which_key`
    already established — and a no-op without runtime-analysis.nvim
    installed, the identical soft-dependency posture every other integration

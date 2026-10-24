@@ -13,9 +13,9 @@
 
 return function(H)
   local eq = H.eq
-  local config = require("documentation.config")
-  local docmap = require("documentation")
-  local safe_fs = require("documentation.core.safe_fs")
+  local config = require("docmap.config")
+  local docmap = require("docmap")
+  local safe_fs = require("docmap.core.safe_fs")
 
   local root = (H.tmpfile("_readme_links"):gsub("\\", "/"))
   H.write(root .. "/lua/t/init.lua", {
@@ -167,8 +167,7 @@ return function(H)
 
   -- A CRLF file read in binary mode (as on POSIX) keeps its `\r`: it ends the line, not the destination.
   -- Read directly, because Windows' text mode drops the `\r` before the check sees it.
-  local refs =
-    require("documentation.core.docs").reference_links("[r]: a.md\r\n[s]: <b c.md> 't'\r\n")
+  local refs = require("docmap.core.docs").reference_links("[r]: a.md\r\n[s]: <b c.md> 't'\r\n")
   eq(
     #refs == 2 and refs[1].dest .. "|" .. refs[2].dest or tostring(#refs),
     "a.md|b c.md",

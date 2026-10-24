@@ -7,7 +7,7 @@
 
 return function(H)
   local eq = H.eq
-  local deps = require("documentation.core.deps")
+  local deps = require("docmap.core.deps")
 
   ---A path index shaped like `deps.path_index` builds one.
   local by_path = {

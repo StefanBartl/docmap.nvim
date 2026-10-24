@@ -1,5 +1,5 @@
 -- TESTS/browse_loaded_spec.lua — the Loaded-vs-declared mode in
--- documentation.editor.browse.view, joined against runtime-analysis.nvim.
+-- docmap.editor.browse.view, joined against runtime-analysis.nvim.
 --
 -- Its own file, not a block in docmap_browse_spec.lua: that file already
 -- sits near Lua's 200-local-per-function ceiling — the same rationale
@@ -8,10 +8,10 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local view = require("documentation.editor.browse.view")
-  local loaded_diff = require("documentation.core.loaded_diff")
+  local view = require("docmap.editor.browse.view")
+  local loaded_diff = require("docmap.core.loaded_diff")
 
-  ---@return Documentation.IR
+  ---@return Docmap.IR
   local function fake_ir()
     return {
       order = { "a", "b" },
@@ -86,13 +86,13 @@ return function(H)
 
   -- entries: nil rows (runtime-analysis.nvim not installed at all) render
   -- an honest "no data" message, not a silently empty list. Forced by
-  -- monkey-patching `documentation.core.loaded_diff` itself -- the same
+  -- monkey-patching `docmap.core.loaded_diff` itself -- the same
   -- technique browse_endpoints_spec.lua uses on `runtime-analysis.history`
   -- -- since a real checkout of runtime-analysis.nvim is genuinely present
   -- in this test environment (RUNTIME_ANALYSIS_DIR), so `loaded_diff.rows`
   -- would otherwise never actually return nil here.
   do
-    package.loaded["documentation.core.loaded_diff"] = {
+    package.loaded["docmap.core.loaded_diff"] = {
       rows = function()
         return nil
       end,
@@ -105,7 +105,7 @@ return function(H)
       entries[1].label:find("no data", 1, true) ~= nil,
       "loaded mode: 'no data', not 'no discrepancies' -- the plugin itself is not installed"
     )
-    package.loaded["documentation.core.loaded_diff"] = nil
+    package.loaded["docmap.core.loaded_diff"] = nil
   end
 
   -- entries: real discrepancies, badges and detail lines.
@@ -207,7 +207,7 @@ return function(H)
 
   -- :DocBrowse's own parser recognizes "loaded" as a bare mode argument.
   do
-    local browse_cmd = require("documentation.bindings.usrcmds.browse")
+    local browse_cmd = require("docmap.bindings.usrcmds.browse")
     local parsed = browse_cmd.parse("loaded")
     eq(parsed.mode, "loaded", "parse: 'loaded' is recognized as a bare mode argument")
     eq(parsed.center, nil, "parse: 'loaded' takes no module, like history/trail/endpoints")
@@ -224,8 +224,8 @@ return function(H)
   -- from opts.source/opts.lua_root rather than a shared config value.
   do
     eq(
-      loaded_diff.prefix({ source = "lua/documentation", lua_root = "lua" }),
-      "documentation",
+      loaded_diff.prefix({ source = "lua/docmap", lua_root = "lua" }),
+      "docmap",
       "prefix: lua/<name> under lua_root 'lua' resolves to the dotted name"
     )
     eq(

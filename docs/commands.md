@@ -442,7 +442,7 @@ surface that.
 
 Scoped to lazy.nvim's spec shape specifically; packer.nvim and vim-plug
 specs look different and are not recognized. See
-[`core/plugins.lua`](../lua/documentation/core/plugins.lua) for exactly what
+[`core/plugins.lua`](../lua/docmap/core/plugins.lua) for exactly what
 counts as a spec — in particular, `return { "repo", event = "…" }` (one
 plugin) is read correctly as one entry, not as several with `event`'s value
 mistaken for a second repo, and a bare-string list is only accepted as
@@ -473,7 +473,7 @@ declared.** The `vim.*` APIs are recognized unconditionally; a config's own
 helper (`map(...)`, `usercmd.create(...)`, or a bare `local
 nvim_create_autocmd = api.nvim_create_autocmd` — all three are real shapes
 from one real config) must be named in `opts.bindings.wrappers`. See
-[`core/bindings.lua`](../lua/documentation/core/bindings.lua) for why that
+[`core/bindings.lua`](../lua/docmap/core/bindings.lua) for why that
 is declared rather than guessed, and
 [`docs/FEATURES/CORE.md`](FEATURES/CORE.md) for the measurement behind it.
 
@@ -487,7 +487,7 @@ produced the live handle — no git, no second pass.
 Recognizes call-based routing (Express/Fastify/Koa-shaped registrations)
 only; file-based routing (Next.js/SvelteKit/Nuxt/Remix) belongs in a
 Hierarchy view instead and is not what this lists — see
-[`core/endpoints.lua`](../lua/documentation/core/endpoints.lua) for exactly
+[`core/endpoints.lua`](../lua/docmap/core/endpoints.lua) for exactly
 what counts as a route.
 
 ### `:DocMap tools`
@@ -503,7 +503,7 @@ why". Each row carries the tool's binary name, `[required]` when set, the
 `why` the manifest declares, and which package managers ship it. A malformed
 entry (missing `bin`, empty `why`, no `pkg` map) is listed too, and also
 raises a `tools-spec-invalid` finding — see
-[`core/tools.lua`](../lua/documentation/core/tools.lua).
+[`core/tools.lua`](../lua/docmap/core/tools.lua).
 
 Declared only, deliberately: whether a tool is actually installed on *this*
 host is never checked here, or baked into the map at all — that answer
@@ -539,7 +539,7 @@ Regenerate this plugin's own `doc/tags`.
 ### `:DocMap all [full]` / `:DocMapAll` / `:DocMapAllFull`
 
 Generate every project in `opts.generate_all.projects` — one real headless
-Neovim subprocess per project (`documentation.generate_all.run()`), chained
+Neovim subprocess per project (`docmap.generate_all.run()`), chained
 sequentially so exactly one is ever running, never blocking this session.
 One project failing does not abort the rest; the closing notification names
 every one that failed.
@@ -580,7 +580,7 @@ side effect this plugin otherwise refuses to produce. Opting in is the
 explicit request that default declines to infer on its own.
 
 ```lua
-require("documentation").setup({
+require("docmap").setup({
   generate_all = {
     projects = {
       { root = "/repos/lib.nvim", title = "lib.nvim" },
@@ -646,7 +646,7 @@ graph produces dozens of history stops and about four places worth returning
 to.
 
 The working trail persists across Neovim restarts on its own, in
-`stdpath("state")/documentation.nvim/trails.json` — state, not the repository.
+`stdpath("state")/docmap.nvim/trails.json` — state, not the repository.
 `S` names a copy of it, `L` loads one back **additively** (replacing would
 silently destroy the trail built this session) and `X` forgets a saved one
 without touching the pins on screen.
@@ -666,4 +666,4 @@ applies to it — the server exists to get the *browser* past a restriction the
 editor never had. Both read the same `history.lua` analysis and show the same
 two caveats, so their answers agree by construction rather than by review.
 
-Full detail: [`lua/documentation/editor/browse/README.md`](../lua/documentation/editor/browse/README.md).
+Full detail: [`lua/docmap/editor/browse/README.md`](../lua/docmap/editor/browse/README.md).

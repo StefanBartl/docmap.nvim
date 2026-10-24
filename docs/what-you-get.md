@@ -5,7 +5,7 @@ what is documented and what only claims to be. None of that is written down
 anywhere a person or a CI job can read, so it is rediscovered by hand every
 time somebody new opens the tree.
 
-documentation.nvim writes it down, as an artifact you can commit, open
+docmap.nvim writes it down, as an artifact you can commit, open
 offline and diff.
 
 The map is generated, not rendered live. That is the whole trade: an artifact
@@ -14,7 +14,7 @@ reaches an existing map by *regenerating* it, never by updating the plugin
 alone.
 
 This repository maps itself with the same tool and publishes the result:
-**<https://stefanbartl.github.io/documentation.nvim/>**.
+**<https://stefanbartl.github.io/docmap.nvim/>**.
 [docs/map/overview.md](map/overview.md) is the same tree as Markdown,
 rendered straight on GitHub.
 

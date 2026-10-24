@@ -1,6 +1,6 @@
 # Generating a map for your own plugin
 
-Nothing in `documentation.nvim` knows about any particular repository's
+Nothing in `docmap.nvim` knows about any particular repository's
 layout, and — since twenty-three language backends — nothing in it assumes
 the tree is Lua either. `opts.root` / `opts.source` point it at any tree a
 backend claims; everything else — module prefix, directory layout, types
@@ -19,7 +19,7 @@ Nothing beyond the plugin spec:
 
 ```lua
 {
-  "StefanBartl/documentation.nvim",
+  "StefanBartl/docmap.nvim",
   dependencies = { "StefanBartl/lib.nvim" },
   cmd = { "DocMap", "DocBrowse" },
   opts = {
@@ -57,7 +57,7 @@ repository root:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/StefanBartl/documentation.nvim/main/docs/docmap.schema.json",
+  "$schema": "https://raw.githubusercontent.com/StefanBartl/docmap.nvim/main/docs/docmap.schema.json",
   "source": "lua/myplugin",
   "title": "myplugin.nvim",
   "repo_url": "https://github.com/me/my-plugin",
@@ -84,7 +84,7 @@ A repository states facts about itself and not about the session reading
 it. `command_name`, `keys`, `watch`, `diagnostics` and `telemetry` are
 refused with a warning naming them; the full split, and the reason for each
 group, is in
-[`lua/documentation/config/file.lua`](../lua/documentation/config/file.lua).
+[`lua/docmap/config/file.lua`](../lua/docmap/config/file.lua).
 
 ## In CI and in a pre-commit hook
 
@@ -97,7 +97,7 @@ Copy [`scripts/gen_map.lua`](../scripts/gen_map.lua) verbatim, then change only
 the options table at the bottom:
 
 ```lua
-local opts = require("documentation.config").build(root, {
+local opts = require("docmap.config").build(root, {
   source = "lua/myplugin",
   title = "myplugin.nvim",
   out_dir = "docs/map",
@@ -105,21 +105,21 @@ local opts = require("documentation.config").build(root, {
   branch = "main",
 })
 
-local code = require("documentation.core.cli").run(opts, _G.arg or {})
+local code = require("docmap.core.cli").run(opts, _G.arg or {})
 vim.cmd("cq " .. code)
 ```
 
 Everything above it is generic: it resolves `cwd`, puts the repository and
-`lib.nvim` on the runtimepath, and hands off to `documentation.core.cli` — the same
+`lib.nvim` on the runtimepath, and hands off to `docmap.core.cli` — the same
 `--check`/`--full` CLI this repository uses on itself, extracted into
-[`cli.lua`](../lua/documentation/core/cli.lua) for exactly this reason. It returns
+[`cli.lua`](../lua/docmap/core/cli.lua) for exactly this reason. It returns
 an exit code rather than calling `cq` itself, so it stays a plain function a
 test can assert on.
 
 The runtimepath block matters more than it looks. A headless `nvim -l` run has
 no plugin manager, so neither `documentation` nor `lib.nvim` is reachable by
 default. The copied script resolves `lib.nvim` from `$LIB_NVIM_DIR`, then
-`.deps/lib.nvim`, then a sibling checkout — and `documentation.nvim` itself the
+`.deps/lib.nvim`, then a sibling checkout — and `docmap.nvim` itself the
 same way if it is not already on your rtp.
 
 ```bash
@@ -252,7 +252,7 @@ map:
   runs-on: ubuntu-latest
   steps:
     - uses: actions/checkout@v4
-    - uses: StefanBartl/documentation.nvim@main
+    - uses: StefanBartl/docmap.nvim@main
       with:
         source: lua/myplugin
         repo-url: https://github.com/me/my-plugin
@@ -306,8 +306,8 @@ map:
         path: .deps/lib.nvim
     - uses: actions/checkout@v4
       with:
-        repository: StefanBartl/documentation.nvim
-        path: .deps/documentation.nvim
+        repository: StefanBartl/docmap.nvim
+        path: .deps/docmap.nvim
     - uses: rhysd/action-setup-vim@v1
       with: { neovim: true, version: stable }
     - run: nvim --headless -l scripts/gen_map.lua --check
@@ -321,11 +321,11 @@ That is not hypothetical — it is why this job exists here.
 
 The generic checks make no assumptions about your conventions. Anything that
 does goes in `opts.extra_checks`, a list of
-`fun(ir: Documentation.IR, opts: Documentation.Opts): Documentation.Finding[]`:
+`fun(ir: Docmap.IR, opts: Docmap.Opts): Docmap.Finding[]`:
 
 ```lua
 ---@param root string
----@return Documentation.Check
+---@return Docmap.Check
 local function my_check(root)
   return function(ir, _opts)
     local findings = {}
@@ -354,7 +354,7 @@ those maps otherwise draws `lib.nvim.fs`, `ui.kit` and friends as
 nameless inert grey boxes in the Deps view's `+ external` toggle.
 
 ```lua
-require("documentation").generate({
+require("docmap").generate({
   ...,
   tag_files = { ["lib.nvim"] = "/path/to/lib.nvim/docs/map" },
 })
@@ -378,7 +378,7 @@ one that depends on network availability and timing.
 GitHub link instead, into the same `ir.tag_links` table:
 
 ```lua
-require("documentation").generate({
+require("docmap").generate({
   ...,
   external_repos = {
     plenary = "nvim-lua/plenary.nvim",

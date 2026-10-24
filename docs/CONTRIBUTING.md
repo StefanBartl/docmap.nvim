@@ -1,7 +1,7 @@
-# Contributing to documentation.nvim
+# Contributing to docmap.nvim
 
 Thank you for your interest! Bugs, ideas and questions are welcome in the
-[issue tracker](https://github.com/StefanBartl/documentation.nvim/issues); pull
+[issue tracker](https://github.com/StefanBartl/docmap.nvim/issues); pull
 requests very welcome.
 
 **Read [`pipeline.md`](pipeline.md) first.** It carries every stage of the
@@ -37,13 +37,13 @@ things CI runs — is [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
 | Path | Contains |
 | --- | --- |
-| `lua/documentation/core/` | The pipeline: scan, parse, build the IR, render the artifacts |
-| `lua/documentation/core/lang/` | One backend per language, all behind `Documentation.LangBackend` |
-| `lua/documentation/editor/` | `:DocBrowse` — the in-editor view over the same map |
-| `lua/documentation/bindings/` | The `:DocMap` and `:DocBrowse` route trees |
-| `lua/documentation/config/` | `Documentation.Opts`, `.docmap.json` precedence, check grading |
-| `lua/documentation/mcp/` | The MCP server: nine read-only tools over stdio |
-| `lua/documentation/integrations/` | Soft-dependency bridges (nvzone/menu) |
+| `lua/docmap/core/` | The pipeline: scan, parse, build the IR, render the artifacts |
+| `lua/docmap/core/lang/` | One backend per language, all behind `Docmap.LangBackend` |
+| `lua/docmap/editor/` | `:DocBrowse` — the in-editor view over the same map |
+| `lua/docmap/bindings/` | The `:DocMap` and `:DocBrowse` route trees |
+| `lua/docmap/config/` | `Docmap.Opts`, `.docmap.json` precedence, check grading |
+| `lua/docmap/mcp/` | The MCP server: nine read-only tools over stdio |
+| `lua/docmap/integrations/` | Soft-dependency bridges (nvzone/menu) |
 | `scripts/` | The headless runners, including `gen_map.lua` and `ci.sh` |
 | `action.yml` | The GitHub Action, at the repository root so adopting it copies nothing |
 | `docs/` | Everything the README links to |
@@ -54,7 +54,7 @@ things CI runs — is [`DEVELOPMENT.md`](DEVELOPMENT.md).
 [`languages.md`](languages.md) has the contract field by field and the parity
 matrix. In short:
 
-1. Implement `Documentation.LangBackend` under `lua/documentation/core/lang/`.
+1. Implement `Docmap.LangBackend` under `lua/docmap/core/lang/`.
    Answer the five questions; do not reach outside them.
 2. Declare which Treesitter grammar it wants, and what it falls back to when the
    grammar is absent. A missing grammar costs precision, never the map.

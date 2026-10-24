@@ -3,13 +3,13 @@
 Every option `setup()` takes, the `.docmap.json` a repository states about
 itself, and the two tables people most often reach for -- `checks` and `keys`.
 
-Every option is a plain field on `Documentation.Opts`; the full list with
+Every option is a plain field on `Docmap.Opts`; the full list with
 per-field documentation is in
-[`lua/documentation/@types/init.lua`](../lua/documentation/@types/init.lua).
+[`lua/docmap/@types/init.lua`](../lua/docmap/@types/init.lua).
 
 ```lua
 {
-  "StefanBartl/documentation.nvim",
+  "StefanBartl/docmap.nvim",
   dependencies = { "StefanBartl/lib.nvim" },
   cmd = { "DocMap", "DocBrowse" },
   opts = {
@@ -28,7 +28,7 @@ per-field documentation is in
     pdf = false,           -- also write overview.pdf (needs pdfport.nvim,
                            -- optional dependency; async, reported separately)
     tests_dir = "TESTS",  -- auto-derived `fn.tested`
-    spec_roots = {},      -- extra spec directories/files for documentation.testing
+    spec_roots = {},      -- extra spec directories/files for docmap.testing
     spec_state = false,   -- show which modules have specs (and their last status)
                           -- in index.html / overview.md; docs/testing-contract.md
     dead_code = false,    -- widen `dead-function` to published functions too
@@ -94,7 +94,7 @@ A `.docmap.json` at the repository root is read by every one of them:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/StefanBartl/documentation.nvim/main/docs/docmap.schema.json",
+  "$schema": "https://raw.githubusercontent.com/StefanBartl/docmap.nvim/main/docs/docmap.schema.json",
   "source": ["lua", "src"],
   "exclude": ["src/generated"],
   "repo_url": "https://github.com/me/my-plugin",
@@ -123,7 +123,7 @@ neighbours are refused with a warning naming them, because a checkout you
 cloned must not be able to rebind your keys or start a watcher. The file is
 **data, never code** for the same reason — `extra_checks` is a list of Lua
 functions and stays a host-side option. The full split is in
-[`lua/documentation/config/file.lua`](../lua/documentation/config/file.lua).
+[`lua/docmap/config/file.lua`](../lua/docmap/config/file.lua).
 Two things the file *can* still set deserve a look before you run `docmap` on a
 repository you do not trust: `tag_files`, `external_repos` and `consumers` may
 name paths outside the project, and `luals` starts `lua-language-server` on the
@@ -173,9 +173,9 @@ still appears in the `?` cheatsheet, marked `(disabled)`, because "where did
 ignored.
 
 The action names are the `id` fields of the `KEYS` table in
-[`lua/documentation/editor/browse/init.lua`](../lua/documentation/editor/browse/init.lua),
-enumerated as `Documentation.Browse.KeyAction` in
-[`lua/documentation/editor/browse/@types/init.lua`](../lua/documentation/editor/browse/@types/init.lua):
+[`lua/docmap/editor/browse/init.lua`](../lua/docmap/editor/browse/init.lua),
+enumerated as `Docmap.Browse.KeyAction` in
+[`lua/docmap/editor/browse/@types/init.lua`](../lua/docmap/editor/browse/@types/init.lua):
 `move`, `enter`, `up`, `back`, `forward`, `dir_in`, `dir_out`, `depth_inc`,
 `depth_dec`, `goto_source`, `quickfix`, `impact`, `open_page`, `commit_diff`,
 `pin`, `unpin`, `trail_save`, `trail_load`, `trail_delete`, `filter`, `search`,

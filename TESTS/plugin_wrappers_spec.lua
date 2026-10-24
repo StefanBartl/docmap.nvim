@@ -17,13 +17,13 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local plugins = require("documentation.core.plugins")
-  local functions = require("documentation.core.functions")
+  local plugins = require("docmap.core.plugins")
+  local functions = require("docmap.core.functions")
 
   ---Write a Lua file and scan it, with `wrappers` declared for that scan.
   ---@param lines string[]
   ---@param wrappers table<string, true>?
-  ---@return Documentation.PluginSpec[]
+  ---@return Docmap.PluginSpec[]
   local function specs_of(lines, wrappers)
     local path = H.tmpfile(".lua")
     local fd = assert(io.open(path, "w"))

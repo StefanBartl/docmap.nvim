@@ -15,8 +15,8 @@
 
 return function(H)
   local eq = H.eq
-  local scan = require("documentation.core.scan")
-  local check = require("documentation.core.check")
+  local scan = require("docmap.core.scan")
+  local check = require("docmap.core.check")
 
   ---@param root string
   ---@param rel string

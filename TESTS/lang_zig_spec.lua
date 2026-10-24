@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_zig_spec.lua — documentation.core.lang.zig
+-- TESTS/lang_zig_spec.lua — docmap.core.lang.zig
 --
 -- Skips when the zig treesitter parser is not reachable, the same precedent
 -- `lang_js_spec.lua` sets and for the same reason: CI does not install a
@@ -33,7 +33,7 @@ return function(H)
     return
   end
 
-  local zig = require("documentation.core.lang_registry").get("zig")
+  local zig = require("docmap.core.lang_registry").get("zig")
   ok(zig ~= nil, "the zig backend must be registered")
 
   local fixture = H.tmpfile(".zig")

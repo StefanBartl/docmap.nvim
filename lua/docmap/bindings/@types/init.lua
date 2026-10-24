@@ -1,0 +1,43 @@
+---@meta
+---@module 'docmap.bindings.@types'
+--- Types for the command and key surface.
+---
+--- `docmap.bindings` is the layer over both halves: it may reach down
+--- into `core` and `editor`, and nothing below it reaches up (enforced by the
+--- `layers` rule in `scripts/gen_map.lua`). These are the two shapes that
+--- exist only at that level.
+---
+--- `Docmap.Browse.KeySpec` is deliberately **not** here. It lives beside
+--- the `KEYS` table it types, in `editor/browse/init.lua`, because the prose
+--- attached to it explains the *table* — why `only` is presentation rather than
+--- a binding condition, why `run == nil` means "documented, deliberately not
+--- bound" — and splitting that explanation from the thing it explains would
+--- cost more than the consistency gains.
+
+---What every `:DocMap` action handler is handed.
+---
+---One table rather than five positional parameters, because handlers use
+---different subsets of it and a positional list would have to be extended in
+---every handler each time one more field is needed.
+---@class Docmap.Bindings.Ctx
+---@field cfg Docmap.Config Fully resolved options -- `root` included, hence the resolved type rather than the input one.
+---@field handle Docmap.Handle Live registry handle; `handle.ir()` is the current IR.
+---@field notify table `lib.nvim.notify` instance, prefixed "[documentation]".
+---@field command_name string The name `:DocMap` was actually registered under, for messages.
+---@field open_map fun(hash: string?): boolean Open the generated page, optionally at a URL fragment.
+---@field find_node fun(ir: Docmap.IR, name: string, lua_root: string): string? Resolve a user-typed module name to a node id.
+---@field generate_all Docmap.GenerateAllOpts? Cross-repo project list for `:DocMap all`/`:DocMapAll` — `opts.generate_all` as given to `setup()`, verbatim. `nil` unless a caller configured it.
+
+---One entry in the autocommand manifest.
+---
+---A description, not a creation site: each autocmd is created by the module
+---that owns its lifecycle. See `bindings/autocmds.lua` for why centralising
+---the creation would be worse than centralising the account of it.
+---@class Docmap.Bindings.AutocmdInfo
+---@field events string[] The events it fires on.
+---@field owner string Module path that creates it.
+---@field scope "buffer"|"global" Buffer-local, or editor-wide.
+---@field lifetime string When it is created and when it goes away.
+---@field why string What it is for.
+
+return {}

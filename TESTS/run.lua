@@ -1,4 +1,4 @@
--- TESTS/run.lua — spec ORDER MANIFEST for documentation.nvim (and the old headless runner).
+-- TESTS/run.lua — spec ORDER MANIFEST for docmap.nvim (and the old headless runner).
 --
 -- The specs run on testing.nvim now (`bash scripts/test.sh`), which reads the order of the `specs`
 -- list below from this file. The order no longer matters for correctness (the spec that used
@@ -56,7 +56,7 @@ add_lib_nvim()
 -- unconditionally at module load (moved out of lib.nvim.ui.kit/
 -- lib.nvim.contextmenu in the 2026-09 migration), and several specs
 -- (browse_*_spec.lua, docmap_browse_spec.lua, pick_spec.lua) require
--- documentation.editor.browse/.pick directly -- same candidate order as
+-- docmap.editor.browse/.pick directly -- same candidate order as
 -- add_lib_nvim above.
 local function add_ui_nvim()
   if pcall(require, "ui.kit") then

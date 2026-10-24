@@ -21,7 +21,7 @@ write:
 
 ```lua
 {
-  "StefanBartl/documentation.nvim",
+  "StefanBartl/docmap.nvim",
   dependencies = { "StefanBartl/lib.nvim" },
   opts = {
     source = "lua/myplugin",   -- the subtree to scan
@@ -133,7 +133,7 @@ If `docmap-callhierarchy` is missing, the usual causes, in order:
    buffers under the scanned subtree — same scoping as the watch autocmd. A
    file in `scripts/` or `TESTS/` will not get it.
 2. **`callhierarchy` was not set**, or was set on a second `setup()` for a
-   different root. `:checkhealth documentation` reports the option's state.
+   different root. `:checkhealth docmap` reports the option's state.
 3. **The handle was installed before the option existed** — the client attaches
    on `BufReadPost`, so a buffer already open when `setup()` ran needs a
    reload (`:e`).
@@ -186,6 +186,6 @@ questions, and Neovim merges them.
   questions, and why `opts.diagnostics` pairs with it.
 - [docs/pipeline.md](pipeline.md) — how `core/calls.lua` resolves a call edge,
   and the four shapes it can and cannot see.
-- `lua/documentation/editor/callhierarchy.lua` — the client itself, including
+- `lua/docmap/editor/callhierarchy.lua` — the client itself, including
   the one sharp edge in Neovim's in-process `cmd` shape (its methods are
   called *without* an implicit `self`).

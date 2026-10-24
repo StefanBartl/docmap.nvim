@@ -1,6 +1,6 @@
 # Pipeline
 
-How `documentation.nvim` works, stage by stage, and why each stage decided
+How `docmap.nvim` works, stage by stage, and why each stage decided
 what it did. The user-facing tour is [README.md](../README.md); this is the
 document to read before changing anything.
 
@@ -61,7 +61,7 @@ Compare, Features, Quicks, Notes, History and Findings tabs) and
 drill-down navigator over the same edges rather than a diagram, because a
 terminal cannot draw one better than the browser already does. What it can do
 instead is jump to the source (`gd`), fill the quickfix list (`gq`) and stay
-live. See [browse/README.md](../lua/documentation/editor/browse/README.md).
+live. See [browse/README.md](../lua/docmap/editor/browse/README.md).
 
 `why` answers the question the Deps view can only be walked by hand to
 answer. The chain goes to the **quickfix list**, not to a message, because
@@ -90,7 +90,7 @@ technically true and completely useless.
 ## Where a diff radiates to (`history.lua`)
 
 `diff` answers what a revision changed about the *shape* of the tree.
-[`history.lua`](../lua/documentation/core/history.lua) answers the other question a reviewer has:
+[`history.lua`](../lua/docmap/core/history.lua) answers the other question a reviewer has:
 these concrete lines changed — **who calls the code that changed**. Pure in
 the same sense `diff.lua` is (text and IRs in, a structure out; no git, no
 filesystem), so the same retrieval trick applies — every commit carries its
@@ -181,7 +181,7 @@ origin in Chrome and Firefox; `fetch()` refuses the `file:` scheme for CORS
 requests outright, and Firefox isolates file origins additionally
 (`privacy.file_unique_origin`, FF68+). `:DocMap open` opens exactly that way.
 So "load it when the reader clicks" cannot mean "read a neighbouring file" —
-it has to mean an origin, and that means [`serve.lua`](../lua/documentation/editor/serve.lua). This is a
+it has to mean an origin, and that means [`serve.lua`](../lua/docmap/editor/serve.lua). This is a
 deliberate break with docmap's previous "produces files, has no runtime"
 self-image, taken because the alternative is not a worse version of the
 feature but no feature.
@@ -234,9 +234,9 @@ plain text saying so.
 the fifth `:DocBrowse` mode and calls git directly, so none of the origin
 problem above applies to it — the server exists to get the browser past a
 restriction the editor never had. Both read the same
-[`history.lua`](../lua/documentation/core/history.lua) analysis and show the same two caveats, so their
+[`history.lua`](../lua/docmap/core/history.lua) analysis and show the same two caveats, so their
 answers agree by construction rather than by review. See
-[browse/README.md](../lua/documentation/editor/browse/README.md).
+[browse/README.md](../lua/docmap/editor/browse/README.md).
 
 `dot` is the third renderer for the same edges, and it exists because the
 other two cannot do what Graphviz does: the HTML page lays boxes out in BFS
@@ -271,24 +271,24 @@ nvim --headless -l scripts/gen_map.lua --check --lenient  # fail on staleness on
 nvim --headless -l scripts/gen_map.lua --full        # + LuaLS enrichment
 ```
 
-The `:DocMap` command is opt-in — call `require("documentation.bindings.usrcmds").setup()`
+The `:DocMap` command is opt-in — call `require("docmap.bindings.usrcmds").setup()`
 to register it. Requiring `documentation` alone never creates a command.
 
 ## Live objects: `install()` / `uninstall()`
 
 `generate()` and `:DocMap` are one-shot: scan, write files, done. `install()`
-is the other half — a live `Documentation.Handle` another plugin's source code
+is the other half — a live `Docmap.Handle` another plugin's source code
 reaches for directly, instead of parsing `module_map.json` off disk:
 
 ```lua
-local handle = require("documentation").install({
+local handle = require("docmap").install({
   root = vim.fn.getcwd(),
   source = "lua/myplugin",
   watch = true,          -- rescan on BufWritePost under source/**.lua, debounced
   callhierarchy = true,  -- attach in/outgoing-calls LSP support alongside LuaLS
 })
 
-handle.ir()                          -- current Documentation.IR, in memory
+handle.ir()                          -- current Docmap.IR, in memory
 handle.node("lua/myplugin/init.lua") -- single node lookup
 
 -- Graph queries, against whatever the handle currently holds — including
@@ -303,7 +303,7 @@ local unsub = handle.on_change(function(ir, findings)
   -- runs after the initial scan and after every rescan (manual or watched)
 end)
 
-handle.uninstall()  -- or: require("documentation").uninstall(handle)
+handle.uninstall()  -- or: require("docmap").uninstall(handle)
 ```
 
 `uninstall()` is idempotent — tearing down twice, or a handle that was never
@@ -376,9 +376,9 @@ which is exactly the failure mode `editor/callhierarchy.lua`'s own header
 comment now documents ahead of the next person who touches this file.
 
 **Costs no new scan.** Every answer comes straight off
-`Documentation.Handle.callers`/`callees`, already built for the HTML map's
+`Docmap.Handle.callers`/`callees`, already built for the HTML map's
 own Calls view — position resolution is a lookup against
-`Documentation.FunctionInfo.line`/`line_end`, the function's real
+`Docmap.FunctionInfo.line`/`line_end`, the function's real
 declared span, so a cursor resting anywhere in a function's body resolves
 correctly, not only on its declaration line.
 
@@ -408,7 +408,7 @@ named, correctly keyed, correctly line-numbered.
 ## Findings as native diagnostics (`opts.diagnostics`)
 
 Session 2026-08-10. `install()`-only, off by default, same posture as
-`watch`/`callhierarchy`: `Documentation.Finding[]` — until now reachable
+`watch`/`callhierarchy`: `Docmap.Finding[]` — until now reachable
 only through the `:DocMap check` quickfix list — is also published as
 native `vim.diagnostic` entries on every already-open buffer under
 `source` that has a finding. A wavy underline and a sign-column mark while
@@ -417,7 +417,7 @@ floats, statusline counts, trouble.nvim/lspsaga if installed — everything
 already wired to `vim.diagnostic` picks it up for free.
 
 **File-level granularity, matching the quickfix list's own existing
-precedent, not a new limitation.** `Documentation.Finding` carries no
+precedent, not a new limitation.** `Docmap.Finding` carries no
 `line` field at all — only `node` (a whole file) and free-text `message`.
 Checked before writing a line of this: `bindings/usrcmds/generate.lua`'s
 own `M.check` sets `filename` for its quickfix items but never `lnum`
@@ -425,7 +425,7 @@ either, so a diagnostic here lands on the buffer's first line exactly the
 way an existing quickfix jump already does. Real per-line precision for
 the handful of checks that already know one internally
 (`dead-function`, `param-name-mismatch`, ...) would mean adding a `line`
-field to `Documentation.Finding` and touching `core/check.lua` — a real,
+field to `Docmap.Finding` and touching `core/check.lua` — a real,
 separate future step, deliberately kept out of this one: confirmed with
 the user to ship the simpler, `bindings/`-only version first rather than
 bundle a `core/` change into the same pass.
@@ -703,7 +703,7 @@ could start — both resolved from primary source, not assumed, 2026-08-10:**
    top of that default. So `render/mdview.lua` sticks to plain tables,
    headings, lists, inline code and `<details>` — no custom class, no
    `style`, no `id` — and needs nothing from mdview beyond what a plain
-   `require("documentation")` install already gets from `ammonia::
+   `require("docmap")` install already gets from `ammonia::
    Builder::default()`.
 2. **How a browser tab gets pointed at a specific room.** Traced through
    mdview's own `init.lua#M.open()` and `adapter/ws_client.lua`: the room
@@ -751,7 +751,7 @@ Off by default — a full-repo `lua-language-server --doc` run costs several
 real seconds (measured: ~4.5s over this repo's ~250 files). Merges parsed
 `@class`/`@alias` definitions onto the node that owns the file, plus two kinds
 of directed edge (`node.types_detail`, `ir.edges`) — see
-[`luals.lua`](../lua/documentation/core/luals.lua):
+[`luals.lua`](../lua/docmap/core/luals.lua):
 
 - **type-reference edges** (`kind="type"`) extracted from field types — "this
   class's field points at that class", what the Hierarchy tab's dashed edges
@@ -770,7 +770,7 @@ to reproduce it. Both class-based views say so explicitly when opened against
 such an artifact instead of rendering blank.
 
 ```lua
-require("documentation").generate({ ..., luals = true })
+require("docmap").generate({ ..., luals = true })
 -- or: :DocMap full / nvim --headless -l scripts/gen_map.lua --full
 ```
 
@@ -780,11 +780,11 @@ everything else in the IR is still valid.
 
 ## Using it for another plugin
 
-Nothing outside [`config/`](../lua/documentation/config/init.lua) knows any one repository's layout. Another
+Nothing outside [`config/`](../lua/docmap/config/init.lua) knows any one repository's layout. Another
 plugin points docmap at its own tree:
 
 ```lua
-require("documentation").generate({
+require("docmap").generate({
   root = "/path/to/my-plugin",
   source = "lua/myplugin",
   lua_root = "lua",
@@ -801,24 +801,24 @@ else — module prefix, directory layout, types directory name — is an option.
 
 | Stage | Module | Produces |
 |---|---|---|
-| Dispatch | [`lang_registry.lua`](../lua/documentation/core/lang_registry.lua) | The backend that claims a filename, the capability handshake (`report()`), and the per-extension glossaries — see [`languages.md`](languages.md) |
-| Scan | [`scan.lua`](../lua/documentation/core/scan.lua) | `Documentation.IR` — hierarchy, summaries, links |
-| Scan | [`functions.lua`](../lua/documentation/core/functions.lua) | `node.functions` — per-function docs via `vim.treesitter`, unconditional (no LuaLS needed) |
-| Scan | [`symbols.lua`](../lua/documentation/core/symbols.lua) | `node.symbols` — module-scope tables, constants and bindings |
-| Graph | [`deps.lua`](../lua/documentation/core/deps.lua) | `kind="require"` edges + `node.requires`/`required_by` |
-| Graph | [`calls.lua`](../lua/documentation/core/calls.lua) | `kind="call"` edges — which function calls which |
-| LuaLS (opt-in) | [`luals.lua`](../lua/documentation/core/luals.lua) | class/alias detail + `kind="type"` and `kind="extends"` edges merged into the IR |
-| Check | [`check.lua`](../lua/documentation/core/check.lua) | `Documentation.Finding[]` — documentation drift |
-| Render | [`render/`](../lua/documentation/core/render/) | HTML (Tree + Hierarchy + Notes + Index + History + Analysis tabs), Markdown, Mermaid, DOT |
-| Encode | [`json.lua`](../lua/documentation/core/json.lua) | deterministic JSON |
-| Diff | [`diff.lua`](../lua/documentation/core/diff.lua) | `Documentation.Diff` — what one revision changed about the shape |
-| History | [`history.lua`](../lua/documentation/core/history.lua) | `Documentation.History.Impact` — which functions a diff's changed lines touch, and who calls them |
-| Live | [`registry.lua`](../lua/documentation/editor/registry.lua) | `install()`/`uninstall()` — an in-memory `Handle` instead of files |
-| CLI | [`cli.lua`](../lua/documentation/core/cli.lua) | `--check`/`--full` entry point, reused verbatim by `scripts/gen_map.lua` and any consuming plugin's equivalent |
-| Tag files | [`tagfiles.lua`](../lua/documentation/core/tagfiles.lua) | `ir.tag_links` — `requires_external` modules resolved against another project's own committed artifact (`opts.tag_files`) |
-| External repos | [`external_repos.lua`](../lua/documentation/core/external_repos.lua) | `ir.tag_links` (same table, sibling resolver) — a `requires_external` module resolved to a GitHub blob link instead, for a third-party plugin with no `docmap` artifact of its own (`opts.external_repos`) |
-| Coverage | [`coverage.lua`](../lua/documentation/core/coverage.lua) | `fn.tested` — auto-derived, no manual `@test` tagging required |
-| Doc coverage | [`doccoverage.lua`](../lua/documentation/core/doccoverage.lua), [`render/badge.lua`](../lua/documentation/core/render/badge.lua) | documented/total function count, optional `coverage.svg` badge (`opts.badge`) |
+| Dispatch | [`lang_registry.lua`](../lua/docmap/core/lang_registry.lua) | The backend that claims a filename, the capability handshake (`report()`), and the per-extension glossaries — see [`languages.md`](languages.md) |
+| Scan | [`scan.lua`](../lua/docmap/core/scan.lua) | `Docmap.IR` — hierarchy, summaries, links |
+| Scan | [`functions.lua`](../lua/docmap/core/functions.lua) | `node.functions` — per-function docs via `vim.treesitter`, unconditional (no LuaLS needed) |
+| Scan | [`symbols.lua`](../lua/docmap/core/symbols.lua) | `node.symbols` — module-scope tables, constants and bindings |
+| Graph | [`deps.lua`](../lua/docmap/core/deps.lua) | `kind="require"` edges + `node.requires`/`required_by` |
+| Graph | [`calls.lua`](../lua/docmap/core/calls.lua) | `kind="call"` edges — which function calls which |
+| LuaLS (opt-in) | [`luals.lua`](../lua/docmap/core/luals.lua) | class/alias detail + `kind="type"` and `kind="extends"` edges merged into the IR |
+| Check | [`check.lua`](../lua/docmap/core/check.lua) | `Docmap.Finding[]` — documentation drift |
+| Render | [`render/`](../lua/docmap/core/render/) | HTML (Tree + Hierarchy + Notes + Index + History + Analysis tabs), Markdown, Mermaid, DOT |
+| Encode | [`json.lua`](../lua/docmap/core/json.lua) | deterministic JSON |
+| Diff | [`diff.lua`](../lua/docmap/core/diff.lua) | `Docmap.Diff` — what one revision changed about the shape |
+| History | [`history.lua`](../lua/docmap/core/history.lua) | `Docmap.History.Impact` — which functions a diff's changed lines touch, and who calls them |
+| Live | [`registry.lua`](../lua/docmap/editor/registry.lua) | `install()`/`uninstall()` — an in-memory `Handle` instead of files |
+| CLI | [`cli.lua`](../lua/docmap/core/cli.lua) | `--check`/`--full` entry point, reused verbatim by `scripts/gen_map.lua` and any consuming plugin's equivalent |
+| Tag files | [`tagfiles.lua`](../lua/docmap/core/tagfiles.lua) | `ir.tag_links` — `requires_external` modules resolved against another project's own committed artifact (`opts.tag_files`) |
+| External repos | [`external_repos.lua`](../lua/docmap/core/external_repos.lua) | `ir.tag_links` (same table, sibling resolver) — a `requires_external` module resolved to a GitHub blob link instead, for a third-party plugin with no `docmap` artifact of its own (`opts.external_repos`) |
+| Coverage | [`coverage.lua`](../lua/docmap/core/coverage.lua) | `fn.tested` — auto-derived, no manual `@test` tagging required |
+| Doc coverage | [`doccoverage.lua`](../lua/docmap/core/doccoverage.lua), [`render/badge.lua`](../lua/docmap/core/render/badge.lua) | documented/total function count, optional `coverage.svg` badge (`opts.badge`) |
 
 `deps` and `calls` run inside `scan()` itself, unlike the LuaLS merge: they
 need no external tool and cost only in-memory resolution over data the walk
@@ -837,7 +837,7 @@ compared `from_class` against `nil` the first time a require edge appeared —
 and `"extends"` would have been the next casualty, since it is the one kind
 with no `via`).
 
-`scan_full()` in [`init.lua`](../lua/documentation/init.lua) is `scan` + optional `luals` + `check`
+`scan_full()` in [`init.lua`](../lua/docmap/init.lua) is `scan` + optional `luals` + `check`
 in one call — the step `generate()` and `install()`'s rescan both build on, so
 the enrichment wiring exists exactly once. The IR itself is the contract
 between scan/LuaLS and render/check: renderers never touch the filesystem,
@@ -848,7 +848,7 @@ and the scanner never knows what will be drawn.
 The walk itself knows nothing about any language. It used to: `scan.lua`
 hardcoded `"%.lua$"`, `"init.lua"`, its own `parse_header` and
 `functions.lua`'s `scan_file` — every one of those a fact about *Lua*, not
-about how a docmap walk works. [`lang_registry.lua`](../lua/documentation/core/lang_registry.lua)
+about how a docmap walk works. [`lang_registry.lua`](../lua/docmap/core/lang_registry.lua)
 is the seam that replaced them. Per filename the walk asks two questions:
 
 - **Who scans this?** `lang_registry.for_file(name)` returns the backend
@@ -904,7 +904,7 @@ does not. `diff.lua` tolerates the bump untouched: its check is written
 `>= 2`, not `== 4`.
 
 Two rules keep the seam from eroding, and the map's own checks enforce the
-first: **`documentation.core` may not reach into `documentation.core.lang.*`**,
+first: **`docmap.core` may not reach into `docmap.core.lang.*`**,
 and **`KNOWN_BACKENDS` in the registry is the only place a backend module is
 named.** Adding a language is one line there plus the backend file.
 
@@ -914,14 +914,14 @@ It does not parse the language. It reads each file's leading comment block —
 everything before the first non-comment line — and stops. That is reliable
 here because `---@module` coverage in this tree is 226/226, and it costs ~200
 lines instead of a Lua front end. Each backend's `parse_header` does the
-equivalent for its own language, returning the same `Documentation.Header`
+equivalent for its own language, returning the same `Docmap.Header`
 shape: a `---@module` path for Lua, a JSDoc `@module` tag for the ECMA
 family, and for most of the twenty-three no module path at all, because the
 file's path already *is* its identity.
 
 The consequence: the scanner alone knows *that* a module exists and what it
 says about itself, not what its functions are — that's the backend's
-`scan_file`, which for Lua is [`functions.lua`](../lua/documentation/core/functions.lua)
+`scan_file`, which for Lua is [`functions.lua`](../lua/docmap/core/functions.lua)
 unchanged.
 
 ## Function-level scanning (`node.functions`)
@@ -935,7 +935,7 @@ exports simply never appears. Retrofitting every module with a redundant
 aggregate class (duplicating what `---@param`/`---@return` already say above
 each function) would have been a drift risk, not a shortcut.
 
-So [`functions.lua`](../lua/documentation/core/functions.lua) uses `vim.treesitter` instead — already a
+So [`functions.lua`](../lua/docmap/core/functions.lua) uses `vim.treesitter` instead — already a
 lib.nvim dependency (`lib.nvim.treesitter`), no new one added. A query finds
 the three function shapes this repo actually uses (`function M.foo(...)`,
 `local function foo(...)`, `M.foo = function(...)`), matched via
@@ -984,7 +984,7 @@ signature's parameter count to the number of `@param` lines; deliberately
 Two things the detail pane could not answer before, both filled during the
 same scan and the same parse:
 
-**Module-scope tables, constants and bindings** ([`symbols.lua`](../lua/documentation/core/symbols.lua)).
+**Module-scope tables, constants and bindings** ([`symbols.lua`](../lua/docmap/core/symbols.lua)).
 `functions.lua` answers "what can I call"; this answers the rest of "what is in
 here" — the lookup tables a module dispatches through, the constants that
 encode its thresholds, the singletons it holds at load time. Reading a module's
@@ -1025,7 +1025,7 @@ that `scan` cannot fill, since the class/alias count only exists once LuaLS
 enrichment ran, so `luals.merge` fills and rolls it up the same way.
 
 **Owning scope** (`fn.owner`, `fn.owner_kind`,
-[`scopes.lua`](../lua/documentation/core/scopes.lua)). A function records the
+[`scopes.lua`](../lua/docmap/core/scopes.lua)). A function records the
 class, `impl` block, trait, receiver type or inline module it is declared in,
 set by the backend at the point the parse tree still exists. The detail pane's
 Functions section groups on it: a Python file with three classes of four
@@ -1048,11 +1048,11 @@ which three do not and should.
 
 ## Call-graph scanning (`kind="call"` edges)
 
-[`calls.lua`](../lua/documentation/core/calls.lua) reuses the tree [`functions.lua`](../lua/documentation/core/functions.lua)
+[`calls.lua`](../lua/docmap/core/calls.lua) reuses the tree [`functions.lua`](../lua/docmap/core/functions.lua)
 already parsed — extraction and resolution are split, because resolution is
 not a per-file question. `fs.read()` only means something once you know this
 file bound `fs` to `lib.nvim.fs` and that some node declares that module,
-which is why require-alias collection in [`deps.lua`](../lua/documentation/core/deps.lua) is a
+which is why require-alias collection in [`deps.lua`](../lua/docmap/core/deps.lua) is a
 prerequisite rather than a coincidence.
 
 Four shapes resolve **exactly**, each a syntactic fact rather than a guess:
@@ -1116,7 +1116,7 @@ overlay drawing solid parent/child connectors and (once `opts.luals` ran)
 dashed type-reference connectors. Center on any module or namespace via its
 detail-pane "Hierarchy ↳" link, or double-click a box to re-center on a
 smaller subtree — capped at 90 nodes per view (`MAX_HNODES` in
-[`render/html.lua`](../lua/documentation/core/render/html.lua)), since a box-and-connector diagram of
+[`render/html.lua`](../lua/docmap/core/render/html.lua)), since a box-and-connector diagram of
 the whole ~250-node tree at once is not something either box-and-connector
 diagrams or the people reading them handle well.
 
@@ -1468,14 +1468,14 @@ that resolves to nothing *in that scan*, even though it resolves perfectly
 well inside `lib.nvim`'s own committed map.
 
 ```lua
-require("documentation").generate({
+require("docmap").generate({
   ...,
   tag_files = { ["lib.nvim"] = "/path/to/lib.nvim/docs/map" },
 })
 ```
 
 Every `requires_external` module matching the prefix (`lib.nvim.fs`, not
-`lib.nvimx` — the same whole-segment matching `Documentation.LayerRule` uses) is
+`lib.nvimx` — the same whole-segment matching `Docmap.LayerRule` uses) is
 looked up in that directory's `module_map.json`. What resolves gets a solid,
 accent-coloured box instead of the usual dashed muted one, and clicking it
 opens the other project's `index.html` at that node, in a new tab. What
@@ -1497,7 +1497,7 @@ from two angles: *why* is this dependency here (which functions of it does
 the tree actually call), and *where* is its source, since it's outside the
 scan entirely.
 
-**Why**, first — [`core/calls.lua`](../lua/documentation/core/calls.lua)
+**Why**, first — [`core/calls.lua`](../lua/docmap/core/calls.lua)
 resolves `node.calls_external` in the exact same pass that resolves internal
 call edges, not a second traversal: every alias `deps.lua` bound to an
 external module (kept, where an earlier version threw it away the moment it
@@ -1518,7 +1518,7 @@ overwriting an entry `tag_files` already set — a local project's own map
 beats a guessed URL for the same module):
 
 ```lua
-require("documentation").generate({
+require("docmap").generate({
   ...,
   external_repos = {
     plenary = "nvim-lua/plenary.nvim",
@@ -1562,10 +1562,10 @@ feature is actually for. `opts.external_repos` is the only way in, the same
 [`docs/annotations.md`](annotations.md)) and has exactly zero real hits
 in this tree — a doc-comment that duplicates what the actual spec file
 already says is a second source of truth, and second sources of truth
-drift. [`coverage.lua`](../lua/documentation/core/coverage.lua) measures instead: every function's
+drift. [`coverage.lua`](../lua/docmap/core/coverage.lua) measures instead: every function's
 bare name is checked against every identifier mentioned anywhere under
 `opts.tests_dir` (default `TESTS`), the same technique
-[`calls.lua`](../lua/documentation/core/calls.lua)'s `identifier_counts` uses for "used as a value",
+[`calls.lua`](../lua/docmap/core/calls.lua)'s `identifier_counts` uses for "used as a value",
 pointed at the test tree instead of the source tree.
 
 Coarse in the safe direction: `M.read` and an unrelated local `read` both
@@ -1586,7 +1586,7 @@ just a printed, number is the planned "Analysis" tab — see the roadmap.
 
 ### Documentation coverage (`opts.badge`, R4)
 
-[`doccoverage.lua`](../lua/documentation/core/doccoverage.lua) turns three scattered per-function
+[`doccoverage.lua`](../lua/docmap/core/doccoverage.lua) turns three scattered per-function
 findings — `missing-summary`, `undocumented-param`, `param-name-mismatch` —
 into one number: a function counts as documented when it has a non-empty
 summary *and* its parameters are fully and correctly named, reusing exactly
@@ -1600,11 +1600,11 @@ precise than that. `@internal` functions are excluded, same as all three
 findings this builds on.
 
 ```lua
-local documented, total = require("documentation.core.doccoverage").summary(ir)
+local documented, total = require("docmap.core.doccoverage").summary(ir)
 ```
 
 `opts.badge = true` additionally writes `coverage.svg` — a hand-rolled,
-shields.io-shaped badge (see [`render/badge.lua`](../lua/documentation/core/render/badge.lua)), not one
+shields.io-shaped badge (see [`render/badge.lua`](../lua/docmap/core/render/badge.lua)), not one
 fetched from shields.io itself: a network call during `scan_full()` would
 make `--check` depend on availability and timing the same way a `dot`-binary
 call would, which is exactly why `render/dot.lua` is a text export instead.
@@ -1663,7 +1663,7 @@ controls; a control that set one behind its back would produce a diagram the
 Back button cannot return from. Only the axes the current view actually uses
 are serialized, so a Tree-tab link is not three pieces of noise long. See
 `serializeState`/`parseState`/`applyState`/`navigate` in
-[`render/html.lua`](../lua/documentation/core/render/html.lua). One non-obvious rule worth knowing if
+[`render/html.lua`](../lua/docmap/core/render/html.lua). One non-obvious rule worth knowing if
 you touch this: **live-preview updates (the Hierarchy search box while
 typing) must never call `history.replaceState`.** An earlier version did,
 and it silently broke Back — `replaceState` overwrites whatever entry is
@@ -1747,23 +1747,23 @@ aggregate numbers instead of boxes. **Seventeen tools today**, and every one
 of them explains itself on hover and on focus — see *Explaining the page's
 own furniture* below:
 
-- **Test coverage** — `fn.tested` (R2, [`coverage.lua`](../lua/documentation/core/coverage.lua))
-- **Documentation** — `fn.documented` (R4, [`doccoverage.lua`](../lua/documentation/core/doccoverage.lua))
+- **Test coverage** — `fn.tested` (R2, [`coverage.lua`](../lua/docmap/core/coverage.lua))
+- **Documentation** — `fn.documented` (R4, [`doccoverage.lua`](../lua/docmap/core/doccoverage.lua))
 - **Annotations** — which tags this tree uses, counted per function against `core/tags.lua`'s catalogue. Generated, so unlike `docs/annotations.md` it cannot go stale
 - **API surface** — every non-`internal` function, with its doc state and how many *other* modules of this tree call it. Computed in the page from `fn.internal`, `fn.documented` and the call edges already in the payload — no new field, no schema bump
 - **Dependencies** — `n.requires`/`n.required_by` (R6, fan-in/fan-out)
-- **Complexity** — `fn.complexity` (cyclomatic/McCabe, [`functions.lua`](../lua/documentation/core/functions.lua))
-- **Duplicates** — `ir.duplicates` (structural copy-paste detection, [`duplicates.lua`](../lua/documentation/core/duplicates.lua))
-- **Plugins** — `n.plugins` (lazy.nvim spec inventory, [`plugins.lua`](../lua/documentation/core/plugins.lua))
+- **Complexity** — `fn.complexity` (cyclomatic/McCabe, [`functions.lua`](../lua/docmap/core/functions.lua))
+- **Duplicates** — `ir.duplicates` (structural copy-paste detection, [`duplicates.lua`](../lua/docmap/core/duplicates.lua))
+- **Plugins** — `n.plugins` (lazy.nvim spec inventory, [`plugins.lua`](../lua/docmap/core/plugins.lua))
 - **Lazy loading** — the same `n.plugins`, indexed the other way round: which plugins load on each event, filetype, command and key, and which are paid for at startup regardless. No new extraction; a second index over data the scan already stamped
-- **Tools** — `ir.tools` (this repo's own `lib.nvim.deps` manifest, [`tools.lua`](../lua/documentation/core/tools.lua))
-- **Telemetry** — `runtime-analysis.telemetry`'s call counts, joined by [`telemetry_join.lua`](../lua/documentation/core/telemetry_join.lua) — the one panel that is not IR-only, see its own paragraph below
-- **Loaded** — `runtime-analysis.loaded`'s persisted loaded-vs-declared snapshots, joined by [`loaded_diff.lua`](../lua/documentation/core/loaded_diff.lua) — also not IR-only, see its own paragraph below
-- **Bindings** — `n.bindings` (keymaps, user commands and autocommands, [`bindings.lua`](../lua/documentation/core/bindings.lua))
+- **Tools** — `ir.tools` (this repo's own `lib.nvim.deps` manifest, [`tools.lua`](../lua/docmap/core/tools.lua))
+- **Telemetry** — `runtime-analysis.telemetry`'s call counts, joined by [`telemetry_join.lua`](../lua/docmap/core/telemetry_join.lua) — the one panel that is not IR-only, see its own paragraph below
+- **Loaded** — `runtime-analysis.loaded`'s persisted loaded-vs-declared snapshots, joined by [`loaded_diff.lua`](../lua/docmap/core/loaded_diff.lua) — also not IR-only, see its own paragraph below
+- **Bindings** — `n.bindings` (keymaps, user commands and autocommands, [`bindings.lua`](../lua/docmap/core/bindings.lua))
 - **Checklist** — `ir.checklist`, the hand-verified ledger. Baked in; the changed-since-verified verdict needs git, so it fills in under `:DocMap serve`
 - **Hooks** — functions named like a React hook (`^use[A-Z]`), set by `core/lang/ecma.lua`. JavaScript, TypeScript and TSX only
 - **Docs** — `ir.docs`: every Markdown file in the tree and how often the rest of the documentation points at it
-- **Endpoints** — `n.endpoints` (Express/Fastify/Koa-shaped route registrations, [`endpoints.lua`](../lua/documentation/core/endpoints.lua))
+- **Endpoints** — `n.endpoints` (Express/Fastify/Koa-shaped route registrations, [`endpoints.lua`](../lua/docmap/core/endpoints.lua))
 
 **This list said "eleven" for five tools too long**, which is the ordinary
 way a hand-written inventory of a growing thing goes wrong — and the reason
@@ -1841,7 +1841,7 @@ function-scope tags are used nowhere here.** `@param` 745, `@return` 668,
 panels and therefore asked of none of them: *what does this thing actually
 expose?* Index has the names, Documentation has the state, Dependencies has
 the edges. It exists because this ecosystem keeps extracting a module into
-its own plugin — `lib.nvim.docmap` → documentation.nvim,
+its own plugin — `lib.nvim.docmap` → docmap.nvim,
 `lib.nvim.telemetry` → runtime-analysis.nvim — and that question was answered
 by hand both times.
 
@@ -1872,7 +1872,7 @@ per-module score would bury the one function that actually needs attention
 under a healthy module's mean. Reads `fn.complexity` — cyclomatic
 complexity (McCabe): one point per `if`/`elseif`/`while`/`for`/`repeat`/
 `and`/`or`, plus a base of 1, computed by
-[`functions.lua`](../lua/documentation/core/functions.lua)'s `cyclomatic_complexity` over each
+[`functions.lua`](../lua/docmap/core/functions.lua)'s `cyclomatic_complexity` over each
 function's own subtree (including nested anonymous closures — a callback's
 branches are still branches the function's reader has to follow, and
 docmap never scans the closure as its own unit). Unlike `tested`/
@@ -1891,7 +1891,7 @@ because neither one requires the other.
 
 The comparison is on `fn.shape`, a hash of the treesitter node *types* over
 a function's whole subtree, never their text, computed in
-[`functions.lua`](../lua/documentation/core/functions.lua) during the scan for the
+[`functions.lua`](../lua/docmap/core/functions.lua) during the scan for the
 same reason `complexity` is: only there does the parse tree exist. Ignoring
 identifier and literal names is the entire point — a copy-paste gets renamed
 on the way in, so a detector that only found byte-identical bodies would find
@@ -1937,7 +1937,7 @@ moment it lands. There is no fixed point. The roadmap listed the two
 candidates side by side as if they were the same kind of work; only one of
 them was ever buildable here. It ships as **`:DocMap churn`** instead —
 live-computed into the quickfix list, nothing written, the shape `:DocMap
-impact` already had. See [`churn.lua`](../lua/documentation/core/churn.lua) for the
+impact` already had. See [`churn.lua`](../lua/docmap/core/churn.lua) for the
 scoring and for the one property worth knowing: `commits × complexity` is a
 scalarization, so a large enough value on one axis outranks a moderate value
 on both. Tornhill's own presentation is a scatter plot whose answer is the
@@ -1949,7 +1949,7 @@ order looks wrong the numbers beside it say why.
 *config* (as opposed to a Neovim *plugin*), where `lua/plugins/*.lua` is
 mostly `return { { "author/repo", event = "…" }, … }` — no functions, no
 symbols, nothing any other panel has anything to say about. Extracted in
-[`plugins.lua`](../lua/documentation/core/plugins.lua), during the same scan
+[`plugins.lua`](../lua/docmap/core/plugins.lua), during the same scan
 pass as `functions`/`symbols`, off the parse tree that already exists.
 Scoped to **lazy.nvim's spec shape** specifically and named as such —
 packer.nvim and vim-plug specs look different and would need their own
@@ -2012,7 +2012,7 @@ byte-compare depend on when it happened to run relative to real usage —
 `ir.tools`'s own reasoning above, one step further (there the *shape* is
 deterministic and only presence is not; here the counts themselves are the
 volatile part). So this panel fetches instead: `GET /api/telemetry` on
-`documentation.editor.serve` (`:DocMap serve`) reads
+`docmap.editor.serve` (`:DocMap serve`) reads
 `core/telemetry_join.lua`'s join — the identical join `:DocBrowse telemetry`
 already used — fresh on every open, joined against whatever
 `docs/map/module_map.json` currently holds on disk, not a revision. Opened
@@ -2020,7 +2020,7 @@ from `file://`, the panel explains itself rather than doing nothing, the
 same treatment the History tab already gives that case, for the identical
 reason: a `file://` origin cannot `fetch()` anything at all.
 
-`telemetry_join.rows`/`by_key` had a real bug until 2026-08-10: `Documentation.
+`telemetry_join.rows`/`by_key` had a real bug until 2026-08-10: `Docmap.
 IR.nodes` is keyed by `node.id` (a file path, `core/scan.lua`'s `local id =
 rel`), but `runtime-analysis.telemetry`'s `wrap_loaded()`/`telemetry.auto()`
 resolve `Data.modules` values to the *dotted* `@module` form instead — the
@@ -2064,7 +2064,7 @@ does not exist.
 `GET /api/loaded?snapshot=<name>` reads the snapshot via
 `runtime-analysis.loaded.load_snapshot(prefix, name)` and joins it against
 whatever `docs/map/module_map.json` currently holds, through
-[`loaded_diff.lua`](../lua/documentation/core/loaded_diff.lua)'s
+[`loaded_diff.lua`](../lua/docmap/core/loaded_diff.lua)'s
 `rows_from_snapshot` — the identical diff logic `M.rows` (the live path
 `:DocBrowse loaded` uses) already has, refactored to take "how do I get a
 module's present fields" as a callback so the two paths share one
@@ -2074,7 +2074,7 @@ implementation rather than two copies of the same discrepancy logic.
 
 **One identifier, not two, unlike Telemetry.** A telemetry namespace can
 genuinely differ from the module prefix it wraps (`core/telemetry_self.lua`
-wraps `main = "documentation"` under `namespace = "documentation.nvim"` —
+wraps `main = "documentation"` under `namespace = "docmap.nvim"` —
 two different strings, for this repo itself), so `telemetry_join.
 M.namespace(opts)` reads `opts.telemetry_namespace`/`opts.title`. A loaded
 snapshot has nothing to name except the prefix it was taken under, so
@@ -2143,7 +2143,7 @@ nobody can ever read, and neither of those fails loudly on its own.
 ## Features tab
 
 A repo's own `docs/FEATURES/` (or `docs/features/`) folder, when it has one
-— read by [`core/features.lua`](../lua/documentation/core/features.lua) into
+— read by [`core/features.lua`](../lua/docmap/core/features.lua) into
 `ir.features`, rendered as an index: one card per `## Feature` section, its
 summary and whatever `- **Key:** value` metadata bullets the author wrote.
 The full field guide is [`docs/features_format.md`](features_format.md);
@@ -2205,7 +2205,7 @@ against a running host, so there is nothing here that could make
 on the *scanned* IR by `scan_full`, but the generated page reads a
 *separately* serialized payload — `core/render/html.lua`'s own `M.render`
 builds its own `json.encode({...})` table independently of
-`documentation.to_json` (`module_map.json`'s writer). Adding a field to
+`docmap.to_json` (`module_map.json`'s writer). Adding a field to
 `ir` and to `to_json` does not, by itself, put it on the page; both sites
 need it, and a comment thread in `M.render` (predating this feature, left
 by two earlier omissions of the same shape) says so plainly. `tools` and
@@ -2294,18 +2294,18 @@ Generic checks (any annotated tree):
 | `missing-module-tag` | error | A source file with no `---@module`. |
 | `module-path-mismatch` | error | Declared `@module` ≠ where the file lives — copy-pasted or stale headers. |
 | `missing-summary` | warn | `@module` present but no description line. |
-| `file-holds-many-modules` | info | One file carrying **several module identities** — a Rust `mod x { … }` beside the file's own surface, or the second `defmodule` in an Elixir file. `Documentation.Node` is keyed on a path, so all of them are grouped under the file by `core/scopes.lua` and none has an id, a summary, a coverage number or an edge of its own; asking "how documented is module X" in such a tree silently gets the *file's* answer. This reports that, which is the half that is useful today — making them real nodes is the open "one file, many modules" entry in the project plan (kept outside the repositories), an id-shape change reaching the walk, `stats`, every `id` and both artifact consumers. `info`, not `warn`: Rust and Elixir are written this way on purpose and there is nothing here for the scanned tree's author to fix — the same reason `missing-readme` is an `info`. A test module (`#[cfg(test)] mod tests`) is not an identity and is not counted; neither is a class, an `impl` block or a trait, which are owned but not by a module. Silent for every Lua tree, which has no owning module construct at all. |
+| `file-holds-many-modules` | info | One file carrying **several module identities** — a Rust `mod x { … }` beside the file's own surface, or the second `defmodule` in an Elixir file. `Docmap.Node` is keyed on a path, so all of them are grouped under the file by `core/scopes.lua` and none has an id, a summary, a coverage number or an edge of its own; asking "how documented is module X" in such a tree silently gets the *file's* answer. This reports that, which is the half that is useful today — making them real nodes is the open "one file, many modules" entry in the project plan (kept outside the repositories), an id-shape change reaching the walk, `stats`, every `id` and both artifact consumers. `info`, not `warn`: Rust and Elixir are written this way on purpose and there is nothing here for the scanned tree's author to fix — the same reason `missing-readme` is an `info`. A test module (`#[cfg(test)] mod tests`) is not an identity and is not counted; neither is a class, an `impl` block or a trait, which are owned but not by a module. Silent for every Lua tree, which has no owning module construct at all. |
 | `dead-readme-link` | warn | A relative link in a module README or any `docs/` file, pointing at nothing. A target with a URL scheme (`mailto:`, `tel:`, `https://`) is never checked as a file, a target that goes through a link leaving the project is not judged, and an absolute path, a `..` that climbs out, a drive path (`C:/x`) and a Windows backslash name are resolved inside the project and judged like any other name, so they are dead when absent. Windows and POSIX give the same verdict. |
 | `placeholder-readme-link` | warn | A Markdown link whose target starts with a shell-style placeholder (`$REPOS_DIR/x.md`, `${HOME}/y.md`). It is not expanded: no Markdown viewer does, so the link is dead for every reader, and expanding the scanning person's environment would make the verdict depend on whose machine ran the check. Its own code so the message says why instead of "does not exist". Link targets are read as CommonMark does for both this and `dead-readme-link`: blanks trimmed, `<...>` unwrapped, a title dropped, `%20`-style escapes decoded, and a target that still holds a blank (`[x](int x)` in prose) is no link. Balanced or escaped parentheses belong to the name, a `#fragment` is dropped and the file before it checked, `%00`-`%1F` and `%2F`/`%5C` stay encoded. Reference definitions (`[r]: x.md "t"`, on one line) are read with the same rules and checked too, as CommonMark reads them: one right below a paragraph line is text, of two with the same label only the first counts, and a footnote (`[^1]: ...`) is no link. Like code, an HTML comment (`<!-- ... -->`) is not read. The page generator rebases inline links with the same reader (`docs.inline_links`); a summary cell holds no reference definition. |
-| `sibling-reference-missing` | warn | A path naming a **declared sibling repository** (`documentation.nvim/docs/ecosystem.md`) that does not exist in that repository's checkout. The third reference shape, and the two existing checks decline it for stated and correct reasons: `doc-references-missing` resolves *code identifiers* against the scanned repo's own module map, `dead-readme-link` resolves *markdown links* within one repo after `strip_code` has removed every code span. A cross-repository citation is none of those — it is a path, in a code span, naming a tree this repository does not contain. Measured: `runtime-analysis.nvim` carried **nine** dead `docs/ecosystem.md` citations in August 2026, every one dead from the moment it was written, and nothing could report them. Only a first segment matching a sibling's declared `name` is considered, so nothing is guessed; URLs and GitHub `blob/`/`tree/` paths are excluded by rule, both after false positives on this repository's own docs. Silent when no sibling declares a reachable `local_path` — on CI there is no checkout, and a warning there would say only that CI is CI. |
+| `sibling-reference-missing` | warn | A path naming a **declared sibling repository** (`docmap.nvim/docs/ecosystem.md`) that does not exist in that repository's checkout. The third reference shape, and the two existing checks decline it for stated and correct reasons: `doc-references-missing` resolves *code identifiers* against the scanned repo's own module map, `dead-readme-link` resolves *markdown links* within one repo after `strip_code` has removed every code span. A cross-repository citation is none of those — it is a path, in a code span, naming a tree this repository does not contain. Measured: `runtime-analysis.nvim` carried **nine** dead `docs/ecosystem.md` citations in August 2026, every one dead from the moment it was written, and nothing could report them. Only a first segment matching a sibling's declared `name` is considered, so nothing is guessed; URLs and GitHub `blob/`/`tree/` paths are excluded by rule, both after false positives on this repository's own docs. Silent when no sibling declares a reachable `local_path` — on CI there is no checkout, and a warning there would say only that CI is CI. |
 | `missing-readme` | info | A module with **no module above it** (the plugin itself, or each source root) or a **big** one (ten or more source files) without a README — the places a reader lands, where the absence should be a decision, not an accident. Small nested folders (`config/`, `marks/`, `bindings/keymaps/`) are not asked: a README for each was a column of `info` lines on every tree. Structural rather than a fixed depth, because the scan's depth differs by `source` layout. |
 | `consumer-require-missing` | warn | A project under `opts.consumers` requires a module under this library's namespace that this library does not declare — either that consumer is broken now, or its committed map predates a rename it has already followed. Both are named in the message. Inert unless `opts.consumers` is set. The opposite finding ("no consumer requires this module") is deliberately **not** a check: that number is a floor, not a fact, and stays a report — see `:DocMap consumers`. |
 | `example-does-not-parse` | warn | An `@example` block that is not valid Lua, tried first as a chunk and then as an expression so a fragment like `{ timeout = 5000 }` is not reported. No tree in this ecosystem uses `@example`, so this has never fired on real code — the false-positive question is settled against fixtures, not usage. |
 | `unused-require` | info | A `require` bound to a local name that is never mentioned again — the mirror of `require-not-declared`, usually left by a refactor that removed the last call. Only aliased requires: a bare `require("x")` is a load for its side effects and has no name to look for. The reference count is deliberately coarse (a mention in a comment counts), because over-counting errs toward keeping a live line. |
 | `unreferenced-module` | info | Never reported for `<plugin>.health`, which `:checkhealth` loads by name and nothing requires. Suppressed for a module the newest `runtime-analysis.loaded` snapshot says a real session had loaded — the aggregator case this check names in its own comment (`lib.nvim` reaches every submodule through a string map, so no literal `require` exists to find) settled by evidence instead of left as a standing false positive. Suppression only, never escalation, and silent without a snapshot, which is CI's normal state. Required by no other file in the tree. |
-| `tag-require-missing` | warn | A `require` under an `opts.tag_files` prefix that the target project's own committed map does not declare — **the mirror of `consumer-require-missing`**, which asks the same question from the library's side. Between them both directions of one cross-repository edge are covered, and neither needs new extraction: both artifacts already exist. Reads `ir.tag_audit`, which `tagfiles.lua` fills; deliberately **never** `external_repos.lua`, because only a tag file is authoritative — that resolver produces a *guessed* GitHub URL, and reporting a broken dependency on the strength of a guess is a different claim entirely. The message carries the same second reading its mirror does, because the same two explanations always fit: the require is broken now, or the map predates a rename the dependency has already followed. Measured: 18 external requires under `lib` from documentation.nvim and 23 from runtime-analysis.nvim, all 41 resolving — zero findings, so the proof is the positive control in its spec, not the silence. |
-| `tag-file-unavailable` | info | A configured tag file whose `module_map.json` could not be read, reported once per directory. **Not an error path but the normal one here**, and the reason the pair is trustworthy at all: every plugin in this ecosystem but `documentation.nvim` gitignores `docs/map/` — a committed map is stale the moment anything it describes changes, only this repository gates that in CI, and across these plugins it came to ~40 MB of artifacts nobody asked for. So the map a tag file points at exists on the author's disk and in no clone, which makes this a working-copy check by nature and makes silence the one unacceptable outcome. `info` like `luals-unavailable`: a thing that did not run is not a defect in the tree. |
-| `orphaned-class-alias` | info | A `@class` or `@alias` declared, documented, and named by nothing in the tree — `unreferenced-module` one level down. Runs only when LuaLS enrichment did (`node.types_detail` is `nil` otherwise, and reporting every type as an orphan then would be a wrong answer rather than a low one). A reference is a **token** match over each node's source and `@types` files, never a substring: the first version asked `line:find(name)`, which let `Lib.Fs.Read` be "referenced" by every mention of `Lib.Fs.ReadAsync` and hid four of lib.nvim's twenty-eight real orphans. A type's own declaration line is not a use, but the rest of it is — `---@class Child : Parent` is often the only place `Parent` is ever named. `info` for `unreferenced-module`'s reason: a published type may legitimately be referenced only by a consumer annotating against this library. Measured: 28 in lib.nvim, 1 in runtime-analysis.nvim, 1 in this repo (`Documentation.Browse`, an aggregate surface class nothing points at), all spot-checked by hand. |
+| `tag-require-missing` | warn | A `require` under an `opts.tag_files` prefix that the target project's own committed map does not declare — **the mirror of `consumer-require-missing`**, which asks the same question from the library's side. Between them both directions of one cross-repository edge are covered, and neither needs new extraction: both artifacts already exist. Reads `ir.tag_audit`, which `tagfiles.lua` fills; deliberately **never** `external_repos.lua`, because only a tag file is authoritative — that resolver produces a *guessed* GitHub URL, and reporting a broken dependency on the strength of a guess is a different claim entirely. The message carries the same second reading its mirror does, because the same two explanations always fit: the require is broken now, or the map predates a rename the dependency has already followed. Measured: 18 external requires under `lib` from docmap.nvim and 23 from runtime-analysis.nvim, all 41 resolving — zero findings, so the proof is the positive control in its spec, not the silence. |
+| `tag-file-unavailable` | info | A configured tag file whose `module_map.json` could not be read, reported once per directory. **Not an error path but the normal one here**, and the reason the pair is trustworthy at all: every plugin in this ecosystem but `docmap.nvim` gitignores `docs/map/` — a committed map is stale the moment anything it describes changes, only this repository gates that in CI, and across these plugins it came to ~40 MB of artifacts nobody asked for. So the map a tag file points at exists on the author's disk and in no clone, which makes this a working-copy check by nature and makes silence the one unacceptable outcome. `info` like `luals-unavailable`: a thing that did not run is not a defect in the tree. |
+| `orphaned-class-alias` | info | A `@class` or `@alias` declared, documented, and named by nothing in the tree — `unreferenced-module` one level down. Runs only when LuaLS enrichment did (`node.types_detail` is `nil` otherwise, and reporting every type as an orphan then would be a wrong answer rather than a low one). A reference is a **token** match over each node's source and `@types` files, never a substring: the first version asked `line:find(name)`, which let `Lib.Fs.Read` be "referenced" by every mention of `Lib.Fs.ReadAsync` and hid four of lib.nvim's twenty-eight real orphans. A type's own declaration line is not a use, but the rest of it is — `---@class Child : Parent` is often the only place `Parent` is ever named. `info` for `unreferenced-module`'s reason: a published type may legitimately be referenced only by a consumer annotating against this library. Measured: 28 in lib.nvim, 1 in runtime-analysis.nvim, 1 in this repo (`Docmap.Browse`, an aggregate surface class nothing points at), all spot-checked by hand. |
 | `test-references-missing` | warn | A spec names `mod.member` through a `local mod = require("…")` binding, and that module has no such member — `doc-references-missing` for the test tree, and the direction `coverage.lua`'s `fn.tested` does not cover. Where a rename rots quietest, because a spec can keep passing while naming something gone: `eq(mod.removed, nil)` asserts exactly what a deleted function returns. `coverage.lua`'s bare-identifier technique is useless reversed — it errs toward "tested", which flipped would report every local in a spec — so this resolves the qualified shape only. Three false-positive classes, each measured against a real repository and each answered: a module-scope **re-export** (`M.x = require("…").x`, invisible to `symbols.lua` by design), a surface **assembled at runtime** (a lazy `__index`, or a table that is a factory's return value — the check stays silent on any module that is not a plain `local M = {}` … `return M`), and a **shadowing local**, handled without a scope model by skipping any name a file binds twice. After all three: 0 findings across three real trees, which is what a healthy tree should produce — so the check's proof is the positive control in its spec, not its silence. **Silence is not evidence, and this check proved it twice.** Its first version anchored the require pattern on `(chunk …)`, which profiling caught and reading had not: a spec here is `return function(H) … end`, so every require sits inside that function and the anchored pattern matched *once* across 75 spec files. The check was reporting nothing because it was looking at nothing. Following a binding across scopes is only safe because the shadow guard counts it first. After the fix it resolves 713 / 760 / 547 member accesses in the three trees — that number, not the finding count, is what says it works. Costs ~150 ms on this repo (75 spec files), 5.9 % of scan+check, so it stays on rather than opt-in; one query walks each tree once, where three separate ones cost ~126 ms against ~80 ms of unavoidable parsing. The tests directory is read in sorted file order, so findings are stable across file systems and across the nvim engine and the standalone build. |
 | `dead-see-target` | warn | A function's `@see` target resolves to no known module or function. |
 | `type-vs-class` | warn | A module's own table is annotated `---@type Foo` and later has real fields assigned to it — LuaLS reports `missing-fields`/"fields cannot be injected" for this exact shape; `---@class M : Foo` is the annotation that actually means it. |
@@ -2369,7 +2369,7 @@ the count, this named exactly which parameter needed a line).
 `requires_external` — the same field a genuine third-party dependency lands
 in. That is the right home for `plenary.async`, which this scan cannot be
 authoritative about, and silently the wrong one for
-`documentation.brwose.trail`: a typo, a renamed module, or one deleted while a
+`docmap.brwose.trail`: a typo, a renamed module, or one deleted while a
 caller kept asking for it. All three break at runtime, and none of them look
 any different in the map from a dependency the scan was never meant to cover.
 
@@ -2418,7 +2418,7 @@ Two decisions make `--check` possible:
 
 - **No timestamp in the IR.** A `generated_at` field would make every
   regeneration a diff even when nothing changed.
-- **Sorted-key JSON** via [`json.lua`](../lua/documentation/core/json.lua), not `vim.json.encode`, whose
+- **Sorted-key JSON** via [`json.lua`](../lua/docmap/core/json.lua), not `vim.json.encode`, whose
   object key order is unspecified. Without it, two runs over an unchanged tree
   produced byte-different files and `--check` reported the map as stale
   immediately after generating it.
@@ -2460,7 +2460,7 @@ from the start to know nothing about lib.nvim's layout — `opts.root`,
 the extraction a rename rather than a rewrite: the pipeline, the IR and every
 renderer are unchanged, and what moved is the module path
 (`lib.nvim.docmap.*` → `documentation.*`), the type namespace (`Lib.Docmap.*`
-→ `Documentation.*`), the command names (`:LibMap`/`:LibBrowse` →
+→ `Docmap.*`), the command names (`:LibMap`/`:LibBrowse` →
 `:DocMap`/`:DocBrowse`), and `config.lua`, which went from *one repository's
 options* to *defaults derived from any root*.
 

@@ -23,8 +23,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
-  local scan = require("documentation.core.scan")
+  local docmap = require("docmap")
+  local scan = require("docmap.core.scan")
 
   local dr = H.tmpfile("_quicks_artifact")
   local function dwrite(rel, lines)
@@ -54,7 +54,7 @@ return function(H)
 
   local opts = { root = dr, source = "lua/t", lua_root = "lua", extra_checks = {} }
   local ir = scan.scan(opts)
-  ir.quicks = require("documentation.core.quicks").compute(ir, {}, opts)
+  ir.quicks = require("docmap.core.quicks").compute(ir, {}, opts)
 
   local all = {}
   for _, bucket in ipairs({ "good", "bad" }) do

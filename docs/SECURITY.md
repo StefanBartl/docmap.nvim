@@ -29,7 +29,7 @@ below, which cannot be tested without flaking.
 History tab cannot ask for a commit's analysis without an origin. It is off
 unless you start it.
 
-- **Binds `127.0.0.1` only, never `0.0.0.0`** ([`serve.lua`](../lua/documentation/editor/serve.lua)).
+- **Binds `127.0.0.1` only, never `0.0.0.0`** ([`serve.lua`](../lua/docmap/editor/serve.lua)).
   This is a personal tool on a personal machine; binding wider would expose the
   repository's source to the network.
 - **Port 0** — the OS picks a free one, so there is no predictable port to
@@ -46,7 +46,7 @@ unless you start it.
   - `safe_static_name(name)` accepts a bare filename inside `out_dir`. Anything
     containing a path separator or a `..` segment is refused, so the route
     cannot be walked out of the served directory. The file is then read through
-    [`safe_fs`](../lua/documentation/core/safe_fs.lua): a file, or a `docs/map`,
+    [`safe_fs`](../lua/docmap/core/safe_fs.lua): a file, or a `docs/map`,
     that is a link leaving the project is answered 404
     (`not served: <name>, it leads outside the project`, the target is not
     named). Links that stay inside the project keep working.
@@ -56,7 +56,7 @@ unless you start it.
 A repository is somebody else's input, and it can contain a symlink — on
 Windows also a junction — anywhere. `core/safe_out_dir.lua` refuses `..` and
 absolute paths in `out_dir`, but that is a check of a *string*; a link makes a
-clean string lead anywhere. [`core/safe_fs.lua`](../lua/documentation/core/safe_fs.lua)
+clean string lead anywhere. [`core/safe_fs.lua`](../lua/docmap/core/safe_fs.lua)
 is the check of the thing itself, with one rule for writing and one for
 reading.
 
@@ -328,6 +328,6 @@ is worse than none:
 
 This repository carries no licence and is a personal project. If you find
 something, open an issue at
-<https://github.com/StefanBartl/documentation.nvim/issues>. There is no embargo
+<https://github.com/StefanBartl/docmap.nvim/issues>. There is no embargo
 process and no security contact beyond that — say so in the issue if you would
 rather not describe the detail publicly.

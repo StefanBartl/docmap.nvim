@@ -11,11 +11,11 @@ from.
 ## `install()` -- a live handle
 
 `generate()` is one-shot. `install()` is the other half — a live
-`Documentation.Handle` another plugin's code reaches for directly, instead of
+`Docmap.Handle` another plugin's code reaches for directly, instead of
 parsing `module_map.json` off disk:
 
 ```lua
-local handle = require("documentation").install({
+local handle = require("docmap").install({
   root = vim.fn.getcwd(),
   source = "lua/myplugin",
   watch = true,          -- rescan on BufWritePost under source/**.lua, debounced
@@ -51,7 +51,7 @@ already computes as native `vim.diagnostic` entries — a wavy underline and
 sign-column mark while reading, not a separate list to open. No new LSP
 client needed here at all, unlike `callhierarchy`: `vim.diagnostic.set()`
 works directly on any already-open buffer. File-level granularity, the
-same the quickfix list already has (`Documentation.Finding` carries no
+same the quickfix list already has (`Docmap.Finding` carries no
 line number); `info`-severity findings map to `vim.diagnostic.severity.HINT`
 and are shown, where the quickfix list drops them.
 
@@ -67,7 +67,7 @@ byte-perfect one, which is why this ships marked experimental.
 
 ## Which specs does a change touch?
 
-`require("documentation.testing").affected_specs({ root, changed, since? })`
+`require("docmap.testing").affected_specs({ root, changed, since? })`
 turns a list of changed files into the spec files that cover them, using the
 committed module map's require graph, and reports how fresh that graph is and
 everything it could not decide. `spec_state` is the opposite view (which modules

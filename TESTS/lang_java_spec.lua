@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_java_spec.lua — documentation.core.lang.java
+-- TESTS/lang_java_spec.lua — docmap.core.lang.java
 --
 -- Skips when the java treesitter parser is not reachable, the same
 -- precedent `lang_js_spec.lua` and `lang_zig_spec.lua` set and for the same
@@ -32,7 +32,7 @@ return function(H)
     return
   end
 
-  local java = require("documentation.core.lang_registry").get("java")
+  local java = require("docmap.core.lang_registry").get("java")
   ok(java ~= nil, "the java backend must be registered")
 
   local fixture = H.tmpfile(".java")

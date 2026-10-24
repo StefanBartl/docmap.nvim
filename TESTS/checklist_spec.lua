@@ -1,4 +1,4 @@
--- TESTS/checklist_spec.lua — `documentation.core.checklist`, the hand-verified
+-- TESTS/checklist_spec.lua — `docmap.core.checklist`, the hand-verified
 -- ledger and its staleness verdict.
 --
 -- Two halves, tested differently on purpose, mirroring the module's own split:
@@ -15,7 +15,7 @@
 
 return function(H)
   local eq = H.eq
-  local checklist = require("documentation.core.checklist")
+  local checklist = require("docmap.core.checklist")
 
   local function dwrite(root, rel, lines)
     local abs = root .. "/" .. rel
@@ -30,7 +30,7 @@ return function(H)
   ---standalone shim has none). Everything is put back whatever happens, since
   ---the suite runs in one editor.
   local function under_windows(fn)
-    local safe_fs = require("documentation.core.safe_fs")
+    local safe_fs = require("docmap.core.safe_fs")
     local saved_host, saved_windows, saved_open = safe_fs.host, safe_fs.windows, io.open
     local function slashed(path)
       return (path:gsub("\\", "/"))
@@ -121,7 +121,7 @@ return function(H)
       table.concat({
         "## S",
         "- [x] The core pipeline runs with no editor around it — nothing",
-        "      under `documentation.core` requires `documentation.editor`",
+        "      under `docmap.core` requires `docmap.editor`",
         "",
         "      <!-- @ref scripts/gen_map.lua:96 -->",
         "      <!-- @verified 2026-08-11 -->",
@@ -132,7 +132,7 @@ return function(H)
     eq(
       item.text,
       "The core pipeline runs with no editor around it — nothing under "
-        .. "`documentation.core` requires `documentation.editor`",
+        .. "`docmap.core` requires `docmap.editor`",
       "parse: an indented continuation line joins the item text with a single space"
     )
     eq(item.ref, "scripts/gen_map.lua", "parse: a blank line does not end the metadata block")

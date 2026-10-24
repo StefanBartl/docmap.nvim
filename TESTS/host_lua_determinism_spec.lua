@@ -19,7 +19,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local json = require("documentation.core.json")
+  local json = require("docmap.core.json")
 
   -- An integral value must encode as an integer regardless of whether Lua
   -- calls it a float. `100 / 1` is a float in 5.3+ and an integer-valued
@@ -60,7 +60,7 @@ return function(H)
   -- The second leak: `quicks.lua` formats `detail` itself. Rather than
   -- reaching into a local, assert on the real `compute` output — a percent
   -- probe whose value is integral must render "100%", never "100.0%".
-  local quicks = require("documentation.core.quicks")
+  local quicks = require("docmap.core.quicks")
   local ir = {
     order = { "lua/x" },
     nodes = {

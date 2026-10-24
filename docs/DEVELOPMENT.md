@@ -2,7 +2,7 @@
 
 ## Getting the dependency
 
-`documentation.nvim` depends on
+`docmap.nvim` depends on
 [`lib.nvim`](https://github.com/StefanBartl/lib.nvim) at runtime — `notify`,
 `fs.*`, `ui.kit`, `usercmd`, `map`, `debounce`, `autocmd`,
 `cross.uv.spawn_capture`. Inside Neovim your plugin manager supplies it. The
@@ -187,7 +187,7 @@ name before touching what they cover:
 | [`win_links_spec.lua`](../TESTS/win_links_spec.lua) | Reading `dir /a:l` (`standalone/win_links.lua`), on listings in English and German (English labels), French and Spanish (translated labels, written from memory) plus ambiguous pairs, targets broken over two lines, a forged line and crafted floods; and the batched listing of many directories (forged marks, a wrong location, a missing segment). |
 | [`shim_links_spec.lua`](../TESTS/shim_links_spec.lua) | How the shim sees a link: against the editor on the host's file system, and its Windows branch on any host, driven on a canned listing that also holds a translated label, a name with a leading blank, an 8.3 alias, an ambiguous pair, a link with a broken target and UNC and device roots; a canned tree listed ahead in batches, and on a Windows host a real tree with real junctions where the number of `cmd.exe` processes is counted. |
 | `lang_*_spec.lua` | One per language backend. **Each skips when its grammar is absent**, which is the normal local state — see [`languages.md § Running the language specs`](languages.md#running-the-language-specs) for the `DOCMAP_<LANG>_PARSER` variable each one reads. |
-| [`usrcmds_readonly_spec.lua`](../TESTS/usrcmds_readonly_spec.lua) | The `:DocMap` subcommands that read straight off the already-scanned IR — `why`, `graph`, `dot`, `mermaid`, `tools`, `bindings`, `plugins`, `endpoints`, `consumers` — none of which touch git. The algorithms one layer down (`core/deps.path`, `core/consumers.index`, …) already had literal-data coverage elsewhere; this is the command layer above them — usage errors, "nothing found" messages, collision/duplicate detection, sort order, and the `dot`/`mermaid` buffer-reuse-by-name regression. Literal `Documentation.IR` fixtures throughout, the same shape `docmap_spec.lua`'s churn/diff blocks use. |
+| [`usrcmds_readonly_spec.lua`](../TESTS/usrcmds_readonly_spec.lua) | The `:DocMap` subcommands that read straight off the already-scanned IR — `why`, `graph`, `dot`, `mermaid`, `tools`, `bindings`, `plugins`, `endpoints`, `consumers` — none of which touch git. The algorithms one layer down (`core/deps.path`, `core/consumers.index`, …) already had literal-data coverage elsewhere; this is the command layer above them — usage errors, "nothing found" messages, collision/duplicate detection, sort order, and the `dot`/`mermaid` buffer-reuse-by-name regression. Literal `Docmap.IR` fixtures throughout, the same shape `docmap_spec.lua`'s churn/diff blocks use. |
 | [`usrcmds_git_spec.lua`](../TESTS/usrcmds_git_spec.lua) | The four `:DocMap` subcommands that shell out to git — `churn`, `diff`, `impact`, `checklist` — against a real, disposable fixture repository (`git init`, real commits, pinned `GIT_AUTHOR_DATE`/`GIT_COMMITTER_DATE`), the same posture `api_spec.lua` and `mcp_spec.lua`'s `docmap_checklist` block already take: a stubbed `vim.system` would prove the wiring reads the stub, not that the real command, pathspec exclusion and async callback chain work. Skips outright on a machine with no `git`. |
 
 **What `bindings/usrcmds/*.lua` still has no direct spec, deliberately:**
@@ -283,9 +283,9 @@ an artifact instead of rendering blank.
 `.docmap.json` declares lib.nvim at `local_path: "../lib.nvim"`, resolved
 relative to the **tree root** — which in a worktree is the worktree, not the
 main checkout. A sibling checkout that `../lib.nvim` finds from
-`repos/documentation.nvim` is therefore invisible from a worktree nested
+`repos/docmap.nvim` is therefore invisible from a worktree nested
 anywhere else, and
-[`core/external_repos.lua`](../lua/documentation/core/external_repos.lua)
+[`core/external_repos.lua`](../lua/docmap/core/external_repos.lua)
 silently falls back to the unverified flat shape: about 20 external links
 degrade from `…/autocmd/init.lua` to `…/autocmd.lua`, the artifact differs by
 roughly a hundred bytes, and `--check` calls the tree stale for something the
@@ -346,21 +346,21 @@ Two rules, and breaking either one makes `--check` useless:
 
 - **No timestamp in the IR.** A `generated_at` field would make every
   regeneration a diff even when nothing changed.
-- **Sorted-key JSON** via [`json.lua`](../lua/documentation/core/json.lua), never
+- **Sorted-key JSON** via [`json.lua`](../lua/docmap/core/json.lua), never
   `vim.json.encode`, whose object key order is unspecified. Without this, two
   runs over an unchanged tree produced byte-different files and `--check`
   reported the map as stale immediately after generating it.
 
 If you add a field to the IR, add it to `M.to_json`'s explicit field list in
-[`init.lua`](../lua/documentation/init.lua) — the ordering there is the
+[`init.lua`](../lua/docmap/init.lua) — the ordering there is the
 serialization contract, not an accident of table iteration.
 
 ## Layout
 
 ```
-lua/documentation/
+lua/docmap/
   init.lua          the public facade: generate/scan_full/install/setup
-  @types/           Documentation.* LuaCATS definitions
+  @types/           Docmap.* LuaCATS definitions
 
   core/             the pipeline. No editor, and a layer rule says so.
     lang_registry.lua  which language backend owns a file — see below
@@ -380,7 +380,7 @@ lua/documentation/
     json.lua        deterministic encoder
     diff.lua        structural diff between two IRs        (pure)
     history.lua     changed lines -> functions -> callers  (pure)
-    config.lua      Documentation.Opts defaults + merge
+    config.lua      Docmap.Opts defaults + merge
     cli.lua         --check/--full entry point
     render/         html · markdown · mermaid · dot · badge
 
@@ -391,7 +391,7 @@ lua/documentation/
                     under it touching disk)
     registry.lua    install()/uninstall(), the watch
     serve.lua       the local map server
-    health.lua      :checkhealth documentation
+    health.lua      :checkhealth docmap
 
   bindings/         keymaps.lua, usrcmds/, autocmds.lua, diagnostics.lua
     autocmds.lua    a manifest, not a creation site -- checkhealth and
@@ -410,8 +410,8 @@ declares one layering rule against this repository's own map:
 
 ```lua
 layers = {
-  { from = "documentation.core", to = "documentation.editor" },
-  { from = "documentation.core", to = "documentation.bindings" },
+  { from = "docmap.core", to = "docmap.editor" },
+  { from = "docmap.core", to = "docmap.bindings" },
 }
 ```
 
@@ -434,8 +434,8 @@ point of the core existing. `init.lua` sits outside the rule and reaches both,
 which is what a facade is for.
 
 **A third rule, added with `core/lang_registry.lua`**
-(Phase 0 of the language work): `{ from = "documentation.core", to =
-"documentation.core.lang" }`. `scan.lua`'s walk used to hardcode `"%.lua$"`,
+(Phase 0 of the language work): `{ from = "docmap.core", to =
+"docmap.core.lang" }`. `scan.lua`'s walk used to hardcode `"%.lua$"`,
 `"init.lua"` and a direct call into `functions.lua` — every one of those is a
 fact about Lua, not about how a walk works. The registry is the seam;
 `core/lang/lua.lua` is Lua registered through it, a thin wrapper delegating to
@@ -443,7 +443,7 @@ the same `scan.lua`/`functions.lua` code that predates the interface, not a
 rewrite of either.
 
 The registry module is deliberately named `lang_registry`, not `lang.init` —
-living inside `documentation.core.lang.*` would trip this very rule, since a
+living inside `docmap.core.lang.*` would trip this very rule, since a
 registry that legitimately knows about every backend is not the violation the
 rule exists to catch. It sits beside the boundary, the same reason `init.lua`
 sits outside the `core`/`editor` rule.
@@ -463,11 +463,11 @@ require another direct child, and `allow` names the shared ones.
 
 ```json
 {
-  "siblings": "documentation.core.lang",
+  "siblings": "docmap.core.lang",
   "allow": [
-    "documentation.core.lang.ecma",
-    "documentation.core.lang.cfamily",
-    "documentation.core.lang.glossary"
+    "docmap.core.lang.ecma",
+    "docmap.core.lang.cfamily",
+    "docmap.core.lang.glossary"
   ]
 }
 ```
@@ -481,7 +481,7 @@ existing pair rules stay valid unchanged.
 
 `lib.nvim` splits the way this plugin does: `lib.lua.*` is pure Lua,
 `lib.nvim.*` needs a running Neovim. So **a `lib.nvim.*` require inside
-`core/` costs exactly what a `documentation.editor` require would** — it is
+`core/` costs exactly what a `docmap.editor` require would** — it is
 the same boundary, and `layer-violation` cannot see it, because the rule
 matches module prefixes inside the scanned tree and `lib.nvim` is outside it.
 

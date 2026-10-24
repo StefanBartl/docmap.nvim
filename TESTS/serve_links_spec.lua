@@ -14,8 +14,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local config = require("documentation.config")
-  local serve = require("documentation.editor.serve")
+  local config = require("docmap.config")
+  local serve = require("docmap.editor.serve")
 
   local MARKER = "PRIVATE-MARKER-OUTSIDE"
 

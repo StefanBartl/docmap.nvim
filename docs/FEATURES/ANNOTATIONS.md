@@ -87,10 +87,10 @@ down in its own tests.
 
 - **Module:** `core/markers.lua` (`M.scan_source`, `M.scan_file`,
   `M.KEYWORDS`)
-- **Backend contract:** `Documentation.LangBackend.line_comments` /
+- **Backend contract:** `Docmap.LangBackend.line_comments` /
   `.block_comments` — a backend that declares neither is not scanned, rather
   than guessed at
-- **Artifact:** `Documentation.Node.markers`, schema 4
+- **Artifact:** `Docmap.Node.markers`, schema 4
 - **Tests:** `TESTS/markers_spec.lua`
 
 **Where they are counted, and where they are not.** The `FIX` family

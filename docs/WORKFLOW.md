@@ -1,4 +1,4 @@
-# Workflow — getting real use out of documentation.nvim day to day
+# Workflow — getting real use out of docmap.nvim day to day
 
 Every feature here is documented on its own elsewhere (`docs/commands.md`,
 `docs/pipeline.md`, `docs/annotation_tags.md`, `docs/languages.md`). This is
@@ -15,7 +15,7 @@ and work the list like any other quickfix output. This is the "did I
 break anything" loop, and it is fast enough to run before every commit,
 not just occasionally: on a mid-sized repo it is a fraction of a second.
 
-`:checkhealth documentation` is the companion check for "is the tool
+`:checkhealth docmap` is the companion check for "is the tool
 itself set up right" (deps, treesitter parser, the resolved root for
 wherever you ran it from) — run it once per new repo, not per edit.
 
@@ -28,7 +28,7 @@ grammar a backend still produces a complete module tree, hierarchy, summaries
 and require edges, and **no function-level data at all**. That reads like a
 scanner bug and is a missing parser.
 
-`:checkhealth documentation` has a **language support** section that answers
+`:checkhealth docmap` has a **language support** section that answers
 exactly this, and it lists only the languages that actually occur in your
 source roots — never all twenty-three, because twenty-two absent grammars for a
 Lua repository are a wall nobody reads. Each line ends in the
@@ -111,11 +111,11 @@ runtime-truth plugin exists. The badge vocabulary is worth internalizing:
 | Badge | Means | Action |
 |---|---|---|
 | `✕` | No static caller, never called | Real deletion candidate |
-| `!` | Called, but no static caller found | A callback/dynamic dispatch documentation.nvim's static scan cannot see — **not dead**, do not delete |
+| `!` | Called, but no static caller found | A callback/dynamic dispatch docmap.nvim's static scan cannot see — **not dead**, do not delete |
 | `○` | Has a caller, never called (yet) | Reachable but unexercised — investigate before concluding either way |
 | blank | Caller exists, and it was called | Healthy |
 
-**The trap this table exists to prevent:** documentation.nvim's own
+**The trap this table exists to prevent:** docmap.nvim's own
 `dead-function` finding, read alone, cannot distinguish `✕` from `!` — a
 function only ever invoked through `vim.keymap.set`'s function-value
 argument, or called from a sibling repo entirely, looks identical to
@@ -281,7 +281,7 @@ A `requires_external` box in the Deps graph does not have to be a dead
 end. If the external repo also runs `:DocMap` and commits its own
 `docs/map/`, `opts.tag_files` (module-prefix → that project's own map
 directory) resolves it against the *real* artifact instead of leaving it
-inert — the same mechanism `runtime-analysis.nvim`/`documentation.nvim`
+inert — the same mechanism `runtime-analysis.nvim`/`docmap.nvim`
 already use to cross-link each other's own maps. Worth setting up once
 per pair of repos you navigate between often, not per session.
 

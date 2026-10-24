@@ -19,10 +19,10 @@
 -- harmless fails here instead of on somebody's repository.
 
 return function(H)
-  local fmsg = require("documentation.core.findings").format
+  local fmsg = require("docmap.core.findings").format
   local eq, ok = H.eq, H.ok
-  local scan = require("documentation.core.scan")
-  local check = require("documentation.core.check")
+  local scan = require("docmap.core.scan")
+  local check = require("docmap.core.check")
 
   local dr = (H.tmpfile("_test_refs"):gsub("\\", "/"))
   local function dwrite(rel, lines)
@@ -194,7 +194,7 @@ return function(H)
     })
   end
 
-  local safe_fs = require("documentation.core.safe_fs")
+  local safe_fs = require("docmap.core.safe_fs")
 
   ---Run `fn` with every directory handed out backwards, and put the host back
   ---whatever happens.

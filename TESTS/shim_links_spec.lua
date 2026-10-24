@@ -292,7 +292,7 @@ return function(H)
   -- ---------------------------------------------------------------------
   do
     local shim = load_shim(real_lfs, false)
-    local safe_fs = require("documentation.core.safe_fs")
+    local safe_fs = require("docmap.core.safe_fs")
     local base = (vim.fn.tempname():gsub("\\", "/")) .. "_shim_relroot"
     local fixture = base .. "/fixture"
     H.write(fixture .. "/lua/p/init.lua", { "return 1" })

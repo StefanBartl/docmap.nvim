@@ -4,7 +4,7 @@
 --- every check/renderer that does not need per-function facts, running under
 --- plain `lua`/`luajit`, no Neovim process anywhere. Deliberately mirrors
 --- `scripts/gen_map.lua` (same `ensure()` dependency search, same
---- `documentation.config.build`/`documentation.core.cli.run` call shape) —
+--- `docmap.config.build`/`docmap.core.cli.run` call shape) —
 --- read that file first if this one looks unfamiliar; the difference is only
 --- in how the Neovim-only bits (`vim.uv.cwd`, `vim.opt.runtimepath`,
 --- `vim.cmd("cq ...")`) get replaced.
@@ -54,7 +54,7 @@ if not capabilities_only and root:sub(1, 1) == "-" then
 end
 
 -- this file lives at <repo>/standalone/docmap.lua; its own repo root is
--- always on package.path so `documentation.*` resolves regardless of the
+-- always on package.path so `docmap.*` resolves regardless of the
 -- scanned root above (which is normally a *different* directory).
 local self_dir = (debug.getinfo(1, "S").source:sub(2):match("(.*)[/\\]")) or "."
 local self_root = self_dir .. "/.."
@@ -105,7 +105,7 @@ end
 ---lets a real checkout be *found* at all; it does not, on its own, make
 ---`--api=telemetry` succeed against real data. Traced against this
 ---machine's own real telemetry (63 KB of real collected data,
----`documentation.nvim`'s own self-instrumentation):
+---`docmap.nvim`'s own self-instrumentation):
 ---`runtime-analysis.telemetry` itself loads, but its own
 ---`require("lib.nvim.bindings.autocmd")` pulls in `lib.lua.lazy`, a *different*
 ---`lib.*` sub-namespace than `lib.nvim.*` — and `scripts/bundle_manifest.
@@ -118,7 +118,7 @@ end
 ---stated reason, never a wrong answer.
 ---
 ---`ensure()` above is the wrong shape for this regardless — `lib.nvim`/
----`documentation.nvim` are load-bearing and a missing one should stop the
+---`docmap.nvim` are load-bearing and a missing one should stop the
 ---build cold; `runtime-analysis.nvim` is optional everywhere else this join
 ---already runs, and should degrade the same way here, not fail loudly for a
 ---dependency every other caller treats as soft.
@@ -148,7 +148,7 @@ end
 
 package.path = self_root .. "/lua/?.lua;" .. self_root .. "/lua/?/init.lua;" .. package.path
 ensure("lib.nvim.fs.read", "lib.nvim")
-ensure("documentation.core.cli", "documentation.nvim")
+ensure("docmap.core.cli", "docmap.nvim")
 -- One call, not one per module: both `runtime-analysis.telemetry` and
 -- `runtime-analysis.loaded` (loaded/snapshots routes) live in the same
 -- checkout, so putting it on package.path once resolves both.
@@ -170,27 +170,27 @@ ensure_soft("runtime-analysis.telemetry", "runtime-analysis.nvim")
 -- reports a healthy backend as broken.
 if capabilities_only then
   local names = {}
-  for name in pairs(require("documentation.core.api").routes) do
+  for name in pairs(require("docmap.core.api").routes) do
     names[#names + 1] = name
   end
   table.sort(names)
-  print(require("documentation.core.json").encode({
+  print(require("docmap.core.json").encode({
     capabilities = { "api", "languages", "schema" },
     -- Which artifact schema this build writes. The release is rolling
     -- (`standalone-latest`), so there is no version number to report that
     -- would not be fiction; the schema is what actually decides whether
     -- two artifacts are comparable, and it is bumped deliberately.
-    schema = require("documentation.core.scan").SCHEMA,
+    schema = require("docmap.core.scan").SCHEMA,
     -- Which build this is. Present only in a bundled binary --
     -- `scripts/package.lua` writes it at bundle time and never into the
     -- source tree, so a run from a checkout answers `nil` rather than
     -- claiming a provenance it does not have.
     build = (function()
-      local ok, b = pcall(require, "documentation.build")
+      local ok, b = pcall(require, "docmap.build")
       return ok and b or nil
     end)(),
     routes = names,
-    languages = require("documentation.core.lang_registry").report(),
+    languages = require("docmap.core.lang_registry").report(),
   }))
   os.exit(0)
 end
@@ -296,7 +296,7 @@ local notify = {
   end,
 }
 
-local opts = require("documentation.config").build(root, {
+local opts = require("docmap.config").build(root, {
   source = source, -- nil: config.build auto-detects, same as scripts/gen_map.lua's callers that omit it
   -- `nil` rather than an empty table for both: `config.build` merges
   -- overrides shallowly, and `{}` would be a real value that reads as "the
@@ -419,15 +419,15 @@ if api_route then
 
   opts.git = popen_git
 
-  local api = require("documentation.core.api")
+  local api = require("docmap.core.api")
   local result, api_err = api.answer(api_route, opts, api_snapshot)
   if not result then
     io.stderr:write("standalone/docmap.lua: " .. tostring(api_err) .. "\n")
     os.exit(2)
   end
-  io.stdout:write(require("documentation.core.json").encode(result) .. "\n")
+  io.stdout:write(require("docmap.core.json").encode(result) .. "\n")
   os.exit(0)
 end
 
-local code = require("documentation.core.cli").run(opts, argv)
+local code = require("docmap.core.cli").run(opts, argv)
 os.exit(code)

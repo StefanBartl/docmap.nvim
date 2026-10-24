@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_cfamily_spec.lua — documentation.core.lang.c / .cpp
+-- TESTS/lang_cfamily_spec.lua — docmap.core.lang.c / .cpp
 --
 -- Skips per language when that treesitter parser is not reachable, the same
 -- precedent `lang_js_spec.lua`, `lang_zig_spec.lua` and `lang_java_spec.lua`
@@ -35,7 +35,7 @@ return function(H)
     return ok_add and added and true or false
   end
 
-  local registry = require("documentation.core.lang_registry")
+  local registry = require("docmap.core.lang_registry")
   ok(registry.get("c") ~= nil, "the c backend must be registered")
   ok(registry.get("cpp") ~= nil, "the cpp backend must be registered")
 

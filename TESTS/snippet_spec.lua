@@ -2,8 +2,8 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/snippet_spec.lua — documentation.core.snippet, and functions.lua's
--- wiring of it into Documentation.FunctionInfo.
+-- TESTS/snippet_spec.lua — docmap.core.snippet, and functions.lua's
+-- wiring of it into Docmap.FunctionInfo.
 --
 -- Unconditional, unlike lang_js_spec.lua: core/snippet.lua takes a plain
 -- string and two row numbers, never a treesitter node, so there is nothing
@@ -11,7 +11,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local snippet = require("documentation.core.snippet")
+  local snippet = require("docmap.core.snippet")
 
   -- A short span, well under the cap: kept whole, nothing omitted.
   do
@@ -61,7 +61,7 @@ return function(H)
   -- End to end: functions.lua actually calls this during a real scan, on a
   -- real Lua fixture — not just unit-tested in isolation.
   do
-    local functions = require("documentation.core.functions")
+    local functions = require("docmap.core.functions")
     local fixture = H.tmpfile(".lua")
     local lines = { "local M = {}", "", "function M.short()", "  return 1", "end", "" }
     lines[#lines + 1] = "function M.long()"
@@ -104,7 +104,7 @@ return function(H)
   -- `M.scan(opts)` (`core/scan.lua`), the actual resolution point, not
   -- `snippet.MAX_LINES` set by hand.
   do
-    local scan = require("documentation.core.scan")
+    local scan = require("docmap.core.scan")
 
     local dr = H.tmpfile("_snippet_opt")
     local lines = { "local M = {}", "", "function M.long()" }

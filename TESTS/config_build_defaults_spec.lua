@@ -6,8 +6,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local cfg = require("documentation.config")
-  local DEFAULTS = require("documentation.config.DEFAULTS")
+  local cfg = require("docmap.config")
+  local DEFAULTS = require("docmap.config.DEFAULTS")
 
   local root = (vim.fn.tempname():gsub("\\", "/"))
   vim.fn.mkdir(root .. "/lua/thing", "p")

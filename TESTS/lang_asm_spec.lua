@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_asm_spec.lua — documentation.core.lang.asm
+-- TESTS/lang_asm_spec.lua — docmap.core.lang.asm
 --
 -- **The one language spec here that never skips.** Every other backend spec
 -- opens by asking whether its tree-sitter grammar is reachable and degrades
@@ -20,7 +20,7 @@
 return function(H)
   local eq, ok = H.eq, H.ok
 
-  local registry = require("documentation.core.lang_registry")
+  local registry = require("docmap.core.lang_registry")
   local asm = registry.get("asm")
   ok(asm ~= nil, "the asm backend must be registered")
 
@@ -355,7 +355,7 @@ return function(H)
   -- the token this backend lists second, which is the one with a second
   -- meaning in ARM.
   -- -------------------------------------------------------------------
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(#markers.scan_source("; TODO: finish this", asm), 1)
   eq(#markers.scan_source("# FIXME: and this", asm), 1)
   eq(#markers.scan_source("    mov r0, #1", asm), 0, "an immediate is not a marker")

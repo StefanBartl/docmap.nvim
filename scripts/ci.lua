@@ -330,7 +330,7 @@ function GATES.standalone()
     lua,
     "standalone/docmap.lua",
     root,
-    "--source=lua/documentation",
+    "--source=lua/docmap",
     "--out-dir=" .. out_rel,
   }, "standalone/docmap.lua")
 

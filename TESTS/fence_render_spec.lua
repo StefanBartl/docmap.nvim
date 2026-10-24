@@ -25,7 +25,7 @@ return function(H)
   local eq, ok = H.eq, H.ok
 
   local root = (vim.fn.getcwd():gsub("\\", "/"))
-  local path = root .. "/lua/documentation/core/render/html.lua"
+  local path = root .. "/lua/docmap/core/render/html.lua"
   local fd = assert(io.open(path, "rb"), "fence spec: html.lua must be readable")
   local src = fd:read("*a")
   fd:close()

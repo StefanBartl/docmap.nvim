@@ -23,8 +23,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local check = require("documentation.core.check")
-  local findings = require("documentation.core.findings")
+  local check = require("docmap.core.check")
+  local findings = require("docmap.core.findings")
 
   local opts = { root = "/fake", lua_root = "lua", extra_checks = {} }
 
@@ -87,7 +87,7 @@ return function(H)
 
   ---The one `file-holds-many-modules` finding, or `nil`.
   ---@param node table
-  ---@return Documentation.Finding?
+  ---@return Docmap.Finding?
   local function fired(node)
     local hit
     for _, f in ipairs(check.run(make_ir(node), opts)) do
@@ -103,7 +103,7 @@ return function(H)
   ---not each one nil check.
   ---@param node table
   ---@param msg string
-  ---@return Documentation.Finding finding
+  ---@return Docmap.Finding finding
   ---@return table<string, any> params Its params, which every built-in check carries.
   local function must_fire(node, msg)
     local hit = fired(node)

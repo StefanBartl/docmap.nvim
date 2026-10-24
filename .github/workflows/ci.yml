@@ -93,7 +93,7 @@ jobs:
       # ui.nvim: editor/browse/init.lua requires ui.kit/ui.contextmenu
       # unconditionally at module load (moved out of lib.nvim in the
       # 2026-09 migration), and several specs require
-      # documentation.editor.browse/.pick directly. It is in the `deps` of
+      # docmap.editor.browse/.pick directly. It is in the `deps` of
       # `.testing.lua`.
       - uses: actions/checkout@v5
         with:

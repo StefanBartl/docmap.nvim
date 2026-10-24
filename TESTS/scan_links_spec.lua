@@ -1,7 +1,7 @@
 -- TESTS/scan_links_spec.lua — the scanner does not follow a link out of the
 -- project.
 --
--- The **real** scanner (`documentation.core.scan`) over a real tree with real
+-- The **real** scanner (`docmap.core.scan`) over a real tree with real
 -- links: symlinks, or directory junctions on Windows (`H.link`). A link out of
 -- the project is a way for a repository to make the engine read somebody
 -- else's files and print what it finds into a map -- or, on Windows, to make
@@ -18,9 +18,9 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local config = require("documentation.config")
-  local scan = require("documentation.core.scan")
-  local safe_fs = require("documentation.core.safe_fs")
+  local config = require("docmap.config")
+  local scan = require("docmap.core.scan")
+  local safe_fs = require("docmap.core.safe_fs")
 
   local base = (vim.fn.tempname():gsub("\\", "/")) .. "_scan_links"
   local root = base .. "/repo"
@@ -390,7 +390,7 @@ return function(H)
   ---@param dir string
   ---@param cap integer
   ---@param blind boolean? The scan is not told that the disk folds case.
-  ---@return Documentation.IR ir
+  ---@return Docmap.IR ir
   ---@return { path: string, why: string }[] noted Links left alone.
   local function scan_capped(dir, cap, blind)
     local result, noted
@@ -413,7 +413,7 @@ return function(H)
   end
 
   local default_limit = scan.MAX_LINKED_DIRS
-  ---@param scanned Documentation.IR
+  ---@param scanned Docmap.IR
   ---@return integer
   local function js_files(scanned)
     return scanned.meta.outside and scanned.meta.outside.js or 0

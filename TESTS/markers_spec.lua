@@ -7,8 +7,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local markers = require("documentation.core.markers")
-  local registry = require("documentation.core.lang_registry")
+  local markers = require("docmap.core.markers")
+  local registry = require("docmap.core.lang_registry")
 
   local lua_backend = registry.for_file("init.lua")
   local js_backend = registry.for_file("index.js")

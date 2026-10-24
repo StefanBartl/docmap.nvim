@@ -2,7 +2,7 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- TESTS/lang_dart_spec.lua — documentation.core.lang.dart
+-- TESTS/lang_dart_spec.lua — docmap.core.lang.dart
 --
 -- Skips when the dart parser is not reachable; `DOCMAP_DART_PARSER` points at
 -- one without installing it into a runtimepath.
@@ -30,7 +30,7 @@ return function(H)
     ok_add, has_dt = pcall(vim.treesitter.language.add, "dart")
   end
 
-  local dt = require("documentation.core.lang_registry").get("dart")
+  local dt = require("docmap.core.lang_registry").get("dart")
   ok(dt ~= nil, "the dart backend must be registered")
 
   eq(dt.is_source("widget.dart"), true)
@@ -168,6 +168,6 @@ return function(H)
   eq(sym["Widget.name"].summary, "The name.")
   eq(sym["Widget._count"].kind, "binding")
 
-  local markers = require("documentation.core.markers")
+  local markers = require("docmap.core.markers")
   eq(#markers.scan_source("// TODO: finish this", dt), 1)
 end

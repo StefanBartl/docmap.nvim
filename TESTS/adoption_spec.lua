@@ -3,7 +3,7 @@
 --
 -- The panel counts, per catalogued tag, how many functions carry it. That
 -- needs one fact the tag's name does not give you: which
--- `Documentation.FunctionInfo` field it lands in (`param` fills `params`,
+-- `Docmap.FunctionInfo` field it lands in (`param` fills `params`,
 -- `return` fills `returns`). `core/tags.lua` declares it; this asserts the
 -- declaration is true.
 --
@@ -17,8 +17,8 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local docmap = require("documentation")
-  local tags = require("documentation.core.tags")
+  local docmap = require("docmap")
+  local tags = require("docmap.core.tags")
 
   local root = vim.fn.tempname()
   local function write(rel, body)
@@ -64,7 +64,7 @@ return function(H)
     "return M",
   }, "\n") .. "\n")
 
-  local opts = require("documentation.config").build(root, { source = "lua/ado" })
+  local opts = require("docmap.config").build(root, { source = "lua/ado" })
   local ir, findings = docmap.scan_full(opts)
 
   local node

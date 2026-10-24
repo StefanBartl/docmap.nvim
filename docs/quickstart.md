@@ -25,7 +25,7 @@ cannot drift from them.
 Verify your setup any time with:
 
 ```vim
-:checkhealth documentation
+:checkhealth docmap
 ```
 
 See [health.md](health.md) for what each line of that report means.

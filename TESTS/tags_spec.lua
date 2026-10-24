@@ -25,7 +25,7 @@
 
 return function(H)
   local eq, ok = H.eq, H.ok
-  local tags = require("documentation.core.tags")
+  local tags = require("docmap.core.tags")
 
   -- ---------------------------------------------------------------------
   -- The catalogue itself
@@ -74,7 +74,7 @@ return function(H)
   -- The join with the parser
   -- ---------------------------------------------------------------------
 
-  local src = table.concat(vim.fn.readfile("lua/documentation/core/functions.lua"), "\n")
+  local src = table.concat(vim.fn.readfile("lua/docmap/core/functions.lua"), "\n")
 
   local handlers_at = src:find("local HANDLERS = {", 1, true)
   ok(handlers_at ~= nil, "tags: the parser dispatches through a named table")
@@ -153,7 +153,7 @@ return function(H)
     }, "\n") .. "\n")
     fd:close()
 
-    local fns = require("documentation.core.functions").scan_file(path)
+    local fns = require("docmap.core.functions").scan_file(path)
     local go
     for _, f in ipairs(fns or {}) do
       if f.name == "M.go" then

@@ -13,11 +13,11 @@
 
 return function(H)
   local eq = H.eq
-  local consumers = require("documentation.core.consumers")
+  local consumers = require("docmap.core.consumers")
 
   ---A library IR, rehydrated-shaped: nodes keyed by id, walked via `order`.
   ---@param nodes table[] Each `{ id, module, requires? }`.
-  ---@return Documentation.IR
+  ---@return Docmap.IR
   local function lib(nodes)
     local ir = { nodes = {}, order = {}, meta = {}, edges = {} }
     for _, n in ipairs(nodes) do

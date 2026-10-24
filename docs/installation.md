@@ -12,7 +12,7 @@ Requires Neovim 0.10+ (`vim.uv`, `vim.treesitter`) and
 
 ```lua
 {
-  "StefanBartl/documentation.nvim",
+  "StefanBartl/docmap.nvim",
   dependencies = { "StefanBartl/lib.nvim" },
   cmd = { "DocMap", "DocBrowse" },
   opts = {},
@@ -26,7 +26,7 @@ Requires Neovim 0.10+ (`vim.uv`, `vim.treesitter`) and
 ```lua
 vim.pack.add({
   { src = "https://github.com/StefanBartl/lib.nvim" },
-  { src = "https://github.com/StefanBartl/documentation.nvim" },
+  { src = "https://github.com/StefanBartl/docmap.nvim" },
 })
 
 -- No lazy-loading layer here, so do it by hand: create the commands on first
@@ -36,7 +36,7 @@ for _, name in ipairs({ "DocMap", "DocBrowse" }) do
   vim.api.nvim_create_user_command(name, function(a)
     vim.api.nvim_del_user_command("DocMap")
     vim.api.nvim_del_user_command("DocBrowse")
-    require("documentation").setup({})
+    require("docmap").setup({})
     vim.cmd(("%s %s"):format(name, a.args))
   end, { nargs = "*" })
 end
@@ -49,11 +49,11 @@ end
 ```lua
 local add, later = MiniDeps.add, MiniDeps.later
 add({
-  source = "StefanBartl/documentation.nvim",
+  source = "StefanBartl/docmap.nvim",
   depends = { "StefanBartl/lib.nvim" },
 })
 later(function()
-  require("documentation").setup({})
+  require("docmap").setup({})
 end)
 ```
 </details>
@@ -63,11 +63,11 @@ end)
 
 ```lua
 use({
-  "StefanBartl/documentation.nvim",
+  "StefanBartl/docmap.nvim",
   requires = { "StefanBartl/lib.nvim" },
   cmd = { "DocMap", "DocBrowse" },
   config = function()
-    require("documentation").setup({})
+    require("docmap").setup({})
   end,
 })
 ```
@@ -79,17 +79,17 @@ use({
 ```lua
 require("paq")({
   "StefanBartl/lib.nvim",
-  "StefanBartl/documentation.nvim",
+  "StefanBartl/docmap.nvim",
 })
 
 -- paq does no lazy-loading and runs no config hooks:
-require("documentation").setup({})
+require("docmap").setup({})
 ```
 </details>
 
 `opts = {}` (or a bare `setup({})`) is enough: with no `root`, the commands
 resolve one **per invocation** from the file behind the current buffer — up to
-the nearest `.git` — and `documentation.config` derives `source` from it
+the nearest `.git` — and `docmap.config` derives `source` from it
 (`lua/<name>` when `lua/` holds exactly one candidate directory, `lua`
 otherwise). Open a file in a sibling checkout and the next `:DocMap` maps that
 checkout; both commands name the repository they acted on in their report. Set
@@ -99,12 +99,12 @@ plugin generating its own map wants.
 Whichever manager you use, load it **lazily on the two commands**. `setup()`
 scans the tree, and a session that never opens a map should not pay for one.
 
-Nothing registers a command until `setup()` runs — `require("documentation")`
+Nothing registers a command until `setup()` runs — `require("docmap")`
 alone never touches the user's editor, so a plugin can embed the pipeline
 without also taking the commands.
 
 ## Checking that it worked
 
-`:checkhealth documentation` reports the configuration a `:DocMap` issued right
+`:checkhealth docmap` reports the configuration a `:DocMap` issued right
 now would act on -- the resolved root, the detected `source`, and how many
 files are under it. See [health.md](health.md).

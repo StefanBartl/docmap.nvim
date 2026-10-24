@@ -2,7 +2,7 @@
 > active use, but the surface is not frozen: breaking changes are still possible. Pin a
 > commit or tag if you depend on it.
 
-# documentation.nvim
+# docmap.nvim
 
 ```
      _                                       _        _   _
@@ -17,7 +17,7 @@
 [![Neovim](https://img.shields.io/badge/Neovim-0.10%2B-57A143?logo=neovim&logoColor=white)](https://neovim.io)
 [![Lua](https://img.shields.io/badge/Lua-5.1%2FLuaJIT-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)
 ![Status](https://img.shields.io/badge/status-beta-orange)
-[![CI](https://github.com/StefanBartl/documentation.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/StefanBartl/documentation.nvim/actions/workflows/ci.yml)
+[![CI](https://github.com/StefanBartl/docmap.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/StefanBartl/docmap.nvim/actions/workflows/ci.yml)
 [![wkd](https://img.shields.io/badge/wkd-family-c6ff3d)](https://stefanbartl.github.io/wkd/p/documentation/)
 
 > Part of the [wkd](https://stefanbartl.github.io/wkd/) family — see this plugin's [page](https://stefanbartl.github.io/wkd/p/documentation/) on the site.
@@ -58,11 +58,11 @@ the question you arrived with. The four to reach for first:
 - [Configuration](docs/configuration.md) — every option, the `.docmap.json` precedence rules, and rebinding `:DocBrowse` by action rather than by key.
 - [Tabs](docs/tabs.md) — what each panel of the generated page shows, and why.
 - [Features](docs/FEATURES/README.md) — one page per area, with the reasoning behind each.
-- [Lua API](docs/api.md) — `generate()`, `install()`, and the live `Documentation.Handle`.
+- [Lua API](docs/api.md) — `generate()`, `install()`, and the live `Docmap.Handle`.
 - [MCP server](docs/mcp.md) — nine read-only tools over stdio, and why none of them writes.
 - [Testing contract](docs/testing-contract.md) — which specs a change touches, from the require graph: freshness, explicit gaps, consumers in other repositories, and a "has specs" column in the map.
 - [Integrations](docs/integrations.md) — the context-menu bridge for `nvzone/menu`.
-- [Health](docs/health.md) — what `:checkhealth documentation` reports, including the declared external tools.
+- [Health](docs/health.md) — what `:checkhealth docmap` reports, including the declared external tools.
 - [Bindings cheatsheet](docs/BINDINGS.md) — every keymap, user command and autocommand.
 - [Workflow](docs/WORKFLOW.md) — which panel answers which question: Trail versus filter versus fuzzy jump.
 
@@ -71,9 +71,9 @@ the question you arrived with. The four to reach for first:
 - [Ecosystem](docs/ecosystem.md) — how this plugin, `runtime-analysis.nvim`, `mdview.nvim` and `docmap-desktop` fit together.
 - [Development](docs/DEVELOPMENT.md) — the toolchain, and the five things CI runs.
 - [Contributing](docs/CONTRIBUTING.md) — ground rules, project layout, and how to add a language backend.
-- [Feedback](https://github.com/StefanBartl/documentation.nvim/issues) — bugs, feature requests and usage questions.
+- [Feedback](https://github.com/StefanBartl/docmap.nvim/issues) — bugs, feature requests and usage questions.
 
-`:help documentation.nvim` is the same ground in Vim help format.
+`:help docmap.nvim` is the same ground in Vim help format.
 
 ---
 
