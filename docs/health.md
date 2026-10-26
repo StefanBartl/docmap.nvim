@@ -17,7 +17,7 @@ It closes with the external tools declared in
 which the opt-in `luals` enrichment pass shells out to. `:Lib deps show
 docmap.nvim` reports the same thing on its own, and `:Lib deps install
 docmap.nvim` offers to install what is missing, via
-[lib.nvim.deps](https://github.com/StefanBartl/lib.nvim/blob/main/lua/lib/nvim/deps/README.md)
+[lib.nvim.deps](https://github.com/WKDSteve/lib.nvim/blob/main/lua/lib/nvim/deps/README.md)
 — which asks before it installs anything. A popup shows this once, the first
 time `setup()` runs after installing; `vim.g.lib_nvim_deps_disable_first_run =
 true` (every plugin) or `vim.g.lib_nvim_deps_disabled_plugins = {

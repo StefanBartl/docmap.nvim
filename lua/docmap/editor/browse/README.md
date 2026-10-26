@@ -466,7 +466,7 @@ what keeps the mode testable headlessly; see
 
 ## Layout
 
-Three [`ui.kit.layout`](https://github.com/StefanBartl/ui.nvim/blob/main/lua/ui/kit/README.md) slots:
+Three [`ui.kit.layout`](https://github.com/WKDSteve/ui.nvim/blob/main/lua/ui/kit/README.md) slots:
 
 ```
 ┌─ list ───────────────┬─ detail ─────────────────┐
@@ -505,7 +505,7 @@ uses an optional plugin. Counted in this tree before it was built: **2 132**
 inline spans are reachable in this pane against **four** node bodies out of a
 hundred and twenty-three carrying a fence, and **zero** `@example` blocks. So
 inline code is the feature and needs nothing installed;
-[`color_my_ascii.nvim`](https://github.com/StefanBartl/color_my_ascii.nvim)
+[`color_my_ascii.nvim`](https://github.com/WKDSteve/color_my_ascii.nvim)
 is probed through `core/soft_require` for the fenced case and its absence
 changes nothing else.
 

@@ -171,8 +171,8 @@ function M.check()
   else
     h_error(("%d of %d lib.nvim modules failed to load"):format(#missing, #DEPS), {
       "Missing: " .. table.concat(missing, ", "),
-      "lib.nvim is a hard dependency: https://github.com/StefanBartl/lib.nvim",
-      'Add it to this plugin\'s spec: dependencies = { "StefanBartl/lib.nvim" }',
+      "lib.nvim is a hard dependency: https://github.com/WKDSteve/lib.nvim",
+      'Add it to this plugin\'s spec: dependencies = { "WKDSteve/lib.nvim" }',
     })
   end
 
@@ -235,7 +235,7 @@ function M.check()
     h_info("pickers.nvim not installed", {
       ":DocMap pick uses lib.nvim's chooser instead, which defers to whatever",
       "you wired into vim.ui.select. Nothing else needs it.",
-      "https://github.com/StefanBartl/pickers.nvim",
+      "https://github.com/WKDSteve/pickers.nvim",
     })
   end
 
@@ -250,7 +250,7 @@ function M.check()
   else
     h_info("pdfport.nvim not installed", {
       "Only opts.pdf = true (overview.pdf, alongside overview.md) needs it.",
-      "https://github.com/StefanBartl/pdfport.nvim",
+      "https://github.com/WKDSteve/pdfport.nvim",
     })
   end
 
@@ -272,7 +272,7 @@ function M.check()
     h_info("color_my_ascii.nvim not installed", {
       "Inline `code` in :DocBrowse's detail pane is highlighted anyway.",
       "Only ``` fenced blocks in a module header would use it — rare, by count.",
-      "https://github.com/StefanBartl/color_my_ascii.nvim",
+      "https://github.com/WKDSteve/color_my_ascii.nvim",
     })
   end
 
@@ -329,7 +329,7 @@ function M.check()
     h_info("runtime-analysis.nvim not installed", {
       "Optional: self-instrumentation for :DocBrowse's telemetry mode and",
       "dead-function suppression (opts.telemetry, default true when present).",
-      "https://github.com/StefanBartl/runtime-analysis.nvim",
+      "https://github.com/WKDSteve/runtime-analysis.nvim",
     })
   end
 

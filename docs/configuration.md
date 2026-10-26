@@ -9,8 +9,8 @@ per-field documentation is in
 
 ```lua
 {
-  "StefanBartl/docmap.nvim",
-  dependencies = { "StefanBartl/lib.nvim" },
+  "WKDSteve/docmap.nvim",
+  dependencies = { "WKDSteve/lib.nvim" },
   cmd = { "DocMap", "DocBrowse" },
   opts = {
     root = "/path/to/my-plugin",       -- default: resolved per invocation
@@ -94,7 +94,7 @@ A `.docmap.json` at the repository root is read by every one of them:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/StefanBartl/docmap.nvim/main/docs/docmap.schema.json",
+  "$schema": "https://raw.githubusercontent.com/WKDSteve/docmap.nvim/main/docs/docmap.schema.json",
   "source": ["lua", "src"],
   "exclude": ["src/generated"],
   "repo_url": "https://github.com/me/my-plugin",

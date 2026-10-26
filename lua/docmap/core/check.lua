@@ -525,7 +525,7 @@ local function check_sibling_references(ir, findings, opts)
     end
     -- URLs first, and this is not an optimisation. A GitHub blob link contains
     -- the repository name followed by a path
-    -- (`github.com/StefanBartl/lib.nvim/blob/main/lua/…/init.lua`), so a
+    -- (`github.com/WKDSteve/lib.nvim/blob/main/lua/…/init.lua`), so a
     -- pattern looking for `<name>/<path>` finds one inside every such link and
     -- reports it against a tree where `blob/main/…` was never going to exist.
     -- Caught on this repository's own FEATURE_LOG.md the first time the check

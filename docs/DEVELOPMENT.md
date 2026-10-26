@@ -3,7 +3,7 @@
 ## Getting the dependency
 
 `docmap.nvim` depends on
-[`lib.nvim`](https://github.com/StefanBartl/lib.nvim) at runtime — `notify`,
+[`lib.nvim`](https://github.com/WKDSteve/lib.nvim) at runtime — `notify`,
 `fs.*`, `ui.kit`, `usercmd`, `map`, `debounce`, `autocmd`,
 `cross.uv.spawn_capture`. Inside Neovim your plugin manager supplies it. The
 headless runners cannot assume that, so they look in three places, in
@@ -149,7 +149,7 @@ bash scripts/test.sh --file docmap    # only spec files whose name contains "doc
 bash scripts/test.sh --json ir.json   # also write the machine-readable result
 ```
 
-The specs run on [testing.nvim](https://github.com/StefanBartl/testing.nvim)
+The specs run on [testing.nvim](https://github.com/WKDSteve/testing.nvim)
 (a checkout in `.deps/testing.nvim`, `../testing.nvim`, or `$TESTING_NVIM_DIR`),
 configured by [`.testing.lua`](../.testing.lua); dependencies (lib.nvim, ui.nvim,
 runtime-analysis.nvim) are found the same way, and a missing one is a loud

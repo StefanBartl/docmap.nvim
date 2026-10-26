@@ -613,7 +613,7 @@ function M.write_artifacts(ir, findings, opts)
   return written
 end
 
----Writes `overview.pdf` via pdfport.nvim (github.com/StefanBartl/
+---Writes `overview.pdf` via pdfport.nvim (github.com/WKDSteve/
 ---pdfport.nvim, optional dependency, soft-required) -- byte-for-byte the
 ---same content `overview.md` gets, just handed to pdfport as text instead of
 ---read back from disk. Unlike `write_artifacts`, this is asynchronous

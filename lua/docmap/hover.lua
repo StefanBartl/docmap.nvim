@@ -8,7 +8,7 @@
 --- reachable only by opening the map.
 ---
 --- This registers a **position** preview with
---- [hover.nvim](https://github.com/StefanBartl/hover.nvim): the cursor rests
+--- [hover.nvim](https://github.com/WKDSteve/hover.nvim): the cursor rests
 --- on `lib.nvim.bindings.usercmd.composer` and the float says what that
 --- module does. No scan at runtime, no Treesitter, one file read of an
 --- artifact that is already on disk.

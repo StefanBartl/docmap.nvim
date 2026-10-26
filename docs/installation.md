@@ -5,15 +5,15 @@ Every plugin manager, and the one setting that decides which repository a
 page is the complete one.
 
 Requires Neovim 0.10+ (`vim.uv`, `vim.treesitter`) and
-[`lib.nvim`](https://github.com/StefanBartl/lib.nvim).
+[`lib.nvim`](https://github.com/WKDSteve/lib.nvim).
 
 <details open>
 <summary><b>lazy.nvim</b></summary>
 
 ```lua
 {
-  "StefanBartl/docmap.nvim",
-  dependencies = { "StefanBartl/lib.nvim" },
+  "WKDSteve/docmap.nvim",
+  dependencies = { "WKDSteve/lib.nvim" },
   cmd = { "DocMap", "DocBrowse" },
   opts = {},
 }
@@ -25,8 +25,8 @@ Requires Neovim 0.10+ (`vim.uv`, `vim.treesitter`) and
 
 ```lua
 vim.pack.add({
-  { src = "https://github.com/StefanBartl/lib.nvim" },
-  { src = "https://github.com/StefanBartl/docmap.nvim" },
+  { src = "https://github.com/WKDSteve/lib.nvim" },
+  { src = "https://github.com/WKDSteve/docmap.nvim" },
 })
 
 -- No lazy-loading layer here, so do it by hand: create the commands on first
@@ -49,8 +49,8 @@ end
 ```lua
 local add, later = MiniDeps.add, MiniDeps.later
 add({
-  source = "StefanBartl/docmap.nvim",
-  depends = { "StefanBartl/lib.nvim" },
+  source = "WKDSteve/docmap.nvim",
+  depends = { "WKDSteve/lib.nvim" },
 })
 later(function()
   require("docmap").setup({})
@@ -63,8 +63,8 @@ end)
 
 ```lua
 use({
-  "StefanBartl/docmap.nvim",
-  requires = { "StefanBartl/lib.nvim" },
+  "WKDSteve/docmap.nvim",
+  requires = { "WKDSteve/lib.nvim" },
   cmd = { "DocMap", "DocBrowse" },
   config = function()
     require("docmap").setup({})
@@ -78,8 +78,8 @@ use({
 
 ```lua
 require("paq")({
-  "StefanBartl/lib.nvim",
-  "StefanBartl/docmap.nvim",
+  "WKDSteve/lib.nvim",
+  "WKDSteve/docmap.nvim",
 })
 
 -- paq does no lazy-loading and runs no config hooks:

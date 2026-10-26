@@ -667,7 +667,7 @@ back would be a different feature with a different posture.
 Session 2026-08-10. `install()`-only, off by default, same posture as
 `watch`/`callhierarchy`/`diagnostics`: pushes a live, `core/render/
 mdview.lua`-shaped Markdown rendering of the in-memory IR into an
-already-running [mdview.nvim](https://github.com/StefanBartl/mdview.nvim)
+already-running [mdview.nvim](https://github.com/WKDSteve/mdview.nvim)
 session on every `on_change`, so a browser tab previewing this root's
 `overview.md` stays in sync with the tree as it changes, not just with
 whatever `generate()` last wrote to disk. Tier A of a roadmap item that had
@@ -1525,7 +1525,7 @@ require("docmap").generate({
     -- Verified against a real checkout when one is named — worth it
     -- whenever one already exists, which in a sibling-repos-under-one-
     -- directory setup (this ecosystem's own) is often.
-    ["lib.nvim"] = { repo = "StefanBartl/lib.nvim", local_path = "/path/to/lib.nvim" },
+    ["lib.nvim"] = { repo = "WKDSteve/lib.nvim", local_path = "/path/to/lib.nvim" },
   },
 })
 ```
@@ -1983,7 +1983,7 @@ wins and nothing else in this map could ever have surfaced it.
 
 **Tools** is shaped like Plugins (a repo-level inventory, not a per-function
 score) but reads a different declaration entirely:
-[`lib.nvim.deps`](https://github.com/StefanBartl/lib.nvim)'s
+[`lib.nvim.deps`](https://github.com/WKDSteve/lib.nvim)'s
 `docs/install.json`/`docs/INSTALL.md`, the manifest a plugin ships for its
 *optional external CLI tools* (`pandoc`, `poppler-utils`, …), not for its
 Lua dependencies. `core/tools.lua` reads exactly this repo's own two known
@@ -2342,7 +2342,7 @@ and being someone's `@see` target. A colon-declared method
 never becomes a call edge, and every colon method in the tree would otherwise
 be misreported the moment its only callers use `:`. Verified against this
 repo's own `Lru:get`/`Lru:put`
-([`lib.nvim`'s `lua/lib/lua/memo/lru.lua`](https://github.com/StefanBartl/lib.nvim/blob/main/lua/lib/lua/memo/lru.lua)), which are the public
+([`lib.nvim`'s `lua/lib/lua/memo/lru.lua`](https://github.com/WKDSteve/lib.nvim/blob/main/lua/lib/lua/memo/lru.lua)), which are the public
 API and are called only from other files, only via `:`.
 
 Never above `info`, and it can never fail `--check`: dynamic dispatch is

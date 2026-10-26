@@ -17,10 +17,10 @@
 [![Neovim](https://img.shields.io/badge/Neovim-0.10%2B-57A143?logo=neovim&logoColor=white)](https://neovim.io)
 [![Lua](https://img.shields.io/badge/Lua-5.1%2FLuaJIT-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)
 ![Status](https://img.shields.io/badge/status-beta-orange)
-[![CI](https://github.com/StefanBartl/docmap.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/StefanBartl/docmap.nvim/actions/workflows/ci.yml)
-[![wkd](https://img.shields.io/badge/wkd-family-c6ff3d)](https://stefanbartl.github.io/wkd/p/docmap/)
+[![CI](https://github.com/WKDSteve/docmap.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/WKDSteve/docmap.nvim/actions/workflows/ci.yml)
+[![wkd](https://img.shields.io/badge/wkd-family-c6ff3d)](https://wkdsteve.github.io/wkd/p/docmap/)
 
-> Part of the [wkd](https://stefanbartl.github.io/wkd/) family — see this plugin's [page](https://stefanbartl.github.io/wkd/p/docmap/) on the site.
+> Part of the [wkd](https://wkdsteve.github.io/wkd/) family — see this plugin's [page](https://wkdsteve.github.io/wkd/p/docmap/) on the site.
 
 > **know your project**
 
@@ -76,7 +76,7 @@ the question you arrived with. The four to reach for first:
 - [Ecosystem](docs/ecosystem.md) — how this plugin, `runtime-analysis.nvim`, `mdview.nvim` and `docmap-desktop` fit together.
 - [Development](docs/DEVELOPMENT.md) — the toolchain, and the five things CI runs.
 - [Contributing](docs/CONTRIBUTING.md) — ground rules, project layout, and how to add a language backend.
-- [Feedback](https://github.com/StefanBartl/docmap.nvim/issues) — bugs, feature requests and usage questions.
+- [Feedback](https://github.com/WKDSteve/docmap.nvim/issues) — bugs, feature requests and usage questions.
 
 `:help docmap.nvim` is the same ground in Vim help format.
 

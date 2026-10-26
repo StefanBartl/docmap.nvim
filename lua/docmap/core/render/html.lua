@@ -9954,7 +9954,7 @@ function M.render(ir, findings, opts)
     -- repository being read, and putting the tool's name in there would
     -- make the two look like one thing.
     '<div class="topbar">'
-      .. '<a class="brand" href="https://github.com/StefanBartl/docmap.nvim"'
+      .. '<a class="brand" href="https://github.com/WKDSteve/docmap.nvim"'
       .. ' target="_blank" rel="noopener">docmap.nvim</a>'
       .. '<span class="tagline">know your project</span>'
       .. "</div>",

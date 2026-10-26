@@ -351,7 +351,7 @@ Entries read as `module` and `module#M.fn`, the same two shapes the
 browser's own jump builds, so a name typed in one place is the name typed in
 the other. On this repository that is 913 entries.
 
-**Which picker.** [`pickers.nvim`](https://github.com/StefanBartl/pickers.nvim)
+**Which picker.** [`pickers.nvim`](https://github.com/WKDSteve/pickers.nvim)
 first, if it is installed and it resolves an engine — telescope, fzf-lua or
 snacks. That buys fuzzy matching over several hundred entries *and* the
 engine's own native file previewer, because an entry carrying a `file` gets

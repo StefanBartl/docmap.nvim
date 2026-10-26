@@ -1,7 +1,7 @@
 # hover.nvim integration
 
 Rest the cursor on a dotted module name and
-[hover.nvim](https://github.com/StefanBartl/hover.nvim) says what that module
+[hover.nvim](https://github.com/WKDSteve/hover.nvim) says what that module
 is — read out of `docs/map/module_map.json`, the artifact this plugin already
 writes.
 

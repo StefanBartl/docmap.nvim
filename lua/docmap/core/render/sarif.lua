@@ -90,7 +90,7 @@ function M.render(ir, findings, opts)
       id = id,
       name = id,
       shortDescription = { text = id },
-      helpUri = "https://github.com/StefanBartl/docmap.nvim/blob/main/docs/pipeline.md",
+      helpUri = "https://github.com/WKDSteve/docmap.nvim/blob/main/docs/pipeline.md",
     }
   end
 
@@ -121,7 +121,7 @@ function M.render(ir, findings, opts)
     tool = {
       driver = {
         name = "docmap.nvim",
-        informationUri = "https://github.com/StefanBartl/docmap.nvim",
+        informationUri = "https://github.com/WKDSteve/docmap.nvim",
         rules = rules,
       },
     },

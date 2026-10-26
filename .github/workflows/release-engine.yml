@@ -63,7 +63,7 @@ jobs:
       # directory, which a fresh CI checkout has no equivalent of).
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/lib.nvim
+          repository: WKDSteve/lib.nvim
           path: .deps/lib.nvim
           ref: ci-verified
       # runtime-analysis.nvim is soft (ensure_soft in standalone/docmap.lua
@@ -78,7 +78,7 @@ jobs:
       # extra env var is needed alongside this checkout.
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/runtime-analysis.nvim
+          repository: WKDSteve/runtime-analysis.nvim
           path: .deps/runtime-analysis.nvim
           ref: ci-verified
       # tree-sitter CLI, the same way ci.yml's own `tests` job already
@@ -102,7 +102,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/lib.nvim
+          repository: WKDSteve/lib.nvim
           path: .deps/lib.nvim
           ref: ci-verified
       # runtime-analysis.nvim is soft (ensure_soft in standalone/docmap.lua
@@ -117,7 +117,7 @@ jobs:
       # extra env var is needed alongside this checkout.
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/runtime-analysis.nvim
+          repository: WKDSteve/runtime-analysis.nvim
           path: .deps/runtime-analysis.nvim
           ref: ci-verified
       # A dedicated MSYS2/MinGW environment rather than whatever happens

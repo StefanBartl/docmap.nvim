@@ -22,7 +22,7 @@ ordinary case, while the short TTL still keeps a held `<Tab>` from spawning
 one `git for-each-ref` per keystroke.
 
 - **Module:** `bindings/usrcmds/init.lua` (`revisions`, the `complete`
-  callback), [`lib.nvim.git.refs`](https://github.com/StefanBartl/lib.nvim/blob/main/lua/lib/nvim/git/README.md)
+  callback), [`lib.nvim.git.refs`](https://github.com/WKDSteve/lib.nvim/blob/main/lua/lib/nvim/git/README.md)
 - **Config:** none — always available.
 - **Docs:** [`docs/BINDINGS.md`](../BINDINGS.md) "User commands".
 
@@ -65,7 +65,7 @@ mostly `return { {...}, {...} }` with no function in sight.
 
 ## Tools Analysis panel
 
-This repo's own [`lib.nvim.deps`](https://github.com/StefanBartl/lib.nvim)
+This repo's own [`lib.nvim.deps`](https://github.com/WKDSteve/lib.nvim)
 manifest (`docs/install.json`/`docs/INSTALL.md`) — declared external CLI
 tools, not Lua dependencies — as its own Analysis-tab panel and as
 `:DocMap tools` → quickfix. Declared only: never a live "is it installed
@@ -302,7 +302,7 @@ with no project/multi-file mode the way CMake/C++ has.
 
 `opts.mdview` pushes a live, Mermaid-free Markdown rendering of the
 in-memory IR into an already-running
-[mdview.nvim](https://github.com/StefanBartl/mdview.nvim) session on every
+[mdview.nvim](https://github.com/WKDSteve/mdview.nvim) session on every
 `on_change`, so a browser tab previewing this root's `overview.md` stays in
 sync with the tree as it changes rather than only with whatever
 `generate()` last wrote to disk. Soft dependency (`pcall`-guarded, same

@@ -19,8 +19,8 @@ Nothing beyond the plugin spec:
 
 ```lua
 {
-  "StefanBartl/docmap.nvim",
-  dependencies = { "StefanBartl/lib.nvim" },
+  "WKDSteve/docmap.nvim",
+  dependencies = { "WKDSteve/lib.nvim" },
   cmd = { "DocMap", "DocBrowse" },
   opts = {
     source = "lua/myplugin",
@@ -57,7 +57,7 @@ repository root:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/StefanBartl/docmap.nvim/main/docs/docmap.schema.json",
+  "$schema": "https://raw.githubusercontent.com/WKDSteve/docmap.nvim/main/docs/docmap.schema.json",
   "source": "lua/myplugin",
   "title": "myplugin.nvim",
   "repo_url": "https://github.com/me/my-plugin",
@@ -252,7 +252,7 @@ map:
   runs-on: ubuntu-latest
   steps:
     - uses: actions/checkout@v4
-    - uses: StefanBartl/docmap.nvim@main
+    - uses: WKDSteve/docmap.nvim@main
       with:
         source: lua/myplugin
         repo-url: https://github.com/me/my-plugin
@@ -302,11 +302,11 @@ map:
     - uses: actions/checkout@v4
     - uses: actions/checkout@v4
       with:
-        repository: StefanBartl/lib.nvim
+        repository: WKDSteve/lib.nvim
         path: .deps/lib.nvim
     - uses: actions/checkout@v4
       with:
-        repository: StefanBartl/docmap.nvim
+        repository: WKDSteve/docmap.nvim
         path: .deps/docmap.nvim
     - uses: rhysd/action-setup-vim@v1
       with: { neovim: true, version: stable }
@@ -382,7 +382,7 @@ require("docmap").generate({
   ...,
   external_repos = {
     plenary = "nvim-lua/plenary.nvim",
-    ["lib.nvim"] = { repo = "StefanBartl/lib.nvim", local_path = "/path/to/lib.nvim" },
+    ["lib.nvim"] = { repo = "WKDSteve/lib.nvim", local_path = "/path/to/lib.nvim" },
   },
 })
 ```

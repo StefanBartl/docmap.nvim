@@ -21,8 +21,8 @@ write:
 
 ```lua
 {
-  "StefanBartl/docmap.nvim",
-  dependencies = { "StefanBartl/lib.nvim" },
+  "WKDSteve/docmap.nvim",
+  dependencies = { "WKDSteve/lib.nvim" },
   opts = {
     source = "lua/myplugin",   -- the subtree to scan
     callhierarchy = true,      -- ← this
@@ -61,7 +61,7 @@ is injected into whatever LuaLS's own hover returns:
 
 ### The runtime half, when there is one
 
-With [`runtime-analysis.nvim`](https://github.com/StefanBartl/runtime-analysis.nvim)
+With [`runtime-analysis.nvim`](https://github.com/WKDSteve/runtime-analysis.nvim)
 installed and telemetry collected for this project's namespace, the hover
 gains a third clause — how often the function was **actually entered**, in the
 last seven days:

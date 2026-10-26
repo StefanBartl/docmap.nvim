@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/StefanBartl/docmap.nvim/main/docs/docmap.schema.json",
+  "$id": "https://raw.githubusercontent.com/WKDSteve/docmap.nvim/main/docs/docmap.schema.json",
   "title": ".docmap.json",
   "description": "Options a repository states about itself, read by docmap.nvim's config.build. Every key here is a fact about the tree; options that belong to whoever opens the repository (keys, commands, watchers, telemetry) are deliberately absent — see lua/docmap/config/file.lua.",
   "type": "object",

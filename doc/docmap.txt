@@ -78,7 +78,7 @@ filesystem, and the scanner never knows what will be drawn.
 
     - Neovim 0.10+  (vim.uv, vim.treesitter)
     - a treesitter Lua parser  (functions, call edges and symbols come from it)
-    - lib.nvim      https://github.com/StefanBartl/lib.nvim
+    - lib.nvim      https://github.com/WKDSteve/lib.nvim
     - git, optional — :DocMap diff/impact/serve and :DocBrowse history
     - lua-language-server, optional — only for `:DocMap full`
 
@@ -119,8 +119,8 @@ check` is the authoritative one and costs a full scan.
 lazy.nvim: >lua
 
     {
-      "StefanBartl/docmap.nvim",
-      dependencies = { "StefanBartl/lib.nvim" },
+      "WKDSteve/docmap.nvim",
+      dependencies = { "WKDSteve/lib.nvim" },
       cmd = { "DocMap", "DocBrowse" },
       opts = {},
     }
@@ -129,8 +129,8 @@ vim.pack (Neovim 0.12+, built in) — no lazy-loading layer, so the commands are
 created by hand on first use rather than at startup: >lua
 
     vim.pack.add({
-      { src = "https://github.com/StefanBartl/lib.nvim" },
-      { src = "https://github.com/StefanBartl/docmap.nvim" },
+      { src = "https://github.com/WKDSteve/lib.nvim" },
+      { src = "https://github.com/WKDSteve/docmap.nvim" },
     })
 
     for _, name in ipairs({ "DocMap", "DocBrowse" }) do
@@ -146,16 +146,16 @@ mini.deps: >lua
 
     local add, later = MiniDeps.add, MiniDeps.later
     add({
-      source = "StefanBartl/docmap.nvim",
-      depends = { "StefanBartl/lib.nvim" },
+      source = "WKDSteve/docmap.nvim",
+      depends = { "WKDSteve/lib.nvim" },
     })
     later(function() require("docmap").setup({}) end)
 <
 packer.nvim: >lua
 
     use({
-      "StefanBartl/docmap.nvim",
-      requires = { "StefanBartl/lib.nvim" },
+      "WKDSteve/docmap.nvim",
+      requires = { "WKDSteve/lib.nvim" },
       cmd = { "DocMap", "DocBrowse" },
       config = function() require("docmap").setup({}) end,
     })
@@ -164,8 +164,8 @@ paq-nvim, or a manual 'runtimepath' — neither lazy-loads nor runs config
 hooks, so call `setup()` yourself: >lua
 
     require("paq")({
-      "StefanBartl/lib.nvim",
-      "StefanBartl/docmap.nvim",
+      "WKDSteve/lib.nvim",
+      "WKDSteve/docmap.nvim",
     })
     require("docmap").setup({})
 <
@@ -680,7 +680,7 @@ Endpoints mode lists every call-based route registration across the whole
 tree (not centered on any one node, the same reason Trail is not) — see
 `core/endpoints.lua` for what is recognized. `gs`, in this mode only, sends
 the route under the cursor to runtime-analysis.nvim
-(https://github.com/StefanBartl/runtime-analysis.nvim) as a request, if it
+(https://github.com/WKDSteve/runtime-analysis.nvim) as a request, if it
 is installed — a soft dependency, absent with a clear message otherwise.
 It opens a new request buffer pre-filled with the route's method and path
 rather than sending immediately: a path is relative and may contain
@@ -1292,7 +1292,7 @@ plugin with no `docmap` artifact of its own: >lua
 
     external_repos = {
       plenary = "nvim-lua/plenary.nvim",
-      ["lib.nvim"] = { repo = "StefanBartl/lib.nvim",
+      ["lib.nvim"] = { repo = "WKDSteve/lib.nvim",
                         local_path = "/path/to/lib.nvim" },
     },
 <
@@ -1350,7 +1350,7 @@ this tree itself uses.
 13. CREDITS                                              *docmap-credits*
 
 Author:   Stefan Bartl
-Repo:     https://github.com/StefanBartl/docmap.nvim
+Repo:     https://github.com/WKDSteve/docmap.nvim
 
 Grew inside lib.nvim as `lib.nvim.docmap` and was extracted once it had
 nothing left to do with lib.nvim. Shaped after Doxygen, scoped to the part

@@ -3,9 +3,9 @@
 > **This is the one architecture document for the whole ecosystem, and it
 > lives here.** It describes four pieces and only one of them is this
 > repository, so the other three link to this file rather than keeping a copy:
-> [`lib.nvim`](https://github.com/StefanBartl/lib.nvim),
-> [`runtime-analysis.nvim`](https://github.com/StefanBartl/runtime-analysis.nvim)
-> and [`mdview.nvim`](https://github.com/StefanBartl/mdview.nvim). Same pattern
+> [`lib.nvim`](https://github.com/WKDSteve/lib.nvim),
+> [`runtime-analysis.nvim`](https://github.com/WKDSteve/runtime-analysis.nvim)
+> and [`mdview.nvim`](https://github.com/WKDSteve/mdview.nvim). Same pattern
 > as the plan for what gets built next, which is kept in one place too (the
 > author's working notes, outside the repositories):
 > one source, several pointers, because the alternative is four copies in three
@@ -26,7 +26,7 @@
 > pairs with whichever name this plugin has.
 
 > **A fifth piece arrived after this was written (2026-08-30).**
-> [`docmap-desktop`](https://github.com/StefanBartl/docmap-desktop) is a Tauri
+> [`docmap-desktop`](https://github.com/WKDSteve/docmap-desktop) is a Tauri
 > app that runs this plugin's standalone binary and serves the same `/api/*`
 > routes over a real HTTP origin. It changes nothing in the seams below — it
 > is a second *host* for the artifact-and-serve tier §1's Seam B already

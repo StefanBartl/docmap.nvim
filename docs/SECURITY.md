@@ -328,6 +328,6 @@ is worse than none:
 
 This repository carries no licence and is a personal project. If you find
 something, open an issue at
-<https://github.com/StefanBartl/docmap.nvim/issues>. There is no embargo
+<https://github.com/WKDSteve/docmap.nvim/issues>. There is no embargo
 process and no security contact beyond that — say so in the issue if you would
 rather not describe the detail publicly.

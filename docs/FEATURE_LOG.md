@@ -1738,7 +1738,7 @@ when telemetry lands as the 8th entry, not the 7th.
 
 A repo-level counterpart to `:DocMap plugins`, for a different declaration
 entirely: not lazy.nvim's `dependencies = {...}`, but
-[`lib.nvim.deps`](https://github.com/StefanBartl/lib.nvim)'s own
+[`lib.nvim.deps`](https://github.com/WKDSteve/lib.nvim)'s own
 `docs/install.json`/`docs/INSTALL.md` — the manifest a plugin ships for its
 *optional external CLI tools* (pandoc, poppler-utils, curl, …). Blocked on
 the data existing at all until `runtime-analysis.nvim` shipped its own

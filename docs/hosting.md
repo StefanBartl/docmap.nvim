@@ -295,7 +295,7 @@ nothing registered here — which is the claim this section makes, now with
 something standing on it.
 
 Writing extensions are stage 3 and still open; both live in
-[`docmap-desktop`'s plan](https://github.com/StefanBartl/docmap-desktop).
+[`docmap-desktop`'s plan](https://github.com/WKDSteve/docmap-desktop).
 
 ## What a host must not assume
 
@@ -304,7 +304,7 @@ Writing extensions are stage 3 and still open; both live in
   arrive by regenerating, not by updating whatever reads the map. This is the
   single fact that makes the app's behaviour predictable rather than
   mysterious — see [`USAGE.md`'s first section in
-  `docmap-desktop`](https://github.com/StefanBartl/docmap-desktop/blob/main/docs/USAGE.md).
+  `docmap-desktop`](https://github.com/WKDSteve/docmap-desktop/blob/main/docs/USAGE.md).
 - **That an empty panel means an empty project.** Several panels are empty
   for reasons that belong to the build, not the repository — no grammar, no
   call extraction for this language, no telemetry collected. The handshake is

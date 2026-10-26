@@ -83,7 +83,7 @@ local opts = require("docmap.config").build(root, {
   source = "lua/docmap",
   title = "docmap.nvim",
   out_dir = "docs/map",
-  repo_url = "https://github.com/StefanBartl/docmap.nvim",
+  repo_url = "https://github.com/WKDSteve/docmap.nvim",
   branch = "main",
 
   -- **`layers` is not here any more.** It lives in `.docmap.json` at the

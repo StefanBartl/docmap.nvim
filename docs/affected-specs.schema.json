@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/StefanBartl/docmap.nvim/main/docs/affected-specs.schema.json",
+  "$id": "https://raw.githubusercontent.com/WKDSteve/docmap.nvim/main/docs/affected-specs.schema.json",
   "title": "docmap.testing affected_specs() answer",
   "description": "The answer of require('docmap.testing').affected_specs and of scripts/affected_specs.lua, contract version 1 (docs/testing-contract.md). A consumer must treat an unknown version as 'no answer' and run everything.",
   "type": "object",

@@ -4,7 +4,7 @@
 # which is the right answer for a repository that wants its own layer rules
 # or extra checks. This is the version that requires copying nothing:
 #
-#     - uses: StefanBartl/docmap.nvim@main
+#     - uses: WKDSteve/docmap.nvim@main
 #       with:
 #         source: lua/myplugin
 #
@@ -122,14 +122,14 @@ runs:
     - name: Check out docmap.nvim
       uses: actions/checkout@v5
       with:
-        repository: StefanBartl/docmap.nvim
+        repository: WKDSteve/docmap.nvim
         ref: ${{ inputs.ref || github.action_ref || 'main' }}
         path: ${{ runner.temp }}/docmap-engine/docmap.nvim
 
     - name: Check out lib.nvim
       uses: actions/checkout@v5
       with:
-        repository: StefanBartl/lib.nvim
+        repository: WKDSteve/lib.nvim
         path: ${{ runner.temp }}/docmap-engine/lib.nvim
 
     - name: Install Neovim

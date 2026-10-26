@@ -276,7 +276,7 @@ return function(H)
   )
   eq(
     own.repo_url,
-    "https://github.com/StefanBartl/docmap.nvim",
+    "https://github.com/WKDSteve/docmap.nvim",
     "this repo's own .docmap.json still supplies repo_url"
   )
 end

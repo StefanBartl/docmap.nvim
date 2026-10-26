@@ -80,7 +80,7 @@ return function(H)
     "Dead: `other.nvim/docs/missing.md`.",
     "",
     "A full URL, which is somebody else's namespace and not a claim about a",
-    "checkout: https://github.com/StefanBartl/other.nvim/blob/main/docs/x.md",
+    "checkout: https://github.com/WKDSteve/other.nvim/blob/main/docs/x.md",
     "",
     "A scheme-less GitHub blob path, the same thing written shorter:",
     "`other.nvim/blob/main/docs/y.md` and `other.nvim/tree/main/docs`.",

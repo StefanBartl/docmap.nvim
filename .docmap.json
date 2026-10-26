@@ -1,6 +1,6 @@
 {
   "$schema": "./docs/docmap.schema.json",
-  "repo_url": "https://github.com/StefanBartl/docmap.nvim",
+  "repo_url": "https://github.com/WKDSteve/docmap.nvim",
   "branch": "main",
   "layers": [
     {
@@ -30,22 +30,22 @@
   ],
   "external_repos": {
     "lib.nvim": {
-      "repo": "StefanBartl/lib.nvim",
+      "repo": "WKDSteve/lib.nvim",
       "name": "lib.nvim",
       "local_path": "../lib.nvim"
     },
     "runtime-analysis": {
-      "repo": "StefanBartl/runtime-analysis.nvim",
+      "repo": "WKDSteve/runtime-analysis.nvim",
       "name": "runtime-analysis.nvim",
       "local_path": "../runtime-analysis.nvim"
     },
     "mdview": {
-      "repo": "StefanBartl/mdview.nvim",
+      "repo": "WKDSteve/mdview.nvim",
       "name": "mdview.nvim",
       "local_path": "../mdview.nvim"
     },
     "docmap-desktop": {
-      "repo": "StefanBartl/docmap-desktop",
+      "repo": "WKDSteve/docmap-desktop",
       "name": "docmap-desktop",
       "local_path": "../docmap-desktop"
     }

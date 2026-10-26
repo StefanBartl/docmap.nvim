@@ -29,7 +29,7 @@
 ---     -- worth it whenever one already exists, which in a sibling-repos-
 ---     -- under-one-directory setup is often.
 ---     ["lib.nvim"] = {
----       repo = "StefanBartl/lib.nvim",
+---       repo = "WKDSteve/lib.nvim",
 ---       local_path = "E:/repos/lib.nvim",
 ---     },
 ---   },

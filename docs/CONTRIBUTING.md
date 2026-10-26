@@ -1,7 +1,7 @@
 # Contributing to docmap.nvim
 
 Thank you for your interest! Bugs, ideas and questions are welcome in the
-[issue tracker](https://github.com/StefanBartl/docmap.nvim/issues); pull
+[issue tracker](https://github.com/WKDSteve/docmap.nvim/issues); pull
 requests very welcome.
 
 **Read [`pipeline.md`](pipeline.md) first.** It carries every stage of the

@@ -13,12 +13,12 @@ other), **plugins**: every lazy.nvim spec in the tree, which matters when
 `docmap.nvim` is pointed at a Neovim *config* rather than a plugin —
 `lua/plugins/*.lua` is mostly `return { { "author/repo", event = "…" } }`
 with no function in sight, invisible to every other panel — and **tools**:
-this repo's own [`lib.nvim.deps`](https://github.com/StefanBartl/lib.nvim)
+this repo's own [`lib.nvim.deps`](https://github.com/WKDSteve/lib.nvim)
 manifest (`docs/install.json`/`docs/INSTALL.md`), declared only — never a
 live "is this installed here" probe, since a static page has no host to
 ask. The eighth, **telemetry**, is the odd one out on purpose: call counts
 change between runs, so unlike the other seven it is never baked into the
-page — `:DocMap serve` reads [`runtime-analysis.nvim`](https://github.com/StefanBartl/runtime-analysis.nvim)'s
+page — `:DocMap serve` reads [`runtime-analysis.nvim`](https://github.com/WKDSteve/runtime-analysis.nvim)'s
 own counts fresh on every open instead, the same on-demand shape the
 History tab already uses for the one other thing that cannot live in a
 static artifact.

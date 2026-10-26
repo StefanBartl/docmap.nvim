@@ -81,13 +81,13 @@ jobs:
       # one of the four places `scripts/test.sh` looks.
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/lib.nvim
+          repository: WKDSteve/lib.nvim
           path: .deps/lib.nvim
           ref: ci-verified
       # testing.nvim: the spec runner (`scripts/test.sh` runs it).
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/testing.nvim
+          repository: WKDSteve/testing.nvim
           path: .deps/testing.nvim
           ref: ci-verified
       # ui.nvim: editor/browse/init.lua requires ui.kit/ui.contextmenu
@@ -97,7 +97,7 @@ jobs:
       # `.testing.lua`.
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/ui.nvim
+          repository: WKDSteve/ui.nvim
           path: .deps/ui.nvim
           ref: ci-verified
       # Optional, unlike lib.nvim: `TESTS/browse_endpoints_spec.lua`'s `gs`
@@ -109,7 +109,7 @@ jobs:
       # `.deps/runtime-analysis.nvim` on the rtp.
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/runtime-analysis.nvim
+          repository: WKDSteve/runtime-analysis.nvim
           path: .deps/runtime-analysis.nvim
           ref: ci-verified
       - uses: rhysd/action-setup-vim@v1
@@ -193,7 +193,7 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/lib.nvim
+          repository: WKDSteve/lib.nvim
           path: .deps/lib.nvim
           ref: ci-verified
       # `.docmap.json` declares lib.nvim's checkout at `../lib.nvim`, and the
@@ -271,7 +271,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/lib.nvim
+          repository: WKDSteve/lib.nvim
           path: .deps/lib.nvim
           ref: ci-verified
       # The rules.nvim engine is run on both hosts by this gate (see
@@ -280,7 +280,7 @@ jobs:
       # the other dependencies, so a broken push there cannot turn this job red.
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/rules.nvim
+          repository: WKDSteve/rules.nvim
           path: .deps/rules.nvim
           ref: ci-verified
       - uses: leafo/gh-actions-lua@v13

@@ -14,7 +14,7 @@ reaches an existing map by *regenerating* it, never by updating the plugin
 alone.
 
 This repository maps itself with the same tool and publishes the result:
-**<https://stefanbartl.github.io/docmap.nvim/>**.
+**<https://wkdsteve.github.io/docmap.nvim/>**.
 [docs/map/overview.md](map/overview.md) is the same tree as Markdown,
 rendered straight on GitHub.
 
@@ -25,7 +25,7 @@ the machine that ran the scan, and say so when opened elsewhere. See
 [reuse.md § Linking to your own map from your README](reuse.md#linking-to-your-own-map-from-your-readme)
 to do the same in a plugin that depends on this one.
 
-It grew inside [lib.nvim](https://github.com/StefanBartl/lib.nvim) as
+It grew inside [lib.nvim](https://github.com/WKDSteve/lib.nvim) as
 `lib.nvim.docmap` and was extracted once it had nothing left to do with
 lib.nvim — see
 [pipeline.md § Why this is its own plugin](pipeline.md#why-this-is-its-own-plugin).
@@ -38,7 +38,7 @@ lib.nvim — see
 | `docs/map/overview.md` | The same tree as Markdown, so it renders on GitHub |
 | `docs/map/module_map.json` | The IR, byte-deterministic. What `--check` compares and what `:DocMap diff` reads out of old commits |
 | `docs/map/coverage.svg` | Optional (`opts.badge`): a doc-coverage badge, hand-rolled, no network call |
-| `docs/map/overview.pdf` | Optional (`opts.pdf`): the same content as `overview.md`, via [pdfport.nvim](https://github.com/StefanBartl/pdfport.nvim) |
+| `docs/map/overview.pdf` | Optional (`opts.pdf`): the same content as `overview.md`, via [pdfport.nvim](https://github.com/WKDSteve/pdfport.nvim) |
 
 **Every one of these is a snapshot of the version that wrote it.** The tour
 of what each tab shows, and why, is [tabs.md](tabs.md); how each one is
