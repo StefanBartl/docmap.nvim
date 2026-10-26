@@ -276,9 +276,13 @@ jobs:
           ref: ci-verified
       # The rules.nvim engine is run on both hosts by this gate (see
       # `GATES.standalone` in scripts/ci.lua), and CI must not skip it: the
-      # step fails when this checkout is missing. Pinned to `ci-verified` like
-      # the other dependencies, so a broken push there cannot turn this job red.
+      # step fails when this checkout is missing -- except here: rules.nvim is
+      # private now and this public repo has no token for it, so the checkout is
+      # allowed to fail and the gate prints a skip (RULES_NVIM_OPTIONAL). Run
+      # the engine gate locally (RULES_NVIM_DIR or a sibling checkout). Pinned
+      # to `ci-verified` like the other dependencies.
       - uses: actions/checkout@v5
+        continue-on-error: true
         with:
           repository: WKDSteve/rules.nvim
           path: .deps/rules.nvim
@@ -295,7 +299,9 @@ jobs:
         with:
           neovim: true
           version: stable
-      - run: |
+      - env:
+          RULES_NVIM_OPTIONAL: "1"
+        run: |
           exec > >(tee -a "$RUNNER_TEMP/test-output.log") 2>&1
           scripts/ci.sh standalone
       - uses: actions/upload-artifact@v7
