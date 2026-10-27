@@ -566,7 +566,7 @@ function GATES.standalone()
       fail("rules.nvim was not checked out to .deps/rules.nvim, and CI must not skip this step.")
     else
       skip(
-        "rules engine under the shim",
+        "rules engine and rules agent pipeline under the shim",
         "rules.nvim not found — set RULES_NVIM_DIR, clone it to .deps/rules.nvim, or put it beside this repo"
       )
     end
