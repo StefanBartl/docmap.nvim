@@ -597,6 +597,10 @@ end
 -- expensive checks only ever run on code that is already tidy.
 local ORDER = { "standalone" }
 
+---The exit code that says "a gate skipped itself" (`skip_exit` of the step in `.testing.lua`): `testing ci` then marks
+---the step `skipped` and the run partial, so a run in which a gate checked nothing is never a green proof.
+local SKIP_EXIT = 77
+
 local stage = (_G.arg or {})[1] or "all"
 
 if stage == "all" then
@@ -632,4 +636,10 @@ else
       table.concat(ORDER, ", ")
     )
   )
+end
+
+-- the last line says what was skipped (`testing ci` shows it as the reason), the exit code says that it was
+if #skipped > 0 then
+  say(("skipped: %s"):format(table.concat(skipped, ", ")))
+  vim.cmd("cq " .. SKIP_EXIT)
 end

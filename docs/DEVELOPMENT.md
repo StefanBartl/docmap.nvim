@@ -67,9 +67,11 @@ Two scripts remain shell, deliberately:
 
 The `standalone` gate runs the parser-less CLI build under a Lua that is **not**
 the LuaJIT Neovim embeds. It needs PUC Lua on `PATH` with `lfs` and `dkjson`;
-where it cannot find one it prints *skipped*, and the closing summary says so
-— `4 gates passed, 1 skipped: standalone`, plus the sentence that matters: *a
-skipped gate checked nothing.* The message names the interpreter it found, the
+where it cannot find one it prints *skipped* and exits `77`, the `skip_exit`
+of its step in `.testing.lua`. `testing ci` then marks the step `skipped` and
+the whole run **partial** (`standalone skipped itself`): exit `0`, but no
+`TESTING_CI_OK` and no proof for `testing ci verify`, because *a skipped gate
+checked nothing.* The message names the interpreter it found, the
 rock it could not load and the `luarocks install` line, because "no PUC Lua
 here" and "a PUC Lua that cannot load the rocks" are different problems.
 

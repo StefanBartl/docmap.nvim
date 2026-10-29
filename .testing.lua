@@ -88,16 +88,18 @@ return {
     default = "full",
     profiles = {
       fast = { "stylua", "luacheck" },
-      full = { "fast", "suite", "map", "standalone" },
+      full = { "fast", "suite", "conformance", "map", "standalone" },
     },
     steps = {
       -- `standalone` is in the list because it was not: the parser-less build sat outside the only gate that reads
       -- Lua for unused locals and undefined globals.
       luacheck = { preset = "luacheck", args = { "lua", "TESTS", "scripts", "standalone" } },
       map = { run = { "nvim", "--headless", "-l", "scripts/gen_map.lua", "--check" } },
-      -- the standalone build under a PUC Lua (not LuaJIT); skips, and counts the skip, without lfs and dkjson
+      -- the standalone build under a PUC Lua (not LuaJIT). Without lfs and dkjson (or without the rules.nvim engine
+      -- where that part is optional) it skips itself and exits 77: the step is `skipped`, the run partial, no proof
       standalone = {
         run = { "nvim", "-n", "-i", "NONE", "--headless", "-l", "scripts/ci.lua", "standalone" },
+        skip_exit = 77,
       },
     },
   },

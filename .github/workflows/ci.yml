@@ -1,9 +1,10 @@
-# Four jobs rather than one `scripts/ci.sh`, deliberately: they run in
+# Several jobs rather than one `scripts/ci.sh`, deliberately: they run in
 # parallel and each keeps its own red/green mark, which is what a CI matrix is
-# for. But WHAT each gate is lives in `scripts/ci.sh` and nowhere else — a
-# workflow spelling the commands out again would be a second copy of them, and
-# a second copy that drifts is what this repository exists to detect. Run all
-# four locally with `scripts/ci.sh`.
+# for. But WHAT each gate is lives in the `ci` section of `.testing.lua` (run by
+# testing.nvim's `testing ci` through the `scripts/ci.sh` shim) and nowhere
+# else — a workflow spelling the commands out again would be a second copy of
+# them, and a second copy that drifts is what this repository exists to detect.
+# Run them all locally with `scripts/ci.sh`.
 
 name: CI
 
@@ -23,8 +24,9 @@ jobs:
       - uses: actions/checkout@v5
       # The one gate that does not go through `scripts/ci.sh`: this action is
       # the installer AND the runner, so there is no binary on PATH to hand
-      # the script. `args` must therefore stay identical to what
-      # `run_stylua` does — the whole tree, not a list of directories.
+      # the script. `args` must therefore stay identical to the `stylua` step of
+      # `.testing.lua` (testing.nvim's preset: `stylua --check .`, the whole
+      # tree, not a list of directories).
       - uses: JohnnyMorganz/stylua-action@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -56,13 +58,10 @@ jobs:
           luaVersion: "5.4"
       - uses: leafo/gh-actions-luarocks@v6
       - run: luarocks install luacheck 1.2.0
-      # `scripts/ci.sh` is itself a Neovim Lua script launched via `nvim -l`
-      # (see scripts/ci.lua's own header) — that launcher requirement holds
-      # for every gate, including this one, even though the luacheck gate's
-      # own logic needs nothing Lua 5.4 + luarocks does not already provide.
-      # This job never installed Neovim, so `scripts/ci.sh luacheck` failed
-      # before ever reaching the actual luacheck run — every push to this
-      # repository failed this job for exactly that reason.
+      # `scripts/ci.sh` runs testing.nvim's `scripts/testing.lua` through
+      # `nvim -l`, so every job that calls it needs Neovim (and the testing.nvim
+      # and lib.nvim checkouts above), even though the luacheck gate itself
+      # needs nothing Lua 5.4 + luarocks does not already provide.
       - uses: rhysd/action-setup-vim@v1
         with:
           neovim: true
