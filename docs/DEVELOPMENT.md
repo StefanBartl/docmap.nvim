@@ -19,7 +19,7 @@ Pick whichever suits your tree. CI clones into `.deps/`.
 export LIB_NVIM_DIR=/path/to/lib.nvim
 ```
 
-## The five things CI runs
+## The six things CI runs
 
 ```bash
 scripts/ci.sh
@@ -36,7 +36,7 @@ nvim -n -i NONE --headless -u NONE -l /path/to/testing.nvim/scripts/testing.lua 
 That is all of them, in order, stopping at the first failure. One gate at a
 time by naming it — `scripts/ci.sh luacheck` (`tests` is the step `suite`) —
 which is also how `.github/workflows/ci.yml` calls it, one stage per job, so
-the five keep their independent red/green marks and their parallelism. A single
+the six keep their independent red/green marks and their parallelism. A single
 gate is a partial run: green for that gate only. `scripts/ci.sh --fast` runs
 stylua and luacheck.
 

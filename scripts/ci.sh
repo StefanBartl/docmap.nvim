@@ -7,6 +7,7 @@
 #   scripts/ci.sh stylua       one gate (a step of the `ci` section in .testing.lua)
 #   scripts/ci.sh luacheck
 #   scripts/ci.sh tests        the step `suite`
+#   scripts/ci.sh conformance
 #   scripts/ci.sh map
 #   scripts/ci.sh standalone
 #   scripts/ci.sh <options>    anything else goes to `testing ci` (--keep-going, --json=<file>, ...)
@@ -47,7 +48,7 @@ for a in "$@"; do
     --fast) args+=("--profile=fast") ;;
     all) ;;
     tests) args+=("--step=suite") ;;
-    stylua | luacheck | map | standalone) args+=("--step=$a") ;;
+    stylua | luacheck | conformance | map | standalone) args+=("--step=$a") ;;
     *) args+=("$a") ;;
   esac
 done

@@ -74,7 +74,7 @@ the question you arrived with. The four to reach for first:
 ### The rest
 
 - [Ecosystem](docs/ecosystem.md) — how this plugin, `runtime-analysis.nvim`, `mdview.nvim` and `docmap-desktop` fit together.
-- [Development](docs/DEVELOPMENT.md) — the toolchain, and the five things CI runs.
+- [Development](docs/DEVELOPMENT.md) — the toolchain, and the six things CI runs.
 - [Contributing](docs/CONTRIBUTING.md) — ground rules, project layout, and how to add a language backend.
 - [Feedback](https://github.com/WKDSteve/docmap.nvim/issues) — bugs, feature requests and usage questions.
 
