@@ -36,7 +36,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      # testing.nvim: `scripts/ci.sh` is a shim for `testing ci` and looks for it here.
+      # testing.nvim: `scripts/ci.sh` is a shim for `testing ci` and looks for it here; it needs lib.nvim itself.
+      - uses: actions/checkout@v5
+        with:
+          repository: WKDSteve/lib.nvim
+          path: .deps/lib.nvim
+          ref: ci-verified
       - uses: actions/checkout@v5
         with:
           repository: WKDSteve/testing.nvim
