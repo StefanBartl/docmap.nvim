@@ -2,32 +2,19 @@
 -- a fixture read, a uv handle -- this file must crash and name it. The nil
 -- guards LuaLS asks for below would hide the very failure it exists to report.
 ---@diagnostic disable: need-check-nil
--- scripts/ci.lua — every gate CI runs, as Lua rather than as shell.
+-- scripts/ci.lua — the `standalone` gate, as Lua rather than as shell.
 --
---   nvim --headless -l scripts/ci.lua              all five, stopping at the first failure
---   nvim --headless -l scripts/ci.lua stylua       one gate
---   nvim --headless -l scripts/ci.lua luacheck
---   nvim --headless -l scripts/ci.lua tests
---   nvim --headless -l scripts/ci.lua map
 --   nvim --headless -l scripts/ci.lua standalone
 --
--- Why this exists next to `ci.sh`: the plugin is cross-platform by
--- construction — no `io.popen`, no `os.execute`, `vim.system`/`vim.uv`/`vim.fs`
--- throughout — but its own tooling was not. `ci.sh` is bash and the pre-commit
--- hook is sh, so a Windows contributor's answer to "how do I run the checks"
--- was "install Git Bash". Neovim is already a hard requirement here; using it
--- as the script host costs nothing and removes that.
+-- The pipeline of this repository (stylua, luacheck, suite, map, standalone) is the `ci` section of
+-- `.testing.lua` and runs with `testing ci` (testing.nvim, docs/CI.md); `scripts/ci.sh` is a shim for it, and
+-- `.github/workflows/ci.yml` calls the shim, so the CI jobs keep their independent red/green marks and their
+-- parallelism while each command exists once. This file holds the one gate that has no preset: it needs a PUC Lua
+-- with `lfs` and `dkjson`, skips (and counts the skip) without one, and checks the standalone build.
 --
--- **What each gate is lives here and nowhere else.** `scripts/ci.sh` is now a
--- wrapper that calls this, and `.github/workflows/ci.yml` calls the wrapper —
--- so the CI jobs keep their independent red/green marks and their
--- parallelism while the commands themselves exist once. A second copy that
--- drifts is precisely the failure this repository exists to detect.
---
--- The one gate that cannot come through here is stylua under GitHub Actions:
--- the action is both the installer and the runner, so there is no binary on
--- PATH to hand a script. Its `args` must stay identical to `run_stylua` below
--- — the whole tree, not a list of directories.
+-- Why Lua and not shell: the plugin is cross-platform by construction — no `io.popen`, no `os.execute`,
+-- `vim.system`/`vim.uv`/`vim.fs` throughout. Neovim is already a hard requirement here; using it as the script host
+-- means a Windows contributor runs the same check without installing Git Bash.
 
 local root = vim.fn.getcwd():gsub("\\", "/"):gsub("/+$", "")
 
@@ -75,13 +62,6 @@ local function fail(msg)
   vim.cmd("cq 1")
 end
 
----@param exe string
-local function need(exe)
-  if vim.fn.executable(exe) == 0 then
-    fail(exe .. " is not on PATH.")
-  end
-end
-
 ---Run a command, streaming nothing but reporting everything.
 ---
 ---`vim.system(...):wait()` rather than `os.execute`: no shell, so no quoting
@@ -102,119 +82,7 @@ local function run(cmd, label)
   end
 end
 
----lib.nvim is a runtime dependency, and a headless `-l` run has no plugin
----manager to supply it. Resolved the same three ways `TESTS/run.lua` and
----`scripts/gen_map.lua` resolve it — checked here as well so the failure is one
----clear message instead of a Lua stack trace two stages in.
----@return boolean
-local function have_lib_nvim()
-  -- Built with explicit indices, not a `{a, b, c}` literal fed to `ipairs`:
-  -- `vim.env.LIB_NVIM_DIR` is `nil` on every run that does not set it —
-  -- the normal case, including every CI job today — and a table literal
-  -- with `nil` in its first slot makes `ipairs` stop immediately without
-  -- ever looking at the slots after it. That silently skipped the
-  -- `.deps/lib.nvim` candidate CI actually checks the dependency out to,
-  -- so this reported "not found" on every single CI run regardless of
-  -- whether the checkout succeeded.
-  local candidates = {}
-  if vim.env.LIB_NVIM_DIR and vim.env.LIB_NVIM_DIR ~= "" then
-    candidates[#candidates + 1] = vim.env.LIB_NVIM_DIR
-  end
-  candidates[#candidates + 1] = root .. "/.deps/lib.nvim"
-  candidates[#candidates + 1] = vim.fs.dirname(root) .. "/lib.nvim"
-  for _, d in ipairs(candidates) do
-    if vim.fn.isdirectory(d) == 1 then
-      return true
-    end
-  end
-  return false
-end
-
-local function need_lib_nvim()
-  if not have_lib_nvim() then
-    fail(
-      "lib.nvim not found. Set LIB_NVIM_DIR, clone it to .deps/lib.nvim, or put it beside this repo."
-    )
-  end
-end
-
 local GATES = {}
-
-function GATES.stylua()
-  step("stylua")
-  need("stylua")
-  -- The whole tree, not a list of directories. The list form silently skipped
-  -- docs/EXAMPLES/, which is how a file sat unformatted in it for as long as it
-  -- existed while every local run reported clean.
-  run({ "stylua", "--check", "." }, "stylua")
-end
-
-function GATES.luacheck()
-  step("luacheck")
-  need("luacheck")
-  -- `standalone` is in the list because it was not: the whole parser-less
-  -- build — `vim_shim.lua`, `docmap.lua`, `treesitter.lua` — sat outside the
-  -- only gate that reads Lua for unused locals and undefined globals, which
-  -- is precisely the tree that has already shipped a `nil` call twice.
-  run({ "luacheck", "lua", "TESTS", "scripts", "standalone" }, "luacheck")
-end
-
----testing.nvim is the spec runner. Looked up like the other dependencies:
----`$TESTING_NVIM_DIR`, `.deps/testing.nvim`, a sibling checkout. The runner resolves
----the dependencies named in `.testing.lua` itself.
----@return string|nil
-local function find_testing_nvim()
-  local candidates = {}
-  if vim.env.TESTING_NVIM_DIR and vim.env.TESTING_NVIM_DIR ~= "" then
-    candidates[#candidates + 1] = vim.env.TESTING_NVIM_DIR
-  end
-  candidates[#candidates + 1] = root .. "/.deps/testing.nvim"
-  candidates[#candidates + 1] = vim.fs.dirname(root) .. "/testing.nvim"
-  for _, d in ipairs(candidates) do
-    if vim.fn.filereadable(d .. "/scripts/testing.lua") == 1 then
-      return d
-    end
-  end
-  return nil
-end
-
-function GATES.tests()
-  step("tests")
-  need("nvim")
-  need_lib_nvim()
-  local testing = find_testing_nvim()
-  if not testing then
-    fail(
-      "testing.nvim not found. Set TESTING_NVIM_DIR, clone it to .deps/testing.nvim, "
-        .. "or put it beside this repo."
-    )
-    return
-  end
-  -- Same call as `scripts/test.sh` (which the CI `tests` job runs directly, to also write the
-  -- JSON result): `TESTS/run.lua` stays only as the order manifest the runner reads.
-  run({
-    "nvim",
-    "-n",
-    "-i",
-    "NONE",
-    "--headless",
-    "-u",
-    "NONE",
-    "-l",
-    testing .. "/scripts/testing.lua",
-    "run",
-    ".",
-    "--sentinel",
-    "DOCMAP_TESTS_OK",
-  }, "tests")
-end
-
-function GATES.map()
-  step("map --check")
-  need("nvim")
-  need_lib_nvim()
-  run({ "nvim", "--headless", "-l", "scripts/gen_map.lua", "--check" }, "map --check")
-end
 
 ---A PUC Lua that can actually run the standalone build, or nil.
 ---
@@ -727,7 +595,7 @@ end
 -- and the least interesting; a stale map is the most likely to be a real
 -- finding rather than a slip. Failing fast on the cheap one first means the
 -- expensive checks only ever run on code that is already tidy.
-local ORDER = { "stylua", "luacheck", "tests", "map", "standalone" }
+local ORDER = { "standalone" }
 
 local stage = (_G.arg or {})[1] or "all"
 

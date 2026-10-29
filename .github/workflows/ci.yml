@@ -36,6 +36,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+      # testing.nvim: `scripts/ci.sh` is a shim for `testing ci` and looks for it here.
+      - uses: actions/checkout@v5
+        with:
+          repository: WKDSteve/testing.nvim
+          path: .deps/testing.nvim
+          ref: ci-verified
       # PUC Lua, not "luajit-2.1": that value fails with a 404 (LuaJIT stopped
       # publishing the 2.1 tarball this action downloads). Which interpreter
       # runs luacheck is independent of what it checks against — `std = "luajit"`
@@ -273,6 +279,12 @@ jobs:
         with:
           repository: WKDSteve/lib.nvim
           path: .deps/lib.nvim
+          ref: ci-verified
+      # testing.nvim: `scripts/ci.sh` is a shim for `testing ci` and looks for it here.
+      - uses: actions/checkout@v5
+        with:
+          repository: WKDSteve/testing.nvim
+          path: .deps/testing.nvim
           ref: ci-verified
       # The rules.nvim engine is run on both hosts by this gate (see
       # `GATES.standalone` in scripts/ci.lua), and CI must not skip it: the

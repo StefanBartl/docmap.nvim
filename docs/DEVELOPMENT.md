@@ -25,30 +25,33 @@ export LIB_NVIM_DIR=/path/to/lib.nvim
 scripts/ci.sh
 ```
 
-Or, identically and without a POSIX shell:
+Or, identically and without a POSIX shell, with
+[testing.nvim](https://github.com/WKDSteve/testing.nvim) (found in
+`$TESTING_NVIM_DIR`, `.deps/testing.nvim` or beside this repo):
 
 ```bash
-nvim --headless -l scripts/ci.lua
+nvim -n -i NONE --headless -u NONE -l /path/to/testing.nvim/scripts/testing.lua ci
 ```
 
 That is all of them, in order, stopping at the first failure. One gate at a
-time by naming it — `scripts/ci.sh luacheck`, `nvim --headless -l
-scripts/ci.lua luacheck` — which is also how `.github/workflows/ci.yml` calls
-it, one stage per job, so the five keep their independent red/green marks and
-their parallelism.
+time by naming it — `scripts/ci.sh luacheck` (`tests` is the step `suite`) —
+which is also how `.github/workflows/ci.yml` calls it, one stage per job, so
+the five keep their independent red/green marks and their parallelism. A single
+gate is a partial run: green for that gate only. `scripts/ci.sh --fast` runs
+stylua and luacheck.
 
-**What each gate *is* lives in [`scripts/ci.lua`](../scripts/ci.lua) and
-nowhere else.** `ci.sh` is a three-line wrapper that picks the interpreter, and
-the workflow calls the wrapper. A workflow — or a second script — spelling the
+**What each gate *is* lives in the `ci` section of
+[`.testing.lua`](../.testing.lua) and nowhere else** (`testing ci`, see
+testing.nvim's `docs/CI.md`). `ci.sh` is a shim that finds testing.nvim, and the
+workflow calls the shim. A workflow — or a second script — spelling the
 commands out again would be a second copy of them, which is the drift this
-repository exists to detect.
+repository exists to detect. The one gate without a preset, `standalone`, is
+[`scripts/ci.lua`](../scripts/ci.lua).
 
-The Lua entry point is not a curiosity, it is the cross-platform answer. This
-plugin's own code is portable by construction (no `io.popen`, no `os.execute`,
-`vim.system`/`vim.uv`/`vim.fs` throughout), but its tooling was bash, so a
-Windows contributor's answer to "how do I run the checks" used to be "install
-Git Bash". Neovim is already a hard requirement here; using it as the script
-host costs nothing and removes that.
+`ci.lua` is Lua rather than shell because this plugin's own code is portable by
+construction (no `io.popen`, no `os.execute`, `vim.system`/`vim.uv`/`vim.fs`
+throughout): Neovim is already a hard requirement here, so using it as the
+script host means a Windows contributor needs no Git Bash for that gate.
 
 Two scripts remain shell, deliberately:
 
@@ -119,7 +122,7 @@ not until 2026-09-17, which meant the entire parser-less build sat outside the
 only gate that reads Lua for unused locals and undefined globals — the same
 tree that has shipped a call to a `nil` value twice.
 
-One gate cannot come through `ci.lua` in GitHub Actions: stylua's action is
+One gate cannot come through `scripts/ci.sh` in GitHub Actions: stylua's action is
 both the installer and the runner, so there is no binary on PATH to hand a
 script. Its `args` in the workflow must therefore stay identical to what the
 `stylua` gate does — the whole tree, not a list of directories.

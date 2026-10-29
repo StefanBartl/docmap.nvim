@@ -82,4 +82,23 @@ return {
       },
     },
   },
+  -- The pipeline `scripts/ci.sh` (a shim for `testing ci`) and the workflow jobs run. `scripts/ci.sh <gate>` runs one
+  -- step (`tests` is the step `suite`); `--fast` is the pre-push profile.
+  ci = {
+    default = "full",
+    profiles = {
+      fast = { "stylua", "luacheck" },
+      full = { "fast", "suite", "map", "standalone" },
+    },
+    steps = {
+      -- `standalone` is in the list because it was not: the parser-less build sat outside the only gate that reads
+      -- Lua for unused locals and undefined globals.
+      luacheck = { preset = "luacheck", args = { "lua", "TESTS", "scripts", "standalone" } },
+      map = { run = { "nvim", "--headless", "-l", "scripts/gen_map.lua", "--check" } },
+      -- the standalone build under a PUC Lua (not LuaJIT); skips, and counts the skip, without lfs and dkjson
+      standalone = {
+        run = { "nvim", "-n", "-i", "NONE", "--headless", "-l", "scripts/ci.lua", "standalone" },
+      },
+    },
+  },
 }
