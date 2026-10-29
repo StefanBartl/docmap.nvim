@@ -9875,6 +9875,21 @@ function M.render(ir, findings, opts)
     t[f.severity] = (t[f.severity] or 0) + 1
   end
 
+  -- Checks that skipped part of the tree because the language has no such
+  -- convention: shown beside the findings so a skip never reads as a pass.
+  -- Nothing is emitted for a tree that skipped none (Lua), keeping its page
+  -- byte-identical.
+  local na_html = ""
+  for _, na in ipairs(require("docmap.core.check").not_applicable(ir)) do
+    na_html = na_html
+      .. ('<p class="na">Not applicable: %s on %d node(s) (%s has no %s)</p>'):format(
+        esc(na.check),
+        na.count,
+        esc(table.concat(na.languages, ", ")),
+        esc(na.needs)
+      )
+  end
+
   local rows = {}
   for _, f in ipairs(findings) do
     -- data-node drives the click-to-select wiring in JS. Left off entirely
@@ -10188,7 +10203,9 @@ function M.render(ir, findings, opts)
     ')</summary><div class="wrap"><table>',
     "<thead><tr><th>Severity</th><th>Check</th><th>Message</th></tr></thead><tbody>",
     table.concat(rows),
-    "</tbody></table></div></details></div></div>",
+    "</tbody></table>",
+    na_html,
+    "</div></details></div></div>",
 
     -- The startup flamegraph, in a `<template>` so the browser parses it
     -- once at load and the Startup panel can clone it without a second

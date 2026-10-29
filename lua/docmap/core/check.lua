@@ -59,30 +59,101 @@ function M.expected_module(path, lua_root)
   return (rest:gsub("/", "."))
 end
 
---- Whether this node's language backend uses a `@module`-tag-shaped
---- authoring convention worth checking the absence of. Lua does — a Lua
---- module's canonical dotted name cannot be recovered from its file path
---- alone in general, which is the entire reason `expected_module`/
---- `module-path-mismatch` exist. A language whose module identity already
---- *is* its file path (JS/TS's ESM imports resolve by path, not by an
---- internal tag) has nothing to be missing, and firing an error-severity
---- finding on every such file would be a real regression the moment a
---- second backend without the convention exists — not a hypothetical one.
+---What each check needs from a language's documentation convention, declared
+---in one place. A check named here reports **not applicable** for a node
+---whose language lacks the convention, instead of passing silently: the skip
+---stays visible (`M.not_applicable`) and never reads as a clean result. The
+---values are the `Docmap.LangBackend` capability fields (`module_tag`,
+---`param_docs`), where an absent field means "the language has it".
 ---
---- Read through the registry, never a specific backend: the same rule
---- `layer-violation` enforces everywhere else in `core`.
+---A check missing from this table needs nothing language-specific.
+---@type table<string, "module_tag"|"param_docs">
+M.NEEDS = {
+  ["missing-module-tag"] = "module_tag",
+  ["undocumented-param"] = "param_docs",
+}
+
+---Whether the convention `need` exists for the language of `node`.
+---
+---Read through the registry, never a specific backend: the same rule
+---`layer-violation` enforces everywhere else in `core`. A node whose language
+---is unknown, or a backend that never states an opinion, keeps today's
+---behaviour (the check applies) rather than silently waiving it.
+---@param need "module_tag"|"param_docs"
+---@param node Docmap.Node
+---@return boolean
+local function node_has(need, node)
+  local registry = require("docmap.core.lang_registry")
+  local backend
+  if need == "module_tag" then
+    if not node.source then
+      return true
+    end
+    backend = registry.for_file(node.source:match("([^/]+)$") or node.source)
+  else
+    backend = node.language and registry.get(node.language)
+  end
+  return not backend or backend[need] ~= false
+end
+
+---Whether check `name` applies to `node`'s language.
+---@param name string Check identifier, a key of `M.NEEDS` or any other.
+---@param node Docmap.Node
+---@return boolean
+function M.applies(name, node)
+  local need = M.NEEDS[name]
+  return need == nil or node_has(need, node)
+end
+
 ---@param node Docmap.Node
 ---@return boolean
 local function wants_module_tag(node)
-  if not node.source then
-    return true
+  return M.applies("missing-module-tag", node)
+end
+
+---One check that skipped part of the tree because its convention is absent.
+---@class Docmap.NotApplicable
+---@field check string
+---@field needs string The `LangBackend` capability the check requires.
+---@field count integer Nodes the check did not apply to.
+---@field languages string[] Sorted language names of those nodes.
+
+---The checks that did not apply somewhere, counted. Empty for a tree whose
+---languages all have the conventions (Lua), so it adds nothing to such a
+---report. Kept apart from `M.run`'s findings: a skip is not a finding, and the
+---committed artifact must not change for a tree that skipped nothing new.
+---@param ir Docmap.IR
+---@return Docmap.NotApplicable[]
+function M.not_applicable(ir)
+  local by_check = {}
+  for _, id in ipairs(ir.order) do
+    local node = ir.nodes[id]
+    if node.kind ~= "namespace" then
+      for name, need in pairs(M.NEEDS) do
+        -- Per-parameter docs only matter for a node that has functions.
+        local relevant = need == "module_tag" or #(node.functions or {}) > 0
+        if relevant and not node_has(need, node) then
+          local e = by_check[name] or { check = name, needs = need, count = 0, seen = {} }
+          by_check[name] = e
+          e.count = e.count + 1
+          e.seen[node.language or "?"] = true
+        end
+      end
+    end
   end
-  local backend =
-    require("docmap.core.lang_registry").for_file(node.source:match("([^/]+)$") or node.source)
-  -- No backend found (or one that never states an opinion): preserve
-  -- today's behavior rather than silently waive the check on an unknown
-  -- shape of node.
-  return not backend or backend.module_tag ~= false
+  local out = {}
+  for _, e in pairs(by_check) do
+    local langs = {}
+    for lang in pairs(e.seen) do
+      langs[#langs + 1] = lang
+    end
+    table.sort(langs)
+    out[#out + 1] = { check = e.check, needs = e.needs, count = e.count, languages = langs }
+  end
+  table.sort(out, function(a, b)
+    return a.check < b.check
+  end)
+  return out
 end
 
 --- Every module and helper file should say what it is in one sentence — that
@@ -2008,8 +2079,7 @@ local function check_undocumented_params(ir, findings)
     -- skips a language whose identity is its path. Zig documents a
     -- declaration with one `///` block; an assembly label has no parameter
     -- list to name at all.
-    local params_documentable =
-      require("docmap.core.doccoverage").language_documents_params(node.language)
+    local params_documentable = M.applies("undocumented-param", node)
     for _, fn in ipairs(node.functions) do
       -- `@internal` says this is implementation, not published surface, so
       -- the documentation bar is the author's own. Nagging about it is how a

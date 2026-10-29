@@ -155,7 +155,6 @@ flowchart LR
   nlua_docmap_core_check_lua --> nlua_docmap_core_check_policy_lua
   nlua_docmap_core_check_lua --> nlua_docmap_core_consumers_lua
   nlua_docmap_core_check_lua --> nlua_docmap_core_deps_lua
-  nlua_docmap_core_check_lua --> nlua_docmap_core_doccoverage_lua
   nlua_docmap_core_check_lua --> nlua_docmap_core_docs_lua
   nlua_docmap_core_check_lua --> nlua_docmap_core_lang_registry_lua
   nlua_docmap_core_check_lua --> nlua_docmap_core_loaded_diff_lua
@@ -165,6 +164,7 @@ flowchart LR
   nlua_docmap_core_checklist_lua --> nlua_docmap_core_safe_fs_lua
   nlua_docmap_core_churn_lua --> nlua_docmap_core_telemetry_join_lua
   nlua_docmap_core_cli_lua --> nlua_docmap_core_artifact_lua
+  nlua_docmap_core_cli_lua --> nlua_docmap_core_check_lua
   nlua_docmap_core_cli_lua --> nlua_docmap_core_coverage_lua
   nlua_docmap_core_cli_lua --> nlua_docmap_core_diff_lua
   nlua_docmap_core_cli_lua --> nlua_docmap_core_doccoverage_lua
@@ -206,6 +206,7 @@ flowchart LR
   nlua_docmap_core_loaded_diff_lua --> nlua_docmap_core_check_lua
   nlua_docmap_core_loaded_diff_lua --> nlua_docmap_core_soft_require_lua
   nlua_docmap_core_quicks_lua --> nlua_docmap_core_doccoverage_lua
+  nlua_docmap_core_render --> nlua_docmap_core_check_lua
   nlua_docmap_core_render --> nlua_docmap_core_docs_lua
   nlua_docmap_core_render --> nlua_docmap_core_findings_lua
   nlua_docmap_core_render --> nlua_docmap_core_json_lua

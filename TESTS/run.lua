@@ -224,6 +224,7 @@ local specs = {
   "findings_spec.lua",
   "quicks_artifact_spec.lua",
   "check_overload_credit_spec.lua",
+  "check_applicability_spec.lua",
   "annotate_spec.lua",
   "markers_spec.lua",
   "scopes_spec.lua",

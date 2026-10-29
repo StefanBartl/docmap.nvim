@@ -116,6 +116,12 @@ them in prose and one of them states them wrong:
 - **Only `lua` sets `module_tag = true`.** Everywhere else the file path *is*
   the module identity, so `check.lua` never reports a missing `@module` for a
   language that has no such concept.
+  A skip is reported, not silent: `check.NEEDS` declares the capability each
+  check requires (`missing-module-tag` needs `module_tag`, `undocumented-param`
+  needs `param_docs`), and `check.not_applicable(ir)` counts the nodes a check
+  did not apply to. The CLI report prints a `not applicable:` line per check and
+  the page lists them under the drift findings; findings themselves (and so
+  `module_map.json` and SARIF) are unchanged.
 - **Six backends name a module file**, in four conventions: Lua's `init.lua`,
   the ECMA family's `index.{js,ts,tsx}`, Python's `__init__.py` and Rust's
   `mod.rs`. Everywhere else a directory is a namespace and every file is its
