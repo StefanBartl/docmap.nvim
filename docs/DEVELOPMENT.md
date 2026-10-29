@@ -36,8 +36,9 @@ nvim -n -i NONE --headless -u NONE -l /path/to/testing.nvim/scripts/testing.lua 
 That is all of them, in order, stopping at the first failure. One gate at a
 time by naming it — `scripts/ci.sh luacheck` (`tests` is the step `suite`) —
 which is also how `.github/workflows/ci.yml` calls it, one stage per job, so
-the six keep their independent red/green marks and their parallelism. A single
-gate is a partial run: green for that gate only. `scripts/ci.sh --fast` runs
+five of them keep their independent red/green marks and their parallelism (the
+conformance gate runs inside the `tests` job, after the specs). A single gate
+is a partial run: green for that gate only. `scripts/ci.sh --fast` runs
 stylua and luacheck.
 
 **What each gate *is* lives in the `ci` section of
