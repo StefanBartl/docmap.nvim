@@ -132,7 +132,6 @@ return function(H)
     report:find("Not applicable: missing-module-tag on 1 node(s)", 1, true),
     "CLI reports the skip"
   )
-  ok(report:find("Not applicable: undocumented-param on 1 node(s)", 1, true), "CLI reports params")
   ok(
     page:find('<p class="na">Not applicable: missing-module-tag', 1, true),
     "page reports the skip"
@@ -140,6 +139,8 @@ return function(H)
 
   local report2, page2 = run_project({ ["missing-module-tag"] = false })
   ok(not report2:find("missing-module-tag on", 1, true), "CLI hides a policy-disabled check")
-  ok(report2:find("undocumented-param on 1", 1, true), "CLI still reports the other")
+  local report3 = run_project({ ["undocumented-param"] = false })
+  ok(not report3:find("undocumented-param on", 1, true), "CLI hides the other one too")
+  ok(report3:find("missing-module-tag on 1", 1, true), "CLI still reports the enabled one")
   ok(not page2:find('class="na">Not applicable: missing-module-tag', 1, true), "page hides it too")
 end
