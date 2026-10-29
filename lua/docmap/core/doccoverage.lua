@@ -45,11 +45,8 @@ local M = {}
 ---@param language string? From `Docmap.Node.language`; `nil` for a namespace.
 ---@return boolean
 function M.language_documents_params(language)
-  if not language then
-    return true
-  end
-  local backend = require("docmap.core.lang_registry").get(language)
-  return not backend or backend.param_docs ~= false
+  -- One source of truth: the declaration in `check.NEEDS`.
+  return require("docmap.core.check").applies("undocumented-param", { language = language })
 end
 
 ---True when `fn`'s declared parameters are fully and correctly documented:

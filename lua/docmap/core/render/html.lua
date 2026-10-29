@@ -9880,13 +9880,10 @@ function M.render(ir, findings, opts)
   -- Nothing is emitted for a tree that skipped none (Lua), keeping its page
   -- byte-identical.
   local na_html = ""
-  for _, na in ipairs(require("docmap.core.check").not_applicable(ir)) do
+  for _, na in ipairs(require("docmap.core.check").not_applicable(ir, opts)) do
     na_html = na_html
-      .. ('<p class="na">Not applicable: %s on %d node(s) (%s has no %s)</p>'):format(
-        esc(na.check),
-        na.count,
-        esc(table.concat(na.languages, ", ")),
-        esc(na.needs)
+      .. ('<p class="na">%s</p>'):format(
+        esc(require("docmap.core.findings").format_not_applicable(na))
       )
   end
 

@@ -873,6 +873,10 @@ puts the functions behind that number straight into this tab.
 Generic checks, run against any annotated Lua tree:
 
     missing-module-tag    error  A source file with no ---@module.
+                                 Not applicable (and listed as such in the
+                                 report) where the language has no module
+                                 tag; so is undocumented-param where it has
+                                 no per-parameter docs.
     module-path-mismatch  error  Declared @module differs from where the file
                                  lives — copy-pasted or stale headers.
     missing-summary       warn   @module present but no description line.

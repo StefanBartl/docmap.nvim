@@ -164,4 +164,22 @@ function M.format(finding)
   return interpolate(template, finding.params)
 end
 
+---Catalog entry for a check that skipped nodes because their language lacks
+---the convention it needs (`check.not_applicable`). Plural-neutral on purpose:
+---`{languages}` is a list.
+M.NOT_APPLICABLE = "Not applicable: {check} on {count} node(s); no {needs} in {languages}"
+
+---Render one `Docmap.NotApplicable` as a sentence, for the CLI report and the
+---page alike.
+---@param na Docmap.NotApplicable
+---@return string
+function M.format_not_applicable(na)
+  return interpolate(M.NOT_APPLICABLE, {
+    check = na.check,
+    count = na.count,
+    needs = na.needs,
+    languages = table.concat(na.languages, ", "),
+  })
+end
+
 return M

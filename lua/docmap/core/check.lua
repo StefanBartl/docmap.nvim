@@ -105,12 +105,6 @@ function M.applies(name, node)
   return need == nil or node_has(need, node)
 end
 
----@param node Docmap.Node
----@return boolean
-local function wants_module_tag(node)
-  return M.applies("missing-module-tag", node)
-end
-
 ---One check that skipped part of the tree because its convention is absent.
 ---@class Docmap.NotApplicable
 ---@field check string
@@ -122,16 +116,23 @@ end
 ---languages all have the conventions (Lua), so it adds nothing to such a
 ---report. Kept apart from `M.run`'s findings: a skip is not a finding, and the
 ---committed artifact must not change for a tree that skipped nothing new.
+---
+---A check switched off by `opts.checks` (`= false`) never ran, so it skipped
+---nothing and is not listed: "not applicable" is about the language, not about
+---policy.
 ---@param ir Docmap.IR
+---@param opts Docmap.Opts? Reads `checks`; omitted, every check counts as on.
 ---@return Docmap.NotApplicable[]
-function M.not_applicable(ir)
+function M.not_applicable(ir, opts)
+  local policy = opts and opts.checks or {}
   local by_check = {}
   for _, id in ipairs(ir.order) do
     local node = ir.nodes[id]
     if node.kind ~= "namespace" then
       for name, need in pairs(M.NEEDS) do
         -- Per-parameter docs only matter for a node that has functions.
-        local relevant = need == "module_tag" or #(node.functions or {}) > 0
+        local relevant = policy[name] ~= false
+          and (need == "module_tag" or #(node.functions or {}) > 0)
         if relevant and not node_has(need, node) then
           local e = by_check[name] or { check = name, needs = need, count = 0, seen = {} }
           by_check[name] = e
@@ -164,7 +165,7 @@ local function check_summaries(ir, findings)
   for _, id in ipairs(ir.order) do
     local node = ir.nodes[id]
     if node.kind ~= "namespace" then
-      if wants_module_tag(node) and not node.module then
+      if M.applies("missing-module-tag", node) and not node.module then
         add(findings, "error", "missing-module-tag", id, { file = node.source or id })
       elseif node.summary == "" then
         add(findings, "warn", "missing-summary", id, { file = node.source or id })

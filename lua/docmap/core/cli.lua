@@ -32,8 +32,9 @@ local REFUSED = 2
 
 ---@param findings Docmap.Finding[]
 ---@param ir Docmap.IR? When given, the checks that did not apply are listed.
+---@param opts Docmap.Opts? Its `checks` policy hides checks switched off.
 ---@return table<Docmap.Severity, integer>
-local function report(findings, ir)
+local function report(findings, ir, opts)
   local docmap = require("docmap")
   local tally = docmap.tally(findings)
   for _, f in ipairs(findings) do
@@ -47,15 +48,8 @@ local function report(findings, ir)
     ("\n%d errors, %d warnings, %d info\n"):format(tally.error, tally.warn, tally.info)
   )
   -- A skipped check is not a pass: say so, with how many nodes it skipped.
-  for _, na in ipairs(ir and require("docmap.core.check").not_applicable(ir) or {}) do
-    io.stdout:write(
-      ("not applicable: %s on %d node(s) (%s has no %s)\n"):format(
-        na.check,
-        na.count,
-        table.concat(na.languages, ", "),
-        na.needs
-      )
-    )
+  for _, na in ipairs(ir and require("docmap.core.check").not_applicable(ir, opts) or {}) do
+    io.stdout:write(require("docmap.core.findings").format_not_applicable(na) .. "\n")
   end
   return tally
 end
@@ -560,12 +554,12 @@ function M.run(opts, argv)
       io.stderr:write(
         "\nRun :DocMap (or nvim --headless -l scripts/gen_map.lua) and commit the result.\n\n"
       )
-      report(findings, ir)
+      report(findings, ir, opts)
       return 1
     end
 
     write_sarif(sarif_path, ir, findings, opts)
-    local tally = report(findings, ir)
+    local tally = report(findings, ir, opts)
 
     if tally.error > 0 then
       if strict then
@@ -731,7 +725,7 @@ function M.run(opts, argv)
     )
   end
   write_sarif(sarif_path, ir, findings, opts)
-  local tally = report(findings, ir)
+  local tally = report(findings, ir, opts)
   return (strict and tally.error > 0) and 1 or 0
 end
 

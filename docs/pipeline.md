@@ -2276,13 +2276,23 @@ The rendered map is the visible half; the checks are the half that catches
 bugs.
 
 **Two of them are gated on what the language can express**, and the gate is
-the backend's own answer rather than a list kept here. `missing-module-tag`
-is silent wherever `module_tag = false` — twenty-two of the twenty-three
-backends, because the file's path already is its module identity and nothing
-tag-shaped can be "missing". `undocumented-param` and `param-name-mismatch`
-are silent wherever `param_docs = false` — nine backends, from an assembly
-label that has no parameter list to Go, which has parameters and documents
-them nowhere. In both cases the reasoning is the same: **a check that reports
+the backend's own answer rather than a list kept here, declared once in
+`check.NEEDS`: `missing-module-tag` needs `module_tag` (twenty-two of the
+twenty-three backends have `module_tag = false`, because the file's path
+already is its module identity and nothing tag-shaped can be "missing") and
+`undocumented-param` needs `param_docs` (nine backends have `param_docs =
+false`, from an assembly label that has no parameter list to Go, which has
+parameters and documents them nowhere). Doc coverage reads the same
+declaration. `param-name-mismatch` is not declared there: it is quiet for those
+languages only because their functions carry no `@param` lines to compare.
+
+**A skip is reported, not silent.** The CLI report and the page list each check
+that skipped nodes, counted (`Not applicable: missing-module-tag on 4 node(s);
+no module_tag in js, ts, zig`), so a tree is never read as clean for a check
+that did not run on it. A check switched off by `checks = { [...] = false }`
+did not skip anything and is not listed. A Lua-only tree lists nothing. It is
+not a finding: the findings, SARIF and `module_map.json` are unchanged. In
+both cases the reasoning is the same: **a check that reports
 the absence of something the language cannot have produces a wrong number,
 not a low one.** See [`languages.md`](languages.md) for which backend answers
 which.
