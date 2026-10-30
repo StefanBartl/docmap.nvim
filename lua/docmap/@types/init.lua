@@ -487,7 +487,7 @@
 ---@field member string? Trailing field access, as in `local x = require("y").z`.
 ---@field names table<string, string>? Bare names this import binds, mapped to the member each refers to — `import { a, b as c }` gives `{ a = "a", c = "b" }`. JS binds an imported function directly into scope, so a call to it looks like a file-local one and has nothing for the alias-then-member model to resolve through; this is what `calls.lua` matches a bare callee against. Absent for every shape that binds no such name, including a *default* import, which names the default export rather than the module object.
 ---@field deferred boolean? The call sits inside a function body — a lazy load, not a load-time dependency.
----@field fallback Docmap.RawRequireFallback? The second reading of an ambiguous import, taken only when `module` resolves to nothing in the tree. Python's `from . import a` is the submodule `./a` or, when no such file exists, the attribute `a` of the package's `__init__.py`. See `deps.resolve_require`.
+---@field fallback Docmap.RawRequireFallback? The second reading of an ambiguous import, taken only when `module` resolves to nothing in the tree. Python's `from . import a` is the submodule `./a` or, when no such file exists, the attribute `a` of the package's `__init__.py` -- emitted as the module `./__init__`, so it resolves only where that file exists (never to a namespace package's bare directory) and also for a package that is the scan root. See `deps.resolve_require`.
 ---@field line integer
 
 ---The reading a `Docmap.RawRequire` falls back to when its own `module` names

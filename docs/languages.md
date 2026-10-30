@@ -452,7 +452,10 @@ saying so is the point:
   receiver of unknown type and stays unresolved). **Imports bind names**:
   `from .helper import double`, `triple as t`, `from . import helper` and
   `import os` fill `RawRequire.names` and `alias`, so a call through them is
-  an exact edge, or a `calls_external` entry for an absolute import. Not
+  an exact edge, or a `calls_external` entry for an absolute import.
+  `from . import a` with no file `./a` binds `a` from the package's
+  `__init__.py` instead, as Python does (`RawRequire.fallback`); a namespace
+  package, having no `__init__.py`, keeps `./a` as an external require. Not
   resolved, on purpose: inherited methods and `super()`, `Thing()` as a call
   to `__init__`. Measured against `psf/requests` (`611c616`): 171 call edges
   over 20 modules; a hand count of `api.py` found 7 of 7, and of the `self.`

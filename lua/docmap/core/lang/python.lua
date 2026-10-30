@@ -732,6 +732,14 @@ end
 ---emitted: the submodule as the entry, the package attribute as its
 ---`fallback`, which `deps.resolve_require` takes only when `./a` names no
 ---file -- one require edge either way, never two.
+---
+---**The fallback names the `__init__` file, not the directory.** `./` would
+---resolve to the package's directory node, which exists for a namespace
+---package (no `__init__.py`, so no attribute to bind) as much as for a real
+---one, and resolves to nothing at all for the scan root itself (`source =
+---"."`, a repository that is the package), whose relative path is empty.
+---`./__init__` resolves exactly when the package has the file, to the
+---package node in both layouts.
 ---@return { module: string, alias: string?, names: table<string, string>?, fallback: Docmap.RawRequireFallback? }[]
 local function import_entries(node, src)
   local kind = node:type()
@@ -797,7 +805,7 @@ local function import_entries(node, src)
       out[#out + 1] = {
         module = base .. (text:gsub("%.", "/")),
         alias = localname,
-        fallback = { module = base, names = { [localname] = text } },
+        fallback = { module = base .. "__init__", names = { [localname] = text } },
       }
     end
   end

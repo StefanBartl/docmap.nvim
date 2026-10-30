@@ -151,6 +151,41 @@ return function(H)
     ok(not mod:find("^%.%.?/"), "python_calls: ...nor an external require: " .. mod)
   end
 
+  -- The fallback names the package's `__init__` *file*, not its directory:
+  -- a repository that is the package itself (`source = "."`, root id `.`)
+  -- is reached, and a namespace package (a directory with no `__init__.py`)
+  -- has no attribute to fall back to, so its missing submodule stays an
+  -- external require instead of a require edge to the bare directory.
+  do
+    local proot = (vim.fn.getcwd():gsub("\\", "/")) .. "/TESTS/fixtures/pyroot"
+    local pir = require("docmap.core.scan").scan(require("docmap.config").build(proot))
+    local pcalls, prequires = {}, {}
+    for _, e in ipairs(pir.edges or {}) do
+      if e.kind == "call" then
+        pcalls[e.from .. "#" .. e.from_fn .. ">" .. e.to .. "#" .. e.to_fn] = true
+      elseif e.kind == "require" then
+        prequires[e.from .. ">" .. e.to] = true
+      end
+    end
+    ok(
+      pcalls["./consumer.py#use_tool>.#tool"],
+      "python_calls: from . import tool in a root package"
+    )
+    ok(prequires["./consumer.py>."], "python_calls: ...requires the root package node")
+    ok(
+      pcalls["./ns/leaf.py#leaf>.#tool"],
+      "python_calls: from .. import tool up to the root package"
+    )
+    ok(
+      not prequires["./ns/mod.py>./ns"],
+      "python_calls: a namespace directory is no package to fall back to"
+    )
+    ok(
+      vim.tbl_contains(pir.nodes["./ns/mod.py"].requires_external, "./gone"),
+      "python_calls: ...so its missing submodule stays an external require"
+    )
+  end
+
   -- The negatives the scope rules exist for.
   for key in pairs(calls) do
     ok(not key:find("#not_a_method>", 1, true), "python_calls: a bare go() never reaches Box.go")
