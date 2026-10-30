@@ -126,6 +126,61 @@ return function(H)
     eq(ext[1].member, "Ext.run", "named import from outside the tree: the member path `Ext.run`")
   end
 
+  -- Parser-free: `calls_heuristic` guesses a bare name only when the whole
+  -- tree declares it once, and a method of a `methods_need_receiver` language
+  -- is never a declaration of its bare name. So a bare `go()` must not guess
+  -- the method `Box.go`, and the method `Widget.run` must not make the one
+  -- free function `run` ambiguous.
+  do
+    local ir = {
+      order = { "./m.py", "./n.py", "./u.py" },
+      nodes = {
+        ["./m.py"] = {
+          id = "./m.py",
+          path = "./m.py",
+          source = "./m.py",
+          module = "m",
+          language = "python",
+          functions = {
+            { name = "Box.go", owner = "Box" },
+            { name = "Widget.run", owner = "Widget" },
+          },
+          requires_raw = {},
+          calls_raw = {},
+        },
+        ["./n.py"] = {
+          id = "./n.py",
+          path = "./n.py",
+          source = "./n.py",
+          module = "n",
+          language = "python",
+          functions = { { name = "run" } },
+          requires_raw = {},
+          calls_raw = {},
+        },
+        ["./u.py"] = {
+          id = "./u.py",
+          path = "./u.py",
+          source = "./u.py",
+          module = "u",
+          language = "python",
+          functions = { { name = "caller" } },
+          requires_raw = {},
+          calls_raw = {
+            { callee = "go", from_fn = "caller", line = 1 },
+            { callee = "run", from_fn = "caller", line = 2 },
+          },
+        },
+      },
+      edges = {},
+    }
+    local added = require("docmap.core.calls").build(ir, { calls_heuristic = true })
+    eq(#added, 1, "heuristic: a bare call never guesses a method, only the free function")
+    eq(added[1].to, "./n.py", "heuristic: a method does not make the free `run` ambiguous")
+    eq(added[1].to_fn, "run")
+    eq(added[1].confidence, "heuristic")
+  end
+
   local explicit = os.getenv("DOCMAP_PYTHON_PARSER")
   local ok_add, has_python
   if explicit and explicit ~= "" then

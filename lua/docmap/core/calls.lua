@@ -344,10 +344,16 @@ function M.build(ir, opts)
   if opts.calls_heuristic then
     local count = {}
     for _, id in ipairs(ir.order) do
+      -- A method of a `methods_need_receiver` language is never reached by
+      -- its bare name, so it is neither a guess for a bare call nor a second
+      -- declaration that makes a real free function ambiguous.
+      local skip_methods = index[id].receiver_only
       for _, fn in ipairs(ir.nodes[id].functions) do
-        local b = bare(fn.name)
-        count[b] = (count[b] or 0) + 1
-        unique_bare[b] = { node = id, fn = fn.name }
+        if not (skip_methods and fn.owner) then
+          local b = bare(fn.name)
+          count[b] = (count[b] or 0) + 1
+          unique_bare[b] = { node = id, fn = fn.name }
+        end
       end
     end
     for b, n in pairs(count) do
