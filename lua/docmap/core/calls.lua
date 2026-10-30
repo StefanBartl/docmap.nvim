@@ -447,6 +447,22 @@ function M.build(ir, opts)
             or (not index[id].receiver_only and index[id].by_name[bare(rest)] or nil)
           to_id = to_fn and id or nil
           confidence = "exact"
+        elseif head and imports[head] and imports[head].node then
+          -- `from .m import Cls; Cls.method()`: the head is a name a named
+          -- import bound, not a module, so the callee is `<member>.<rest>`
+          -- in the module it came from. Its declared name only, no bare
+          -- fallback: `Cls.go` must not land on a module-level `go`. Checked
+          -- after this file's own prefixes so a local class shadows it.
+          local target = imports[head].node
+          to_fn = index[target].by_name[imports[head].member .. "." .. rest]
+          to_id = to_fn and target or nil
+          confidence = "exact"
+        elseif head and imports[head] and imports[head].external then
+          record_external_call(
+            calls_external_acc,
+            imports[head].external,
+            imports[head].member .. "." .. rest
+          )
         elseif call.callee:find("::", 1, true) and not call.callee:find("[^%w_%-:]") then
           -- A `::` path (Rust): the longest prefix that is a module of the
           -- map, the rest being the function's declared name there. The

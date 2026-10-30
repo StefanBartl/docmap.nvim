@@ -18,9 +18,11 @@
 --               Box.by_class -> Box.size (Box.)                           7
 --   sub/deep.py deep -> double, deep -> triple                            2
 --   consumer.py use_tool -> tool (`from . import tool`, a def of
---               `__init__.py` rather than a submodule)                    1
+--               `__init__.py` rather than a submodule),
+--               use_class -> Thing.go (`from .helper import Thing`),
+--               use_own_class -> Kit.make (`from . import Kit`)           3
 --                                                                        --
---                                                                        12
+--                                                                        14
 --
 -- Not edges, on purpose: `go()` in `not_a_method` (a bare name never reaches
 -- `Box.go`), `self.attr.go()`, `super().go()` and `os.path.join` (outside).
@@ -76,6 +78,54 @@ return function(H)
     eq(added[1].to_fn, "Box.go", "python: `Box.go()` reaches the method by its declared name")
   end
 
+  -- Parser-free too: a dotted callee whose head a named import bound (not a
+  -- module alias). Inside the tree it names `<member>.<rest>` declared there,
+  -- with no bare fallback to a module-level `go`; outside the tree it is an
+  -- external call of that member path.
+  do
+    local ir = {
+      order = { "./m.py", "./u.py" },
+      nodes = {
+        ["./m.py"] = {
+          id = "./m.py",
+          path = "./m.py",
+          source = "./m.py",
+          module = "m",
+          language = "python",
+          functions = { { name = "Cls.method", owner = "Cls" }, { name = "go" } },
+          requires_raw = {},
+          calls_raw = {},
+        },
+        ["./u.py"] = {
+          id = "./u.py",
+          path = "./u.py",
+          source = "./u.py",
+          module = "u",
+          language = "python",
+          functions = { { name = "caller" } },
+          requires_raw = {
+            { module = "m", names = { Cls = "Cls" } },
+            { module = "extlib", names = { Ext = "Ext" } },
+          },
+          calls_raw = {
+            { callee = "Cls.method", from_fn = "caller", line = 1 },
+            { callee = "Cls.go", from_fn = "caller", line = 2 },
+            { callee = "Ext.run", from_fn = "caller", line = 3 },
+          },
+        },
+      },
+      edges = {},
+    }
+    local added = require("docmap.core.calls").build(ir, {})
+    eq(#added, 1, "named import: only the declared method resolves")
+    eq(added[1].to, "./m.py")
+    eq(added[1].to_fn, "Cls.method", "named import: `Cls.method()` reaches m's Cls.method")
+    local ext = ir.nodes["./u.py"].calls_external
+    eq(#ext, 1, "named import from outside the tree: one external call")
+    eq(ext[1].module, "extlib")
+    eq(ext[1].member, "Ext.run", "named import from outside the tree: the member path `Ext.run`")
+  end
+
   local explicit = os.getenv("DOCMAP_PYTHON_PARSER")
   local ok_add, has_python
   if explicit and explicit ~= "" then
@@ -110,7 +160,7 @@ return function(H)
     return calls[from .. "#" .. from_fn .. ">" .. to .. "#" .. to_fn]
   end
 
-  eq(n, 12, "python_calls: exactly the twelve edges counted by hand")
+  eq(n, 14, "python_calls: exactly the fourteen edges counted by hand")
 
   -- `self.` and `cls.` are the enclosing class: rewritten, not guessed.
   ok(edge(helper, "Thing.go", helper, "Thing.step"), "python_calls: self.step() is Thing.step")
@@ -141,6 +191,17 @@ return function(H)
     "python_calls: from . import tool binds the package's own def when ./tool is no file"
   )
   ok(requires[consumer .. ">./pkg"], "python_calls: ...and requires the package node, once")
+  -- A class a named import bound is a dotted callee whose head is no module:
+  -- `Thing.go()` names `Thing.go` in the module the name came from, exactly
+  -- as `helper.Thing.go()` does through the module binding.
+  ok(
+    edge(consumer, "use_class", helper, "Thing.go"),
+    "python_calls: from .helper import Thing; Thing.go() reaches the method"
+  )
+  ok(
+    edge(consumer, "use_own_class", "./pkg", "Kit.make"),
+    "python_calls: from . import Kit; Kit.make() reaches the method in __init__.py"
+  )
   for _, c in ipairs(ir.nodes[consumer].calls_external or {}) do
     ok(
       not c.module:find("^%.%.?/"),
