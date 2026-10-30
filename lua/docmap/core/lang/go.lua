@@ -455,19 +455,22 @@ function M.scan_file(path)
     if not decl then
       return nil
     end
+    -- `Widget`, `*Widget`, `Stack[T]` and `*Stack[T]`. The star wraps the
+    -- generic type, so a pointer's `type_identifier` is one level further
+    -- down there: reading only the pointer's direct child left the most
+    -- common generic receiver ownerless, a free `Push` that took every bare
+    -- `Push()` of its package despite `methods_need_receiver`.
     for child in decl:iter_children() do
-      local kind = child:type()
+      local ty = child
+      if ty:type() == "pointer_type" then
+        ty = child_of(ty, "generic_type") or ty
+      end
+      local kind = ty:type()
       if kind == "type_identifier" then
-        return text_of(child, src)
+        return text_of(ty, src)
       end
-      if kind == "pointer_type" then
-        local inner = child_of(child, "type_identifier")
-        if inner then
-          return text_of(inner, src)
-        end
-      end
-      if kind == "generic_type" then
-        local inner = child_of(child, "type_identifier")
+      if kind == "pointer_type" or kind == "generic_type" then
+        local inner = child_of(ty, "type_identifier")
         if inner then
           return text_of(inner, src)
         end

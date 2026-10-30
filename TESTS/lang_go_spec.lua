@@ -102,6 +102,12 @@ return function(H)
     "",
     "func (w Widget) hidden() {}",
     "",
+    "type Stack[T any] struct{}",
+    "",
+    "func (s Stack[T]) Len() int { return 0 }",
+    "",
+    "func (s *Stack[T]) Push(v T) {}",
+    "",
   }, "\n"))
 
   -- ---------------------------------------------------------------------
@@ -148,6 +154,12 @@ return function(H)
   eq(by["Thinger.Go"].summary, "Go does it.")
   eq(by["Thinger.Go"].signature, "Thinger.Go(n)")
   eq(by["Thinger.hidden"].internal, true, "and capitalisation decides there too")
+
+  -- A generic receiver keeps its owner, with or without the star: in
+  -- `*Stack[T]` the type name sits one level below the pointer.
+  eq(by["Stack.Len"] and by["Stack.Len"].owner, "Stack", "a `Stack[T]` receiver owns its method")
+  eq(by["Stack.Push"] and by["Stack.Push"].owner, "Stack", "and so does a `*Stack[T]` receiver")
+  eq(by["Push"], nil, "a pointer-generic method is not a free function")
 
   -- `x, y int` is one declaration with two names — a shape no other language
   -- here has.

@@ -13,3 +13,17 @@ func (w Widget) Go() int {
 func Run() int {
 	return Go()
 }
+
+// Stack is generic, and its pointer receiver `*Stack[T]` nests the type
+// name one level deeper than `*Widget` does.
+type Stack[T any] struct{}
+
+// Push is a method all the same: a bare `Push()` never reaches it.
+func (s *Stack[T]) Push() int {
+	return 0
+}
+
+// Fill calls the bare name `Push`, the package-level `func Push` of launch.go.
+func Fill() int {
+	return Push()
+}

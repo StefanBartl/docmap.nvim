@@ -125,4 +125,12 @@ return function(H)
   ok(run, "go_calls: a bare call named like a method of its file still resolves")
   eq(run.to, "./launch.go", "go_calls: ...to the sibling's package-level func, not the method")
   eq(run.to_fn, "Go")
+
+  -- The same for a pointer to a generic receiver, `*Stack[T]`, where the star
+  -- wraps the generic type. Its method was read with no owner at all, a free
+  -- `Push` that `methods_need_receiver` could not tell from a function.
+  local fill = calls["./method.go#Fill"]
+  ok(fill, "go_calls: a bare call named like a `*Stack[T]` method still resolves")
+  eq(fill.to, "./launch.go", "go_calls: ...to the sibling's package-level func, not the method")
+  eq(fill.to_fn, "Push")
 end

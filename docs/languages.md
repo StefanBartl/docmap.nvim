@@ -432,7 +432,8 @@ saying so is the point:
   the package index the method made a real `func Go` of a sibling file
   ambiguous. Rechecked on `aws/smithy-go` (2026-10-30, `37210e1`): 1039 call
   edges before, 1028 after; the 11 that pointed at a method from a bare call
-  are gone, none was right.
+  are gone, none was right. A pointer to a generic receiver (`*Stack[T]`)
+  owns its method too; it used to be read as a free function `Push`.
 
   **A qualified `other.Bump` still does not resolve**, and that is a stated
   limit rather than an oversight: a Go import path is absolute against the
