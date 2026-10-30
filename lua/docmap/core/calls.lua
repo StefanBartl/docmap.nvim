@@ -253,9 +253,15 @@ end
 ---is never called that way — `w.Go(...)` names a variable, which nothing
 ---here can resolve without a receiver-type model — so indexing the
 ---qualified form would add a key no call site can produce.
+---
+---**A method of a `methods_need_receiver` language is not indexed at all.**
+---Its bare name is no more reachable from a sibling file than from its own:
+---a bare `Go()` never names `Widget.Go`. Indexing it would also turn a real
+---package-level `func Go` in another sibling ambiguous and drop that edge.
 ---@param ir Docmap.IR
+---@param receiver_only table<string, boolean> Languages whose methods need a receiver.
 ---@return table<string, table<string, { node: string, fn: string }>> by parent id
-local function package_index(ir)
+local function package_index(ir, receiver_only)
   local scoped = package_scoped_languages()
   if not next(scoped) then
     return {}
@@ -272,12 +278,15 @@ local function package_index(ir)
         out[node.parent] = bucket
         ambiguous[node.parent] = {}
       end
+      local skip_methods = receiver_only[node.language] == true
       for _, fn in ipairs(node.functions) do
-        local b = bare(fn.name)
-        if bucket[b] and bucket[b].node ~= id then
-          ambiguous[node.parent][b] = true
-        else
-          bucket[b] = { node = id, fn = fn.name }
+        if not (skip_methods and fn.owner) then
+          local b = bare(fn.name)
+          if bucket[b] and bucket[b].node ~= id then
+            ambiguous[node.parent][b] = true
+          else
+            bucket[b] = { node = id, fn = fn.name }
+          end
         end
       end
     end
@@ -311,13 +320,13 @@ function M.build(ir, opts)
   local by_path = require("docmap.core.deps").path_index(ir)
   ir.edges = ir.edges or {}
 
-  -- Empty for a tree with no package-scoped language in it, which is every
-  -- Lua and JavaScript repository — so this costs one `next()` there.
-  local packages = package_index(ir)
-
   local receiver_only = languages_where(function(backend)
     return backend.methods_need_receiver == true
   end)
+  -- Empty for a tree with no package-scoped language in it, which is every
+  -- Lua and JavaScript repository — so this costs one `next()` there.
+  local packages = package_index(ir, receiver_only)
+
   local index = {} ---@type table<string, { by_name: table<string, string>, prefixes: table<string, boolean>, receiver_only: boolean }>
   for _, id in ipairs(ir.order) do
     local node = ir.nodes[id]

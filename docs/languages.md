@@ -424,6 +424,16 @@ saying so is the point:
   one scope (`widgets` beside `widgets_test`), and a confident wrong edge is
   exactly what `calls_heuristic` stays opt-in to avoid.
 
+  **A method needs its receiver**, as in Python and Rust: `w.Go()` reaches
+  the method `Widget.Go`, a bare `Go()` never does, so Go sets
+  `LangBackend.methods_need_receiver` and its methods stay out of both the
+  file's bare-name index and the package index. Before that, a bare `Go()`
+  in the file of a method `Widget.Go` became an edge to the method, and in
+  the package index the method made a real `func Go` of a sibling file
+  ambiguous. Rechecked on `aws/smithy-go` (2026-10-30, `37210e1`): 1039 call
+  edges before, 1028 after; the 11 that pointed at a method from a bare call
+  are gone, none was right.
+
   **A qualified `other.Bump` still does not resolve**, and that is a stated
   limit rather than an oversight: a Go import path is absolute against the
   module graph, so placing it inside this tree needs `go.mod`'s module line —

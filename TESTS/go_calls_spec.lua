@@ -114,4 +114,15 @@ return function(H)
     nil,
     "go_calls: an ambiguous name yields no edge — fewer edges beats a wrong one"
   )
+
+  -- A method needs its receiver (`methods_need_receiver`). method.go declares
+  -- the method `Widget.Go` and calls a bare `Go()`, which in Go is the
+  -- package-level `func Go` of launch.go. Indexing the method under its bare
+  -- name took the call in its own file, and in the package index it made
+  -- `Go` ambiguous with launch.go and dropped the real edge.
+  eq(go.methods_need_receiver, true, "go: a bare call never reaches a method")
+  local run = calls["./method.go#Run"]
+  ok(run, "go_calls: a bare call named like a method of its file still resolves")
+  eq(run.to, "./launch.go", "go_calls: ...to the sibling's package-level func, not the method")
+  eq(run.to_fn, "Go")
 end

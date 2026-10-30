@@ -363,6 +363,13 @@ M.emits_calls = true
 ---three call sites were exactly this shape.
 M.call_scope = "package"
 
+---A method is reachable only through a receiver: `w.Go()` or `Widget.Go(w)`,
+---never a bare `Go()`, which names a package-level function of this
+---directory. Without it a method `Widget.Go` was indexed under `Go` and took
+---every bare `Go()` of its file, ahead of the sibling that declares the real
+---`func Go`. See `Docmap.LangBackend.methods_need_receiver`.
+M.methods_need_receiver = true
+
 ---Every call site, attributed to the function whose span contains it.
 ---
 ---The same query and the same two-input shape `core/calls.lua`'s own
