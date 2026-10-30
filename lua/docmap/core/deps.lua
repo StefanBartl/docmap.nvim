@@ -385,6 +385,31 @@ function M.resolve_relative(by_path, from_path, spec)
   return nil
 end
 
+---Resolve one raw require to a node of the tree: the declared module path
+---first, then the relative specifier, then -- only when neither names a node
+----- the require's `fallback` reading (see `Docmap.RawRequire.fallback`).
+---
+---The one place both `M.build` and `core/calls.lua` decide this, so the
+---require graph and the call graph can never disagree about which node an
+---import names, or about which of its two readings is the true one.
+---@param by_module table<string, string> From `M.module_index`.
+---@param by_path table<string, string> From `M.path_index`.
+---@param from_path string Repo-relative path of the *importing* file.
+---@param req Docmap.RawRequire
+---@return string? target The node id, or nil when the module is outside the tree.
+---@return Docmap.RawRequire|Docmap.RawRequireFallback reading The reading that resolved -- `req.fallback` when that one did, otherwise `req` itself.
+function M.resolve_require(by_module, by_path, from_path, req)
+  local target = by_module[req.module] or M.resolve_relative(by_path, from_path, req.module)
+  local alt = req.fallback
+  if not target and alt then
+    local alt_target = by_module[alt.module] or M.resolve_relative(by_path, from_path, alt.module)
+    if alt_target then
+      return alt_target, alt
+    end
+  end
+  return target, req
+end
+
 ---Resolve every node's `requires_raw` into `kind="require"` edges, appended to
 ---`ir.edges`, and fill the `requires`/`required_by` index on each node.
 ---
@@ -413,8 +438,7 @@ function M.build(ir)
       -- Declared module path first, then the relative-specifier fallback: a
       -- Lua `require("a.b")` is never relative, and a JS `./util.js` is never
       -- a declared module, so the two never compete for the same string.
-      local target = by_module[req.module]
-        or M.resolve_relative(by_path, node.source or node.path, req.module)
+      local target, reading = M.resolve_require(by_module, by_path, node.source or node.path, req)
 
       -- Requires that resolve to nothing in this tree are still facts about
       -- the module: `fidget.progress` is a real dependency, it just is not
@@ -444,7 +468,7 @@ function M.build(ir)
             kind = "require",
             from = id,
             to = target,
-            to_module = req.module,
+            to_module = reading.module,
             deferred = req.deferred or nil,
             line = req.line,
           }

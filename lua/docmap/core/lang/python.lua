@@ -725,7 +725,14 @@ end
 ---into a `calls_external` entry, which is the honest answer for `os.path`.
 ---@param node TSNode
 ---@param src string
----@return { module: string, alias: string?, names: table<string, string>? }[]
+---
+---**`from . import a` has two readings, and only the tree can pick one.**
+---Python looks `a` up in the package (`__init__.py`) first and loads the
+---submodule `a` only when the package has no such attribute. Both are
+---emitted: the submodule as the entry, the package attribute as its
+---`fallback`, which `deps.resolve_require` takes only when `./a` names no
+---file -- one require edge either way, never two.
+---@return { module: string, alias: string?, names: table<string, string>?, fallback: Docmap.RawRequireFallback? }[]
 local function import_entries(node, src)
   local kind = node:type()
   local out = {}
@@ -777,6 +784,8 @@ local function import_entries(node, src)
 
   -- `from . import a, b` names the *modules*, not a package, so each one is
   -- its own edge, and each binds its module under its own (or its `as`) name.
+  -- Unless `./a` is no file: then `a` is an attribute of the package itself,
+  -- bound as a name from `__init__.py` (the `fallback`).
   for _, item in ipairs(node:field("name")) do
     local name, alias = item, nil
     if item:type() == "aliased_import" then
@@ -784,9 +793,11 @@ local function import_entries(node, src)
     end
     if name then
       local text = text_of(name, src)
+      local localname = alias and text_of(alias, src) or text
       out[#out + 1] = {
         module = base .. (text:gsub("%.", "/")),
-        alias = alias and text_of(alias, src) or text,
+        alias = localname,
+        fallback = { module = base, names = { [localname] = text } },
       }
     end
   end
@@ -950,6 +961,7 @@ function M.scan_file(path)
           module = entry.module,
           alias = entry.alias,
           names = entry.names,
+          fallback = entry.fallback,
           line = node:start() + 1,
         }
       end

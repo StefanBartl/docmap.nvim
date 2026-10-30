@@ -17,8 +17,10 @@
 --               local_call -> same, Box.go -> Box.size (self.),
 --               Box.by_class -> Box.size (Box.)                           7
 --   sub/deep.py deep -> double, deep -> triple                            2
+--   consumer.py use_tool -> tool (`from . import tool`, a def of
+--               `__init__.py` rather than a submodule)                    1
 --                                                                        --
---                                                                        11
+--                                                                        12
 --
 -- Not edges, on purpose: `go()` in `not_a_method` (a bare name never reaches
 -- `Box.go`), `self.attr.go()`, `super().go()` and `os.path.join` (outside).
@@ -108,7 +110,7 @@ return function(H)
     return calls[from .. "#" .. from_fn .. ">" .. to .. "#" .. to_fn]
   end
 
-  eq(n, 11, "python_calls: exactly the eleven edges counted by hand")
+  eq(n, 12, "python_calls: exactly the twelve edges counted by hand")
 
   -- `self.` and `cls.` are the enclosing class: rewritten, not guessed.
   ok(edge(helper, "Thing.go", helper, "Thing.step"), "python_calls: self.step() is Thing.step")
@@ -130,6 +132,24 @@ return function(H)
   ok(edge(widget, "static_call", helper, "Thing.go"), "python_calls: helper.Thing.go()")
   ok(edge(deep, "deep", helper, "double"), "python_calls: from ..helper import double")
   ok(edge(deep, "deep", helper, "triple"), "python_calls: from .. import helper as h; h.triple()")
+
+  -- `from . import tool` where `./tool.py` does not exist: Python finds
+  -- `tool` in the package's `__init__.py`, and so must the resolver.
+  local consumer = "./pkg/consumer.py"
+  ok(
+    edge(consumer, "use_tool", "./pkg", "tool"),
+    "python_calls: from . import tool binds the package's own def when ./tool is no file"
+  )
+  ok(requires[consumer .. ">./pkg"], "python_calls: ...and requires the package node, once")
+  for _, c in ipairs(ir.nodes[consumer].calls_external or {}) do
+    ok(
+      not c.module:find("^%.%.?/"),
+      "python_calls: no relative module is ever an external call: " .. c.module
+    )
+  end
+  for _, mod in ipairs(ir.nodes[consumer].requires_external or {}) do
+    ok(not mod:find("^%.%.?/"), "python_calls: ...nor an external require: " .. mod)
+  end
 
   -- The negatives the scope rules exist for.
   for key in pairs(calls) do

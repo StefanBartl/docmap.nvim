@@ -380,22 +380,22 @@ function M.build(ir, opts)
       -- Same two-step resolution `deps.build` uses, and it must be the same
       -- or the call graph would disagree with the require graph about which
       -- module a specifier names.
-      local target = by_module[req.module]
-        or require("docmap.core.deps").resolve_relative(
-          by_path,
-          node.source or node.path,
-          req.module
-        )
+      local target, reading = require("docmap.core.deps").resolve_require(
+        by_module,
+        by_path,
+        node.source or node.path,
+        req
+      )
 
-      if req.alias then
+      if reading.alias then
         if target then
-          aliases[req.alias] = { node = target, member = req.member }
+          aliases[reading.alias] = { node = target, member = req.member }
         else
-          external_aliases[req.alias] = req.module
+          external_aliases[reading.alias] = req.module
         end
       end
 
-      for localname, exported in pairs(req.names or {}) do
+      for localname, exported in pairs(reading.names or {}) do
         if target then
           imports[localname] = { node = target, member = exported }
         else
