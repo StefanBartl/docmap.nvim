@@ -1849,6 +1849,33 @@ local function entry_type(dir, name)
   return entry_mode(dir .. "/" .. name, "mode")
 end
 
+---`lfs.dir`, in the order libuv lists a directory. On a POSIX system libuv's
+---`scandir` sorts the names byte-wise (`strcmp`), and `vim.fs.dir`, `fs_scandir`
+---and everything built on them (`vim.fs.find` with a `limit`) answer in that
+---order; `readdir` order is whatever the file system keeps. On Windows libuv
+---does not sort and neither does this: both list in the file system's order.
+---Found by the `fs.find` corpus on Linux CI, where the first two matches of a
+---search came back different from the editor's.
+---@param dir string
+---@return function iter
+---@return any state
+local function ordered_dir(dir)
+  local iter_fn, dir_obj = lfs.dir(dir)
+  if IS_WINDOWS then
+    return iter_fn, dir_obj
+  end
+  local names = {}
+  for name in iter_fn, dir_obj do
+    names[#names + 1] = name
+  end
+  table.sort(names)
+  local i = 0
+  return function()
+    i = i + 1
+    return names[i]
+  end, nil
+end
+
 ---Directory iterator shaped like `vim.fs.dir`: `for name, type in
 ---vim.fs.dir(dir) do ... end`, `type` one of the `uv` dirent strings this
 ---codebase actually branches on (`"directory"`/`"file"`/`"link"`; anything
@@ -1856,7 +1883,7 @@ end
 ---@param dir string
 ---@return fun(): string?, string?
 function vim.fs.dir(dir)
-  local ok, iter_fn, dir_obj = pcall(lfs.dir, dir)
+  local ok, iter_fn, dir_obj = pcall(ordered_dir, dir)
   if not ok then
     return function()
       return nil
@@ -2059,7 +2086,7 @@ function uv.fs_scandir(dir)
   if lfs.attributes(dir, "mode") ~= "directory" then
     return nil
   end
-  local ok, iter_fn, dir_obj = pcall(lfs.dir, dir)
+  local ok, iter_fn, dir_obj = pcall(ordered_dir, dir)
   if not ok then
     return nil
   end
