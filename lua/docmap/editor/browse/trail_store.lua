@@ -424,13 +424,15 @@ function M.delete_named(root, name)
   return true
 end
 
----Drop the in-memory mirror, the hydration marks and the attach flag.
+---Drop the in-memory mirror, the hydration marks, the attach flag and the
+---`VimLeavePre` hook `attach` made (else every re-attach adds another one).
 ---Test-support: lets a spec point at a fresh file, and re-attach after
 ---`trail.reset()` has dropped this module's subscription, without needing a
 ---new Neovim.
 function M.reset()
   db, hydrated, dirty = nil, {}, {}
   attached = false
+  pcall(vim.api.nvim_clear_autocmds, { group = "docmap.trail_store" })
 end
 
 return M

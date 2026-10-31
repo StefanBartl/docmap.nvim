@@ -7,6 +7,7 @@
 -- fixture cannot exercise.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
   local scan = require("docmap.core.scan")
   local annotate = require("docmap.core.annotate")
@@ -415,4 +416,5 @@ return function(H)
       "annotate --write (wide): the last file got its header on disk"
     )
   end
+  H.restore(snap)
 end

@@ -15,6 +15,7 @@
 -- through `telemetry.load()`) only runs when a real checkout is reachable.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
   local telemetry_self = require("docmap.core.telemetry_self")
 
@@ -128,4 +129,5 @@ return function(H)
 
     telemetry_self._reset_for_test()
   end
+  H.restore(snap, { groups = { "ra_telemetry_" } })
 end

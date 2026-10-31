@@ -13,6 +13,7 @@
 -- real keymaps.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
 
   local source = require("docmap.editor.browse.source")
@@ -587,6 +588,10 @@ return function(H)
   trail.reset()
   store.reset()
   store.attach()
+  store.reset()
+  store.attach()
+  local leave_hooks = #vim.api.nvim_get_autocmds({ group = "docmap.trail_store" })
+  eq(leave_hooks, 1, "store: reset() drops the VimLeavePre hook, so a re-attach does not add one")
 
   local sroot = "/repo/one"
   trail.toggle(sroot, { mode = "deps", id = "lua/x/beta", dir = "in", depth = 3, label = "beta" })
@@ -1440,4 +1445,5 @@ return function(H)
   trail.reset()
   store.reset()
   os.remove(store_file)
+  H.restore(snap, { groups = { "docmap.trail_store" } })
 end

@@ -11,6 +11,7 @@
 -- `BufWritePost`.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
   local docmap = require("docmap")
 
@@ -199,7 +200,7 @@ return function(H)
   eq(outsider_attached, false, "callhierarchy: a file outside source never gets the client")
 
   handle.uninstall()
-  vim.cmd("silent! %bwipeout!")
+  H.wipe_new(snap)
 
   -- ------------------------------------------------------------------------
   -- The runtime half of the hover (`runtime-analysis.nvim`'s IDEAS.md 1.8).
@@ -345,7 +346,7 @@ return function(H)
 
     handle2.uninstall()
     package.loaded["runtime-analysis.telemetry"] = previous
-    vim.cmd("silent! %bwipeout!")
+    H.wipe_new(snap)
 
     -- Re-raised after the teardown, so the failure still fails.
     if not ok_body then
@@ -445,10 +446,11 @@ return function(H)
 
     handle3.uninstall()
     package.loaded["runtime-analysis.telemetry"] = previous
-    vim.cmd("silent! %bwipeout!")
+    H.wipe_new(snap)
 
     if not ok_body3 then
       error(err3, 0)
     end
   end
+  H.restore(snap, { groups = { "ra_telemetry_" } })
 end

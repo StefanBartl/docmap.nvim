@@ -13,6 +13,7 @@
 -- Windows rules are driven through the injectable `safe_fs` host.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
   local config = require("docmap.config")
   local safe_fs = require("docmap.core.safe_fs")
@@ -532,4 +533,5 @@ return function(H)
   end)
 
   vim.fn.delete(base, "rf")
+  H.restore(snap)
 end

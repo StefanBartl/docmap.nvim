@@ -15,6 +15,7 @@
 -- already proven elsewhere.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
 
   local repo_root = (debug.getinfo(1, "S").source:sub(2):match("(.*)[/\\]TESTS[/\\]")) or "."
@@ -256,4 +257,5 @@ return function(H)
 
     os.execute(('rm -rf "%s"'):format(fixture))
   end
+  H.restore(snap, { groups = { "ra_telemetry_" } })
 end

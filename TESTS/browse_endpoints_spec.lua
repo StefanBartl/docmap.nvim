@@ -11,6 +11,7 @@
 -- a plain IR and a state table in, strings out.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
   local view = require("docmap.editor.browse.view")
 
@@ -320,4 +321,5 @@ return function(H)
       )
     end
   end
+  H.restore(snap, { groups = { "ra_telemetry_" } })
 end

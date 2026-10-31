@@ -23,6 +23,7 @@
 -- or `ctx.notify.warn`, which makes that the one reliable completion signal.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
   local docmap = require("docmap")
 
@@ -429,4 +430,5 @@ return function(H)
 
     docmap.uninstall(handle)
   end
+  H.restore(snap)
 end

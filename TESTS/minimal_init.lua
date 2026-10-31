@@ -91,4 +91,11 @@ if parsers and parsers ~= "" and vim.fn.isdirectory(parsers) == 1 then
   vim.opt.rtp:append(parsers)
 end
 
+-- Loading `vim.lsp` registers the runtime's groupless `VimLeavePre` exit handler, and its
+-- document_color / semantic_tokens modules set `vim.g._lsp_enabled_*`. Loaded here, before any
+-- spec, so the state guard does not blame whichever spec first touches LSP for the editor's own
+-- module-load side effects (the specs share one editor, `isolated = "none"`).
+require("vim.lsp.document_color")
+require("vim.lsp.semantic_tokens")
+
 return { root = root, deps = found }

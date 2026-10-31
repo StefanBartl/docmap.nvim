@@ -114,4 +114,114 @@ function H.slurp(path)
   return content
 end
 
+---@param list any[]
+---@return table<any, true>
+local function set_of(list)
+  local s = {}
+  for _, v in ipairs(list) do
+    s[v] = true
+  end
+  return s
+end
+
+--- What a spec may leave behind, taken at its start; hand it to `H.restore`
+--- at its end. The specs share one editor (`isolated = "none"`), and the
+--- state guard of testing.nvim (`.testing.lua`, `guards.state = "error"`)
+--- fails a spec that leaves buffers, windows, tabs, user commands or
+--- autocmds behind.
+---@return table snapshot
+function H.snapshot()
+  local autocmds = {}
+  for _, a in ipairs(vim.api.nvim_get_autocmds({})) do
+    if a.id then
+      autocmds[a.id] = true
+    end
+  end
+  local bufs = {}
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    bufs[buf] = vim.api.nvim_buf_get_name(buf)
+  end
+  return {
+    bufs = bufs,
+    wins = set_of(vim.api.nvim_list_wins()),
+    tabs = set_of(vim.api.nvim_list_tabpages()),
+    cmds = vim.api.nvim_get_commands({ builtin = false }),
+    autocmds = autocmds,
+    g = vim.deepcopy(vim.g),
+  }
+end
+
+--- Wipe every buffer that was not there when `snap` was taken. Unlike
+--- `%bwipeout!` this keeps the buffers the spec found, so the editor does not
+--- have to make a fresh `[No Name]` buffer (which would outlive the spec).
+--- `:edit` reuses an empty `[No Name]` buffer for the file it opens; such a
+--- buffer is emptied and loses its name again instead of being wiped.
+---@param snap table from `H.snapshot()`
+function H.wipe_new(snap)
+  for buf, name in pairs(snap.bufs) do
+    if vim.api.nvim_buf_is_valid(buf) and name == "" and vim.api.nvim_buf_get_name(buf) ~= "" then
+      vim.api.nvim_buf_call(buf, function()
+        -- `:0file` keeps the old name as a new (alternate) buffer: wiped below.
+        vim.cmd("silent! 0file")
+      end)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {})
+      vim.bo[buf].modified = false
+      vim.bo[buf].filetype = ""
+    end
+  end
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if not snap.bufs[buf] and vim.api.nvim_buf_is_valid(buf) then
+      pcall(vim.api.nvim_buf_delete, buf, { force = true })
+    end
+  end
+end
+
+--- Put the editor back the way `snap` found it: close the tabs and windows
+--- the spec opened, wipe its buffers, delete the user commands it (or a
+--- `setup()` it called) defined, and delete its autocmds. Only autocmds in a
+--- group whose name starts with one of `opts.groups`, or groupless ones on an
+--- event in `opts.events`, are deleted: the editor's own runtime creates
+--- autocmds lazily (LSP, filetypes) that must survive for later specs.
+--- `opts.vars` names `vim.g` keys to put back.
+---@param snap table from `H.snapshot()`
+---@param opts? { groups?: string[], events?: string[], vars?: string[] }
+function H.restore(snap, opts)
+  opts = opts or {}
+  for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+    if not snap.tabs[tab] and #vim.api.nvim_list_tabpages() > 1 then
+      vim.cmd.tabclose({ args = { vim.api.nvim_tabpage_get_number(tab) }, bang = true })
+    end
+  end
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if not snap.wins[win] and vim.api.nvim_win_is_valid(win) and #vim.api.nvim_list_wins() > 1 then
+      pcall(vim.api.nvim_win_close, win, true)
+    end
+  end
+  H.wipe_new(snap)
+  for name in pairs(vim.api.nvim_get_commands({ builtin = false })) do
+    if not snap.cmds[name] then
+      pcall(vim.api.nvim_del_user_command, name)
+    end
+  end
+  local groups, events = opts.groups or {}, set_of(opts.events or {})
+  for _, a in ipairs(vim.api.nvim_get_autocmds({})) do
+    if a.id and not snap.autocmds[a.id] then
+      local mine = false
+      if a.group_name then
+        for _, prefix in ipairs(groups) do
+          mine = mine or a.group_name:sub(1, #prefix) == prefix
+        end
+      else
+        mine = events[a.event] == true
+      end
+      if mine then
+        pcall(vim.api.nvim_del_autocmd, a.id)
+      end
+    end
+  end
+  for _, name in ipairs(opts.vars or {}) do
+    vim.g[name] = snap.g[name]
+  end
+end
+
 return H

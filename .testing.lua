@@ -17,10 +17,11 @@ return {
   -- Guards (safety nets, see testing.nvim docs/GUARDS.md).
   guards = {
     fs = "error",
-    -- Real finding, kept at warn: the specs run in one editor (isolated = "none") and leave
-    -- buffers, windows, user commands, highlight groups and autocmds behind (setup() of the
-    -- plugin and its dependencies). Per-file isolation would fix it.
-    state = "warn",
+    -- The specs run in one editor (isolated = "none") and leave no state behind: each takes
+    -- H.snapshot() at its start and H.restore() / H.wipe_new() at its end (TESTS/harness.lua),
+    -- and TESTS/minimal_init.lua loads vim.lsp up front so its runtime side effects predate the
+    -- specs. Left as warn-only findings: the highlight groups ui.nvim's kit defines.
+    state = "error",
     scheduled_error = "error",
     prompt = "error",
     deprecation = "error",

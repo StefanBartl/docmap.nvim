@@ -11,6 +11,7 @@
 -- (`RUNTIME_ANALYSIS_DIR`, wired the same way in TESTS/run.lua).
 
 return function(H)
+  local snap = H.snapshot()
   local fmsg = require("docmap.core.findings").format
   local eq, ok = H.eq, H.ok
   local check = require("docmap.core.check")
@@ -398,4 +399,5 @@ return function(H)
     store.clear(namespace, { dir = cache_dir })
     store.clear(namespace .. "-alive", { dir = cache_dir })
   end
+  H.restore(snap, { groups = { "ra_telemetry_" } })
 end

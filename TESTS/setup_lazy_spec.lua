@@ -6,6 +6,7 @@
 -- The handle `setup()` returns is lazy now: the first read scans.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
 
   local root = vim.fn.tempname():gsub("\\", "/")
@@ -55,4 +56,5 @@ return function(H)
   require("docmap.editor.registry").uninstall(root)
   require("docmap").scan_full = scan_full
   vim.fn.delete(root, "rf")
+  H.restore(snap)
 end

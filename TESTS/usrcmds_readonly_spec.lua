@@ -17,6 +17,7 @@
 -- what counts as a duplicate, or reuses a scratch buffer by name.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
 
   ---A minimal fake ctx: every command here reads at most cfg/handle/notify/
@@ -879,4 +880,5 @@ return function(H)
       docmap.uninstall(handle)
     end
   end
+  H.restore(snap)
 end

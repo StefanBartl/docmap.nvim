@@ -9,6 +9,7 @@
 -- back what actually landed — not a direct call into `diagnostics.publish`.
 
 return function(H)
+  local snap = H.snapshot()
   local eq, ok = H.eq, H.ok
   local docmap = require("docmap")
 
@@ -140,5 +141,5 @@ return function(H)
   )
 
   handle.uninstall()
-  vim.cmd("silent! %bwipeout!")
+  H.wipe_new(snap)
 end
