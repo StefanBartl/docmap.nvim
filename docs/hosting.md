@@ -146,7 +146,14 @@ come from `rules.settings`, the same resolution `:Rules check` uses: the project
   `$RULES_VAULT`: a child process inherits an environment nobody looked at for this run. Grep, file and JSON
   checks run regardless, they read files and execute nothing.
 - Absence answers `{ "available": false, "reason": ... }`: `rules.nvim` not part of this build, a `.rules.json`
-  that cannot be used, no ruleset configured, a ruleset that does not exist, a selection that matches nothing.
+  that cannot be used, no ruleset configured, a ruleset that does not exist, a selection that matches nothing,
+  and an error raised inside the engine (its message is the reason).
+- `gates` in the catalog is a list sorted by name, `[{ "name": "release", "families": ["FIX", "PRD"] }]`, so a
+  project without gates answers `[]` like any other list.
+- From the editor (`:DocMap serve`) the same routes answer at `/api/rules/catalog` and
+  `/api/rules/run?select=...` (`select=` as on the command line). That server passes **no trust**: there is no
+  `--trust=` to name, and the trust of `rules.nvim`'s own settings (`setup({ trust })`, `$RULES_TRUST`) is not
+  taken over, so every `lua_predicate` there reports `predicate not trusted`. Run predicates with `:Rules check`.
 
 **The join logic stays in Lua.** `docmap-desktop` runs a small HTTP server
 that forwards `/api/*` here; its Rust side is transport only. `core/api.lua`

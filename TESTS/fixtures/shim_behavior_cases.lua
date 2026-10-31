@@ -434,6 +434,14 @@ function M.evaluate(surface, case, root)
         answer[key] = fn(value)
       end
       answer["<empty_dict>"] = fn(resolve(surface, "empty_dict")())
+      -- the marker counts only while the table is empty: filled with `[1]`,
+      -- an `empty_dict` and a decoded `{}` are lists in the editor
+      local filled = resolve(surface, "empty_dict")()
+      filled[1] = 1
+      answer["<filled_empty_dict>"] = fn(filled)
+      local obj = decode('{"o":{}}').o
+      obj[1] = 1
+      answer["<filled_decoded_obj>"] = fn(obj)
       return answer
     end)
     if not ok then

@@ -155,11 +155,44 @@ local function relative(root, file)
   return p
 end
 
+---The gates of the settings as a list sorted by name, `{ { name, families } }`: a map would encode as `[]` when
+---empty and as an object otherwise (`core/json` cannot tell an empty map from an empty list), and a typed consumer
+---(the desktop app) would fail on the first project without gates.
+---@param gates table<string, string[]>|nil
+---@return { name: string, families: string[] }[]
+local function gate_list(gates)
+  local out = {}
+  for name, families in pairs(gates or {}) do
+    if type(families) == "table" then
+      out[#out + 1] = { name = name, families = families }
+    end
+  end
+  table.sort(out, function(a, b)
+    return a.name < b.name
+  end)
+  return out
+end
+
+---Run a route's body, turning an error raised inside `rules.nvim` (a module missing from the bundle, a bug in the
+---engine) into an answer with its reason: the app shows it, where a traceback on stderr would only fail the call.
+---@param body fun(...): table
+---@return fun(...): table
+local function guarded(body)
+  return function(...)
+    local ok, result = pcall(body, ...)
+    if ok then
+      return result
+    end
+    return { available = false, reason = "the rules engine failed: " .. tostring(result) }
+  end
+end
+
 ---`/api/rules/catalog` -- every rule of the configured rulesets, sorted by id, with what the Rules tab lists and
 ---groups by: file, section, family, whether there is a mechanical check and of which type, and the agent hint.
+---`gates` is a list sorted by name, `{ { name, families } }`.
 ---@param opts table A resolved `Docmap.Opts`; `opts.rules_trust` the folders whose predicates may run.
 ---@return table
-function M.catalog(opts)
+local function catalog(opts)
   local engine = M.engine()
   if not engine then
     return { available = false, reason = M.NO_ENGINE }
@@ -221,7 +254,7 @@ function M.catalog(opts)
   return {
     available = true,
     rulesets = rulesets,
-    gates = loaded.res.gates,
+    gates = gate_list(loaded.res.gates),
     rules = rules,
     counts = counts,
     errors = loaded.errors,
@@ -258,7 +291,7 @@ end
 ---`opts.rules_today` the date waivers are judged against (`YYYY-MM-DD`, default today: for tests).
 ---@param param string|nil
 ---@return table
-function M.run(opts, param)
+local function run(opts, param)
   local engine = M.engine()
   if not engine then
     return { available = false, reason = M.NO_ENGINE }
@@ -402,5 +435,15 @@ function M.run(opts, param)
     warnings = warnings_of(engine, loaded.res),
   }
 end
+
+-- Exported guarded: whatever `rules.nvim` raises comes back as `{ available = false, reason }`.
+
+---`/api/rules/catalog` (see `catalog` above).
+---@type fun(opts: table): table
+M.catalog = guarded(catalog)
+
+---`/api/rules/run` (see `run` above).
+---@type fun(opts: table, param: string|nil): table
+M.run = guarded(run)
 
 return M

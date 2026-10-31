@@ -62,6 +62,29 @@ return function(H)
     eq(run, { available = false, reason = rules_api.NO_ENGINE }, "no engine: run says why")
   end
 
+  -- ------------------------------------ an engine that raises (a module missing from the bundle)
+  do
+    local saved = rules_api.engine
+    local boom = function()
+      error("module 'rules.env' not found", 0)
+    end
+    ---@diagnostic disable-next-line: duplicate-set-field
+    rules_api.engine = function()
+      return { settings = { resolve = boom }, loader = {}, runner = {}, waivers = {} }
+    end
+    local ok_cat, cat = pcall(rules_api.catalog, { root = repo })
+    local ok_run, run = pcall(rules_api.run, { root = repo }, "FIX")
+    rules_api.engine = saved
+    ok(ok_cat and ok_run, "engine raises: neither route raises")
+    eq(cat.available, false, "engine raises: catalog is not available")
+    ok(
+      tostring(cat.reason):find("rules.env", 1, true) ~= nil,
+      "engine raises: catalog names the error"
+    )
+    eq(run.available, false, "engine raises: run is not available")
+    ok(tostring(run.reason):find("rules.env", 1, true) ~= nil, "engine raises: run names the error")
+  end
+
   -- -------------------------------------------------------- the real engine
   local rules_dir
   for _, d in ipairs({
@@ -133,7 +156,10 @@ return function(H)
     eq(fix01.agent.question, "Is every flatten call guarded?", "catalog: the agent hint")
     eq(by_id["FIX-06"].has_check, false, "catalog: a rule without a check is manual")
     eq(by_id["FIX-06"].check, nil, "catalog: and names no check type")
-    eq(cat.gates.release, { "FIX", "PRD" }, "catalog: the gates of .rules.json")
+    eq(cat.gates, {
+      { name = "release", families = { "FIX", "PRD" } },
+      { name = "typo", families = { "NOPE" } },
+    }, "catalog: the gates of .rules.json, a list sorted by name")
     eq(cat.rulesets[1].trusted, false, "catalog: a ruleset the host did not name is not trusted")
     eq(cat.rulesets[1].origin, "project", "catalog: it came from the project .rules.json")
 
@@ -179,6 +205,15 @@ return function(H)
       trusted_elsewhere.results[1].status,
       "error",
       "run: trusting another folder trusts nothing here"
+    )
+
+    -- a project without gates: still a list, so it encodes as `[]` like a full one encodes as a list
+    local nogates = api.answer("rules/catalog", { root = fixtures .. "/rules_api/nogates" })
+    eq(nogates.available, true, "no gates: available")
+    eq(nogates.gates, {}, "no gates: an empty list")
+    ok(
+      require("docmap.core.json").encode(cat):find('"gates":[{', 1, true) ~= nil,
+      "gates: a project with gates encodes them as a JSON list"
     )
 
     -- empty states

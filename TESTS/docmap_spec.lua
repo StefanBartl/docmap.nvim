@@ -1871,6 +1871,14 @@ return function(H)
     ---@diagnostic disable-next-line: param-type-mismatch
     eq(serve.safe_sha(42), nil, "docmap.serve: refuses a non-string")
 
+    -- The one parameter of an `/api/` request: `rules/run` reads its selection
+    -- from `select=`, the name the standalone build's `--select=` uses.
+    eq(serve.api_param("?select=FIX%2Cgate%3Arelease"), "FIX,gate:release", "docmap.serve: select=")
+    eq(serve.api_param("?x=1&select=PRD"), "PRD", "docmap.serve: select= after another key")
+    eq(serve.api_param("?snapshot=base"), "base", "docmap.serve: snapshot= still read")
+    eq(serve.api_param("?n=20"), "20", "docmap.serve: n= still read")
+    eq(serve.api_param(nil), nil, "docmap.serve: no query, no parameter")
+
     -- The other half of the server's security surface: the static route may
     -- only ever hand out a bare filename inside `out_dir`. Same reasoning as
     -- `safe_sha` — the property is the whole point of the route, so it is

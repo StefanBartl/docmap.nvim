@@ -196,6 +196,17 @@ probe(rules_fixture .. "/project", {
   "--trust=" .. rules_fixture .. "/ruleset",
 })
 
+-- **`rules.env`, which no probe reaches.** `rules.settings.resolve` requires
+-- it lazily, only when `$RULES_TRUST` is set (`trust_paths`), and these probes
+-- run with whatever environment the build has -- normally without it, and PUC
+-- Lua has no `setenv` to force it. Unmeasured, it is never staged, and any host
+-- with `$RULES_TRUST` in its environment (the desktop app hands its own to the
+-- engine) gets "module 'rules.env' not found" from both rules routes. Required
+-- here explicitly, only when the probes above reached `rules.settings`.
+if package.loaded["rules.settings"] then
+  require("rules.env")
+end
+
 -- `commit/<sha>` needs a real sha, unlike the fixed-name routes above: on
 -- success it requires `core.history` for the diff analysis, which
 -- measured (`nvim --headless`, package.loaded before/after) is not pulled

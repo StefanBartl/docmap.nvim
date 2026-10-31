@@ -164,6 +164,25 @@ end
 -- enforces before any request reaches `core.api.answer`.
 M.safe_sha = require("docmap.core.api").safe_sha
 
+---The one optional parameter of an `/api/` request, decoded, out of its raw
+---query string: `snapshot=` (telemetry/loaded), `n=` (commits) or `select=`
+---(`rules/run`, the name the standalone build's `--select=` uses). No route
+---reads more than one of them, so whichever is present is the parameter and
+---no per-route branch is needed; each route's own doc comment says what it
+---reads `param` as. Exported for the reason `safe_sha` is: a query parsed
+---only behind a socket does not get tested.
+---@param query string|nil Raw query string, `?`-prefixed.
+---@return string|nil
+function M.api_param(query)
+  local raw = query
+    and (
+      query:match("[?&]snapshot=([^&]+)")
+      or query:match("[?&]n=([^&]+)")
+      or query:match("[?&]select=([^&]+)")
+    )
+  return require("docmap.core.api").decode_param(raw)
+end
+
 ---Encode one `core.api` answer as this server's JSON response.
 ---
 ---Every data route is thin on purpose: their bodies moved to `core/api.lua`
@@ -179,12 +198,7 @@ M.safe_sha = require("docmap.core.api").safe_sha
 ---@param query string|nil Raw query string, `?`-prefixed.
 local function respond_api(client, name, cfg, query)
   local api = require("docmap.core.api")
-  -- `snapshot=` (telemetry/loaded) and `n=` (commits) never both apply to
-  -- the same route, so trying both and taking whichever is present needs
-  -- no per-route branch here — each route's own doc comment says which
-  -- one it reads `param` as.
-  local raw = query and (query:match("[?&]snapshot=([^&]+)") or query:match("[?&]n=([^&]+)"))
-  local param = api.decode_param(raw)
+  local param = M.api_param(query)
   cfg.git = cfg.git or git
   local result, err = api.answer(name, cfg, param)
   if not result then

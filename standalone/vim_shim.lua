@@ -357,11 +357,16 @@ end
 ---lists: both carry the marker metatable `EMPTY_DICT_MT`, as both carry one in
 ---the editor. Added when `rules.nvim`'s settings schema had to tell `{}` from
 ---`[]` in a `.rules.json` (a `gates` that is `[]` is a mistake it reports).
+---The marker counts only while the table is empty, as in the editor: an
+---`empty_dict` filled with `[1]` afterwards is a list there (nvim 0.12.2).
 ---@param t any
 ---@return boolean
 function vim.islist(t)
-  if type(t) ~= "table" or getmetatable(t) == EMPTY_DICT_MT then
+  if type(t) ~= "table" then
     return false
+  end
+  if next(t) == nil then
+    return getmetatable(t) ~= EMPTY_DICT_MT
   end
   local j = 1
   for _ in pairs(t) do
@@ -1967,10 +1972,6 @@ end
 
 local uv = {}
 
----`type`, and `ino` and `dev` where the platform has them: `core/safe_fs.lua` tells two spellings of a root apart by
----them (does the disk fold case?), and without the numbers two sibling roots that differ only in case would read as one.
----@param path string
----@return { type: string, ino: integer?, dev: integer? }|nil
 ---The stat fields beside `type` that a caller here reads, asked for on first use and then kept: `ino` and
 ---`dev` (`lib.nvim.fs.read_bounded` compares them), `size` (the same module's limit) and `mtime` as `{ sec, nsec }`
 ---(`rules.contract`'s cache signature). `lfs` knows whole seconds only, so `nsec` is always 0.
@@ -1992,6 +1993,11 @@ local function lazy_stat_field(path, stat, key)
   return value
 end
 
+---`type`, and `ino` and `dev` where the platform has them: `core/safe_fs.lua` tells two spellings of a root apart by
+---them (does the disk fold case?), and without the numbers two sibling roots that differ only in case would read as one.
+---`size` and `mtime` come the same lazy way (`lazy_stat_field`).
+---@param path string
+---@return { type: string, ino: integer?, dev: integer?, size: integer?, mtime: { sec: integer, nsec: integer }? }|nil
 function uv.fs_stat(path)
   local mode = lfs.attributes(path, "mode")
   if not mode then

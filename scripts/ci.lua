@@ -596,7 +596,7 @@ function GATES.standalone()
           and fix01.source_line == 11
           and fix01.source_file:match("/rules_engine/ruleset/RULES%.md$") ~= nil
           and fix01.agent.question == "Is every flatten call guarded?"
-          and vim.deep_equal(r.gates.release, { "FIX", "PRD" })
+          and vim.deep_equal(r.gates[1], { name = "release", families = { "FIX", "PRD" } })
       end,
     },
     {
@@ -641,6 +641,14 @@ function GATES.standalone()
             ["PRD-04"] = "pass",
             ["PRD-05"] = "pass",
           })
+      end,
+    },
+    {
+      label = "a project without gates",
+      project = api_fixtures .. "/nogates",
+      args = { "rules/catalog" },
+      check = function(r)
+        return r.available == true and vim.deep_equal(r.gates, {})
       end,
     },
     {
