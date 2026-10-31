@@ -20,8 +20,16 @@ return {
     -- The specs run in one editor (isolated = "none") and leave no state behind: each takes
     -- H.snapshot() at its start and H.restore() / H.wipe_new() at its end (TESTS/harness.lua),
     -- and TESTS/minimal_init.lua loads vim.lsp up front so its runtime side effects predate the
-    -- specs. Left as warn-only findings: the highlight groups ui.nvim's kit defines.
-    state = "error",
+    -- specs.
+    state = {
+      mode = "error",
+      -- The Kit* highlight groups (KitNormal, KitAccent, ... and the window-scoped KitNormal_N,
+      -- KitBorder_N, KitTitle_N) belong to the ui kit of lib.nvim, which ui.nvim drives: the first
+      -- kit surface a spec opens (docmap_browse_spec) defines them once per process, and the kit
+      -- relies on them existing afterwards (it re-links them on ColorScheme), so a spec must not
+      -- delete them. docmap.nvim defines no Kit* group of its own.
+      ignore_highlights = { "Kit" },
+    },
     scheduled_error = "error",
     prompt = "error",
     deprecation = "error",
