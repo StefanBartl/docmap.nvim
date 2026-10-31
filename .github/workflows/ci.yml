@@ -124,8 +124,8 @@ jobs:
           ref: ci-verified
       # rules.nvim: the real-engine half of `TESTS/rules_api_spec.lua` (the
       # `rules/catalog` and `rules/run` routes over the fixture ruleset) finds
-      # it at `.deps/rules.nvim` and skips without it, so the checkout is what
-      # makes that half run here at all.
+      # it at `.deps/rules.nvim`; under CI it fails without it (a local run skips),
+      # so this checkout is required, not optional.
       - uses: actions/checkout@v5
         with:
           repository: WKDSteve/rules.nvim

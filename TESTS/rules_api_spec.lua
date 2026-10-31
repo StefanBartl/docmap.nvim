@@ -10,8 +10,9 @@
 -- runs the real engine over the fixture project (`TESTS/fixtures/rules_engine/
 -- project`, whose `.rules.json` names `../ruleset`) when a `rules.nvim` checkout
 -- is reachable -- `RULES_NVIM_DIR`, `.deps/rules.nvim` or a sibling, as
--- `scripts/ci.lua` finds it -- and skips it otherwise (a developer machine
--- without a checkout; CI's `tests` job checks it out). The same routes are
+-- `scripts/ci.lua` finds it -- and skips it visibly otherwise (a developer machine
+-- without a checkout; under `CI` a missing checkout raises, since the `tests` job
+-- checks it out). The same routes are
 -- compared between Neovim and PUC Lua by the `standalone` gate of `scripts/ci.lua`.
 --
 -- `$RULES_VAULT` and `$RULES_TRUST` are emptied while the engine runs, and put
@@ -86,20 +87,57 @@ return function(H)
   end
 
   -- -------------------------------------------------------- the real engine
-  local rules_dir
-  for _, d in ipairs({
-    vim.env.RULES_NVIM_DIR or "",
-    repo .. "/.deps/rules.nvim",
-    vim.fs.dirname(repo) .. "/rules.nvim",
-  }) do
-    if d ~= "" and vim.fn.filereadable(d .. "/lua/rules/engine/runner.lua") == 1 then
-      rules_dir = d
-      break
+  ---Where the real-engine half finds `rules.nvim`, as `scripts/ci.lua` finds it: `RULES_NVIM_DIR`,
+  ---`<repo>/.deps/rules.nvim`, then a sibling checkout. Without one it skips on a developer machine,
+  ---but raises under `CI`: the `tests` job checks the engine out, so its absence is the job being
+  ---wrong, and a quiet skip there would be the silent green the `standalone` gate refuses.
+  ---@param root string the repo root the candidates are relative to
+  ---@param env { RULES_NVIM_DIR: string?, CI: string? }
+  ---@return string? dir
+  local function locate_rules(root, env)
+    for _, d in ipairs({
+      env.RULES_NVIM_DIR or "",
+      root .. "/.deps/rules.nvim",
+      vim.fs.dirname(root) .. "/rules.nvim",
+    }) do
+      if d ~= "" and vim.fn.filereadable(d .. "/lua/rules/engine/runner.lua") == 1 then
+        return d
+      end
     end
+    if env.CI and env.CI ~= "" then
+      error("rules.nvim not found at .deps/rules.nvim; CI's tests job must check it out", 0)
+    end
+    return nil
   end
+
+  do
+    local empty = vim.fn.tempname()
+    vim.fn.mkdir(empty .. "/repo", "p")
+    local root = empty .. "/repo"
+    eq(locate_rules(root, {}), nil, "locate_rules: no checkout and no CI is a skip")
+    local raised, msg = pcall(locate_rules, root, { CI = "true" })
+    eq(raised, false, "locate_rules: no checkout under CI raises instead of skipping")
+    ok(
+      tostring(msg):find(".deps/rules.nvim", 1, true) ~= nil,
+      "locate_rules: the CI error names the path"
+    )
+    local fake = empty .. "/fake-rules"
+    vim.fn.mkdir(fake .. "/lua/rules/engine", "p")
+    H.write(fake .. "/lua/rules/engine/runner.lua", { "return {}" })
+    eq(
+      locate_rules(root, { RULES_NVIM_DIR = fake, CI = "true" }),
+      fake,
+      "locate_rules: RULES_NVIM_DIR wins"
+    )
+    vim.fn.delete(empty, "rf")
+  end
+
+  local rules_dir = locate_rules(repo, { RULES_NVIM_DIR = vim.env.RULES_NVIM_DIR, CI = vim.env.CI })
   if not rules_dir then
-    -- Skipped, as `browse_rules_spec.lua` skips its real-engine half, on a developer machine without a
-    -- `rules.nvim` checkout. CI's `tests` job checks it out, and the `standalone` gate runs the routes too.
+    -- Visible, unlike a bare return: the runner's `ok` line alone reads the same for a skipped half.
+    io.stdout:write(
+      "skip  rules_api_spec.lua: real-engine half (rules.nvim not found; set RULES_NVIM_DIR)\n"
+    )
     return
   end
 

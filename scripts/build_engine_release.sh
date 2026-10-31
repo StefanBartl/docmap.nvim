@@ -285,7 +285,14 @@ LUA_PATH="$WORK_N/?.lua;;" \
 # were complete. Only the `capabilities` array is searched, not the route list.
 if [ -n "${REQUIRE_CAPABILITIES:-}" ]; then
   echo "== checking --capabilities for: $REQUIRE_CAPABILITIES"
-  caps_json="$("build/docmap$EXE_EXT" --capabilities)"
+  # Probe in isolation: the binary's soft-dependency lookup also tries
+  # $RULES_NVIM_DIR and cwd-relative `../.deps/rules.nvim` / `../../rules.nvim`
+  # (self_root is relative inside a luastatic binary), so a probe from $repo
+  # or with that variable set could report `rules` for a bundle lacking it.
+  # From an empty dir nested under $work, only compiled-in modules count.
+  probe_cwd="$work/caps-probe/a/b"
+  mkdir -p "$probe_cwd"
+  caps_json="$(cd "$probe_cwd" && unset RULES_NVIM_DIR && "$repo/build/docmap$EXE_EXT" --capabilities)"
   caps_list="$(printf '%s' "$caps_json" | tr -d '\r\n' | sed -n 's/.*"capabilities":\[\([^]]*\)\].*/\1/p')"
   echo "capabilities: [$caps_list]"
   for cap in $REQUIRE_CAPABILITIES; do
