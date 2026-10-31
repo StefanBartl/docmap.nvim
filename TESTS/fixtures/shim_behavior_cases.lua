@@ -1131,12 +1131,13 @@ M.cases = {
     id = "uv.fs_realpath/short-name",
     path = "uv.fs_realpath",
     normalize = "slashes",
-    -- `progra~1` in lower case, then `..` and the second alias: both are looked up, and the
-    -- spelling comes from the listing, not from what was asked. Elsewhere both sides answer nil.
-    args = { "c:/progra~1/../PROGRA~2" },
-    local_only = true,
-    why = "Windows only: an 8.3 alias resolves to the long name, as the editor's does; under the shim it "
-      .. "stayed short, so normkey called two spellings of one trusted folder different",
+    -- `sub/longfoldername` gets the alias `LONGFO~1` on a volume that makes 8.3 names (most
+    -- Windows system volumes); asked in lower case, so the spelling has to come from the listing.
+    -- Where no alias is made, and off Windows, both sides answer nil. `shim_links_spec.lua` drives
+    -- the same lookup on a canned `dir /x` on every host.
+    args = { "<ROOT>/sub/longfo~1/f.txt" },
+    why = "an 8.3 alias resolves to the long name, as the editor's does; under the shim it stayed "
+      .. "short, so normkey called two spellings of one trusted folder different",
   },
   {
     id = "uv.fs_realpath/missing",

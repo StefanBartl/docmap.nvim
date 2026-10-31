@@ -509,6 +509,28 @@ return function(H)
     ["C:/tree/odd%dir/inner/l2"] = { kind = "directory", link = true },
     ["C:/tree/moved"] = { kind = "directory", children = { "m" } },
     ["C:/tree/moved/m"] = { kind = "directory", link = true },
+    -- 8.3 aliases (D. below): `lfs.dir` lists the long names only, and only
+    -- `dir /x` (`DIR_X`) says which alias belongs to which. `C:/alias` is not
+    -- among the children of `C:/`, so nothing above meets it.
+    ["C:/alias"] = { kind = "directory", children = { "Long Folder", "other", "a PROGRA~1 b" } },
+    ["C:/alias/Long Folder"] = { kind = "directory", children = { "f.txt" } },
+    ["C:/alias/Long Folder/f.txt"] = { kind = "file" },
+    ["C:/alias/other"] = { kind = "directory", children = {} },
+    ["C:/alias/a PROGRA~1 b"] = { kind = "directory", children = {} },
+  }
+
+  -- What `dir /x` prints, by working directory: the alias column, then the
+  -- long name. `UNLIST~1` is printed for a name `lfs.dir` does not list (a
+  -- console code page that garbled it), so it must not be taken.
+  local DIR_X = {
+    ["C:/alias"] = table.concat({
+      " Volume in drive C has no label.",
+      " Directory of C:\\alias",
+      "10/08/2026  06:24 PM    <DIR>          LONGFO~1     Long Folder",
+      "10/08/2026  06:24 PM    <DIR>                       other",
+      "10/08/2026  06:24 PM    <DIR>          APROGR~1     a PROGRA~1 b",
+      "10/08/2026  06:24 PM    <DIR>          UNLIST~1     Unl?sted",
+    }, "\r\n"),
   }
 
   -- What `dir /a:l` prints in each directory of the tree, without the end
@@ -614,7 +636,12 @@ return function(H)
         end,
       }
     end
+    world.dir_x = {}
     world.popen = function(command)
+      if command:find("dir /x", 1, true) then
+        world.dir_x[#world.dir_x + 1] = { command = command, cwd = world.cwd }
+        return answer(DIR_X[world.cwd] or "")
+      end
       if command:find("pushd", 1, true) then
         world.batches[#world.batches + 1] = { command = command, cwd = world.cwd }
         return answer(run_batch(command))
@@ -633,6 +660,7 @@ return function(H)
         world.cwd == "C:/proj/empty"
         or world.cwd == "C:/"
         or world.cwd == "C:/proj"
+        or world.cwd:find("^C:/alias")
         or world.cwd:sub(1, 2) == "//"
       then
         -- A UNC or device working directory: the real `cmd.exe` says it does
@@ -921,6 +949,58 @@ return function(H)
       eq(type_of("C:/tree/src/util"), "directory", "C: lstat of a listed-ahead directory")
       eq(#world.commands - per_dir, 3, "C: ...all of it without another process")
       eq(#world.batches - batches, 4, "C: ...nor another batch")
+    end)
+    io.popen, io.stderr = real_popen, real_stderr
+    if not ran then
+      error(err, 0)
+    end
+  end
+
+  -- ---------------------------------------------------------------------
+  -- D. `uv.fs_realpath` and 8.3 aliases, on a `dir /x` written down.
+  --
+  -- The editor answers the long name for an alias; `lfs.dir` never lists the
+  -- alias, so the shim reads it out of `dir /x` in the alias's folder and takes
+  -- the long name only when that folder lists it.
+  -- ---------------------------------------------------------------------
+  do
+    local world = windows_world()
+    local shim = load_shim(world.lfs, true)
+    local real_popen, real_stderr = io.popen, io.stderr
+    io.popen = world.popen
+    io.stderr = {
+      write = function(self)
+        return self
+      end,
+    }
+    local ran, err = pcall(function()
+      eq(
+        shim.uv.fs_realpath("C:/alias/longfo~1/f.txt"),
+        "C:\\alias\\Long Folder\\f.txt",
+        "D: an alias, asked in lower case, resolves to the long name the folder lists"
+      )
+      eq(#world.dir_x, 1, "D: ...from one `dir /x`")
+      eq(world.dir_x[1].cwd, "C:/alias", "D: ...run inside the alias's folder")
+      ok(
+        world.dir_x[1].command:find('set "DIRCMD="', 1, true)
+          and not world.dir_x[1].command:find("C:", 1, true),
+        "D: ...with DIRCMD cleared and no path on the command line: " .. world.dir_x[1].command
+      )
+      eq(world.cwd, "C:/start", "D: ...and the working directory is put back")
+
+      local resolved, _, code = shim.uv.fs_realpath("C:/alias/PROGRA~1")
+      eq(resolved, nil, "D: the alias inside another entry's long name is not that entry's alias")
+      eq(code, "ENOENT", "D: ...so the alias is kept and not found")
+      resolved = shim.uv.fs_realpath("C:/alias/UNLIST~1")
+      eq(resolved, nil, "D: a long name the folder does not list is not taken")
+
+      local asked = #world.dir_x
+      eq(
+        shim.uv.fs_realpath("C:/alias/other"),
+        "C:\\alias\\other",
+        "D: a name without an alias resolves as before"
+      )
+      eq(#world.dir_x, asked, "D: ...and starts no `dir /x`")
     end)
     io.popen, io.stderr = real_popen, real_stderr
     if not ran then
