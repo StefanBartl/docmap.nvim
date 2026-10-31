@@ -394,6 +394,34 @@ function M.evaluate(surface, case, root)
       return "error", tostring(out)
     end
     return M.canon(out)
+  elseif kind == "fs_find" then
+    -- `vim.fs.find` downward, as the real rulesets' predicates call it: names a
+    -- string or a predicate on the name (`case.suffix`), `opts.path` under the
+    -- fixture (`case.sub`), the rest of `case.opts` as given. The answer is the
+    -- list with the fixture root cut off, in the order found: breadth first,
+    -- in the order the directory lists.
+    local opts = {}
+    for k, v in pairs(case.opts or {}) do
+      opts[k] = v
+    end
+    opts.path = root .. (case.sub or "")
+    local names = case.names
+    if case.suffix then
+      local suffix = case.suffix
+      names = function(name)
+        return name:sub(-#suffix) == suffix
+      end
+    end
+    local ok, out = pcall(fn, names, opts)
+    if not ok then
+      return "error", tostring(out)
+    end
+    local rel = {}
+    for i, f in ipairs(out) do
+      local p = f:gsub("\\", "/")
+      rel[i] = p:sub(1, #root) == root and p:sub(#root + 1) or p
+    end
+    return M.canon(rel)
   elseif kind == "decode_islist" then
     -- What `vim.islist` says about each field of a decoded document: an empty
     -- object is not a list in the editor, which is how `rules.nvim`'s settings
@@ -1096,6 +1124,37 @@ M.cases = {
     path = "uv.fs_realpath",
     args = { "<ROOT>/nope/a.txt" },
     why = "a path that is not there resolves to nothing; normkey then walks up to the deepest one that is",
+  },
+  {
+    id = "fs.find/predicate-all-files",
+    path = "fs.find",
+    kind = "fs_find",
+    suffix = ".txt",
+    opts = { type = "file", limit = math.huge },
+    why = "NEW-48/49/56/57 of the real Lua ruleset walk a project this way; under the shim they reported error",
+  },
+  { id = "fs.find/name-first", path = "fs.find", kind = "fs_find", names = "b.txt" },
+  {
+    id = "fs.find/directories-only",
+    path = "fs.find",
+    kind = "fs_find",
+    suffix = "",
+    opts = { type = "directory", limit = 10 },
+  },
+  {
+    id = "fs.find/limit-two",
+    path = "fs.find",
+    kind = "fs_find",
+    sub = "/lines",
+    suffix = ".txt",
+    opts = { limit = 2 },
+  },
+  {
+    id = "fs.find/missing-path",
+    path = "fs.find",
+    kind = "fs_find",
+    sub = "/nope",
+    names = "a.txt",
   },
   { id = "fn.tolower/ascii", path = "fn.tolower", args = { "AbC/D_e.LUA" } },
   {

@@ -40,7 +40,8 @@
 ---   vim.empty_dict (and `vim.json.decode` marking an empty object with it, `vim.islist` saying no to it: the
 ---   settings schema tells `{}` from `[]`), vim.fn.tolower (ASCII, Latin-1, Greek, Cyrillic), the stat fields
 ---   `size` and `mtime` on vim.uv.{fs_stat, fs_lstat}, and vim.uv.{fs_realpath, fs_open (read-only), fs_fstat,
----   fs_read, fs_close, constants} (`lib.nvim.fs.read_bounded`, `lib.nvim.fs.normkey`).
+---   fs_read, fs_close, constants} (`lib.nvim.fs.read_bounded`, `lib.nvim.fs.normkey`); and vim.fs.find (downward
+---   only), which predicates of the real Lua ruleset walk a project with.
 ---
 --- `TESTS/shim_contract_spec.lua` holds this list to the file: a `vim.fn`,
 --- `vim.fs` or `vim.uv` function defined below and missing here fails it.
@@ -1871,6 +1872,68 @@ function vim.fs.dir(dir)
     end
     return name, entry_type(dir, name)
   end
+end
+
+---`vim.fs.find`, the downward search only: ported from Neovim 0.12's `runtime/lua/vim/fs.lua` (breadth first, in
+---the order `vim.fs.dir` lists, `limit` default 1, `type`, `stop`, `follow`). `upward = true` raises rather than
+---answering something else. Added because the real rulesets' predicates walk a project with it (`NEW-48`, `NEW-49`,
+---`NEW-56`, `NEW-57` of the Lua ruleset) and reported `error` under this shim where the editor passed them.
+---@param names string|string[]|fun(name: string, path: string): boolean
+---@param opts table|nil
+---@return string[]
+function vim.fs.find(names, opts)
+  opts = opts or {}
+  if opts.upward then
+    error("standalone vim_shim: vim.fs.find does not implement upward = true", 2)
+  end
+  if type(names) == "string" then
+    names = { names }
+  end
+  local path = opts.path or lfs.currentdir()
+  local stop = opts.stop
+  local limit = opts.limit or 1
+  local matches = {}
+  local function add(match)
+    matches[#matches + 1] = vim.fs.normalize(match)
+    if #matches == limit then
+      return true
+    end
+  end
+  local function join(dir, name)
+    return ((dir .. "/" .. name):gsub("//+", "/"))
+  end
+  local dirs = { path }
+  while #dirs > 0 do
+    local dir = table.remove(dirs, 1)
+    if stop and dir == stop then
+      break
+    end
+    for other, type_ in vim.fs.dir(dir) do
+      local f = join(dir, other)
+      if type(names) == "function" then
+        if (not opts.type or opts.type == type_) and names(other, dir) then
+          if add(f) then
+            return matches
+          end
+        end
+      else
+        for _, name in ipairs(names) do
+          if name == other and (not opts.type or opts.type == type_) then
+            if add(f) then
+              return matches
+            end
+          end
+        end
+      end
+      if
+        type_ == "directory"
+        or (type_ == "link" and opts.follow and lfs.attributes(f, "mode") == "directory")
+      then
+        dirs[#dirs + 1] = f
+      end
+    end
+  end
+  return matches
 end
 
 -- ------------------------------------------------------------ uv / loop
