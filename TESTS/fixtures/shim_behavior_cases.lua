@@ -1128,6 +1128,17 @@ M.cases = {
     args = { "<ROOT>/sub/" },
   },
   {
+    id = "uv.fs_realpath/short-name",
+    path = "uv.fs_realpath",
+    normalize = "slashes",
+    -- `progra~1` in lower case, then `..` and the second alias: both are looked up, and the
+    -- spelling comes from the listing, not from what was asked. Elsewhere both sides answer nil.
+    args = { "c:/progra~1/../PROGRA~2" },
+    local_only = true,
+    why = "Windows only: an 8.3 alias resolves to the long name, as the editor's does; under the shim it "
+      .. "stayed short, so normkey called two spellings of one trusted folder different",
+  },
+  {
     id = "uv.fs_realpath/missing",
     path = "uv.fs_realpath",
     args = { "<ROOT>/nope/a.txt" },

@@ -2206,6 +2206,34 @@ local function listed_spelling(dir, name)
   return nil
 end
 
+---The long name `dir` holds under the Windows 8.3 alias `short` (`PROGRA~1` -> `Program Files`), spelt the way
+---the listing spells it. `nil` off Windows, for a name that is no alias (no `~` and a digit), when `cmd.exe` cannot
+---list `dir` (a share, see `run_in`), and when the answer is not exactly one name the directory lists: then the
+---alias is kept, as before.
+---@param dir string
+---@param short string
+---@return string|nil
+local function long_spelling(dir, short)
+  if not (IS_WINDOWS and win_links and short:find("~%d")) then
+    return nil
+  end
+  local text = run_in(dir, 'set "DIRCMD=" & dir /x /a 2>nul')
+  if not text then
+    return nil
+  end
+  local found
+  for _, long in ipairs(win_links.long_names(text, short)) do
+    local listed = listed_spelling(dir, long)
+    if listed then
+      if found and found ~= listed then
+        return nil
+      end
+      found = listed
+    end
+  end
+  return found
+end
+
 ---The path with every link along it resolved, `.` and `..` gone, absolute, in the editor's separators.
 ---
 ---`lfs` has no `realpath`, so this walks the path one segment at a time: a segment that `fs_lstat` calls a link is
@@ -2213,10 +2241,10 @@ end
 ---the walk goes on from there, at most 40 links deep (libuv's `ELOOP`). On a file system that folds case each
 ---segment takes the spelling its folder lists (`listed_spelling`).
 ---
----**What it cannot do, measured rather than claimed:** a Windows 8.3 short name (`C:/Users/STEFAN~1`) stays short,
----where the editor answers the long name. `lib.nvim.fs.normkey` uses this to compare paths, so two spellings of
----one folder, one of them short, compare unequal under this shim: a trusted folder named by its short name is not
----recognised, which errs toward not trusting.
+---A Windows 8.3 short name (`C:/Users/STEFAN~1`) is not in any listing, so it is looked up with `dir /x` in its
+---folder (`long_spelling`) and replaced by the long name before it is examined, as the editor answers it: two
+---spellings of one folder then compare equal in `lib.nvim.fs.normkey`. Where that lookup has no answer (a share,
+---an alias `dir` does not print) the short name stays, which errs toward not trusting.
 ---@param path string
 ---@return string|nil resolved
 ---@return string|nil err
@@ -2255,6 +2283,11 @@ function uv.fs_realpath(path)
       done[#done] = nil
     elseif seg ~= "." then
       local parent = root .. "/" .. table.concat(done, "/")
+      local listing_dir = parent == "" and "/" or parent
+      if folds and IS_WINDOWS and seg:find("~%d") and not listed_spelling(listing_dir, seg) then
+        -- Before `fs_lstat`: in a folder that lists a link, an alias is answered as one (`win_links.find`).
+        seg = long_spelling(listing_dir, seg) or seg
+      end
       local candidate = (parent:gsub("/+$", "")) .. "/" .. seg
       local st = uv.fs_lstat(candidate)
       if not st then
@@ -2295,7 +2328,7 @@ function uv.fs_realpath(path)
           root, done = t_root, {}
         end
       else
-        done[#done + 1] = folds and listed_spelling(parent == "" and "/" or parent, seg) or seg
+        done[#done + 1] = folds and listed_spelling(listing_dir, seg) or seg
       end
     end
   end

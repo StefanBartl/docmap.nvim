@@ -555,4 +555,45 @@ return function(H)
   eq(next(win_links.parse_batch("", rels, nonce)), nil, "batch: no output answers nothing")
   local root = win_links.parse_batch("C:\\\r\n" .. "C:\\src\r\n" .. mark(1), { "src" }, nonce)
   ok(root[1], "batch: from the root of a drive, which `cd` prints with its backslash")
+
+  -- `dir /x`: the 8.3 alias in a column of its own, then the long name. The
+  -- date columns are the locale's (German here) and are never read.
+  local SHORT_LISTING = table.concat({
+    " Datenträger in Laufwerk C: hat keine Bezeichnung.",
+    "",
+    " Verzeichnis von C:\\",
+    "",
+    "27.10.2026  15:36    <DIR>          PROGRA~1     Program Files",
+    "10.09.2026  16:39    <DIR>          PROGRA~2     Program Files (x86)",
+    "22.10.2026  04:25            12.288 DUMPST~1.LOG DumpStack.log",
+    "01.04.2024  08:26    <DIR>                       PerfLogs",
+    "01.04.2024  08:26    <DIR>          ABPROG~1     ab PROGRA~1 trailing  ",
+    "",
+  }, "\r\n")
+  eq(
+    table.concat(win_links.long_names(SHORT_LISTING, "PROGRA~1"), "|"),
+    "Program Files|trailing",
+    "8.3: the long name after the alias, and a long name holding the alias as a word is a candidate too"
+  )
+  eq(
+    table.concat(win_links.long_names(SHORT_LISTING, "progra~2"), "|"),
+    "Program Files (x86)",
+    "8.3: compared without case, blanks inside the long name kept"
+  )
+  eq(
+    table.concat(win_links.long_names(SHORT_LISTING, "DUMPST~1.LOG"), "|"),
+    "DumpStack.log",
+    "8.3: a file alias with an extension"
+  )
+  eq(
+    #win_links.long_names(SHORT_LISTING, "PROGRA~3"),
+    0,
+    "8.3: an alias nobody has answers nothing"
+  )
+  eq(
+    #win_links.long_names(SHORT_LISTING, "PROGRA~"),
+    0,
+    "8.3: a prefix of an alias is not the alias"
+  )
+  eq(#win_links.long_names(SHORT_LISTING, ""), 0, "8.3: an empty name answers nothing")
 end

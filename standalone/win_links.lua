@@ -210,6 +210,41 @@ function M.find(census, name)
   return nil
 end
 
+-- ---------------------------------------------------------- 8.3 aliases
+--
+-- `uv.fs_realpath` in the editor answers the long name for an 8.3 alias
+-- (`C:/PROGRA~1` -> `C:\Program Files`), and `lfs` has no way to ask. `dir /x`
+-- prints the alias in a column of its own in front of the long name, so the
+-- long name is whatever follows the alias on its line. The date, time and size
+-- columns are the locale's and are not read at all.
+
+---The names `dir /x` prints after `short` as a blank-delimited word: one per
+---line that holds it, in listing order. A line may hold the alias inside a
+---long name as well (`a PROGRA~1 b`), and the console may print a non-ASCII
+---name in a code page the caller does not hold, so these are candidates: the
+---caller keeps only one that the directory itself lists.
+---@param text string Everything `dir /x` wrote to stdout.
+---@param short string The alias, e.g. `PROGRA~1`.
+---@return string[]
+function M.long_names(text, short)
+  local out = {}
+  local want = short:lower()
+  if want == "" or want:find("%s") then
+    return out
+  end
+  for line in text:gmatch("[^\r\n]+") do
+    -- `lower` is byte-wise, so positions in `lowered` are positions in `line`.
+    local _, to = line:lower():find(" " .. want .. " ", 1, true)
+    if to then
+      local long = line:sub(to + 1):match("^%s*(.-)%s*$")
+      if long ~= "" then
+        out[#out + 1] = long
+      end
+    end
+  end
+  return out
+end
+
 -- ------------------------------------------------------------ batches
 --
 -- One `cmd.exe` per directory is one process start per directory, and on a
