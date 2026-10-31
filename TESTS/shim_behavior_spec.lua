@@ -280,6 +280,32 @@ return function(H)
       .. " cases are left to the PUC runner (real dkjson, and `system`'s exit status)"
   )
 
+  -- `uv.fs_realpath/short-name` agrees with itself (nil == nil) on a volume
+  -- that makes no 8.3 names, so it is said out loud whether it compared an
+  -- alias at all: `dir /x` in the fixture folder tells. Where the alias is
+  -- there, the editor must have resolved it -- otherwise the case checked
+  -- nothing and must not read as coverage.
+  if vim.fn.has("win32") == 1 then
+    local sub = fixture .. "/sub"
+    local listed = vim
+      .system({ "cmd.exe", "/d", "/c", "dir /x /a" }, { cwd = sub, text = true })
+      :wait()
+    local stdout = listed.stdout or ""
+    if listed.code == 0 and stdout:find("LONGFO~1", 1, true) then
+      local real = vim.uv.fs_realpath(sub .. "/longfo~1/f.txt")
+      ok(
+        real ~= nil and (real:gsub("\\", "/")):find("/longfoldername/f.txt$") ~= nil,
+        "shim behavior: uv.fs_realpath/short-name compared a real alias (editor: "
+          .. tostring(real)
+          .. ")"
+      )
+    else
+      io.stdout:write(
+        "shim behavior: uv.fs_realpath/short-name skipped: volume makes no 8.3 names\n"
+      )
+    end
+  end
+
   -- ---------------------------------------------------------------------
   -- What the shim refuses, and `vim.env`. None of it can be a corpus case:
   -- either the editor *answers* where the shim declines, or the answer is a

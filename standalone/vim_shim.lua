@@ -2208,13 +2208,18 @@ end
 
 ---The long name `dir` holds under the Windows 8.3 alias `short` (`PROGRA~1` -> `Program Files`), spelt the way
 ---the listing spells it. `nil` off Windows, for a name that is no alias (no `~` and a digit), when `cmd.exe` cannot
----list `dir` (a share, see `run_in`), and when the answer is not exactly one name the directory lists: then the
----alias is kept, as before.
+---list `dir` (a share, see `run_in`), for an alias that does not open, and when the answer is not exactly one name
+---the directory lists: then the alias is kept, as before.
 ---@param dir string
 ---@param short string
 ---@return string|nil
 local function long_spelling(dir, short)
   if not (IS_WINDOWS and win_links and short:find("~%d")) then
+    return nil
+  end
+  -- Windows opens an alias that exists; one that does not must stay ENOENT, even when some long name in the
+  -- listing holds it as a word and a sibling happens to be called what follows it.
+  if not lfs.attributes((dir:gsub("/+$", "")) .. "/" .. short, "mode") then
     return nil
   end
   local text = run_in(dir, 'set "DIRCMD=" & dir /x /a 2>nul')

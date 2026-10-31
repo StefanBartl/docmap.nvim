@@ -568,17 +568,25 @@ return function(H)
     "22.10.2026  04:25            12.288 DUMPST~1.LOG DumpStack.log",
     "01.04.2024  08:26    <DIR>                       PerfLogs",
     "01.04.2024  08:26    <DIR>          ABPROG~1     ab PROGRA~1 trailing  ",
+    "01.04.2024  08:26    <DIR>          ABPROG~2     ab PROGRA~2     padded",
+    "01.04.2024  08:26    <DIR>          EVIL~1        evil",
+    "01.04.2024  08:26    <DIR>                       evil",
     "",
   }, "\r\n")
   eq(
     table.concat(win_links.long_names(SHORT_LISTING, "PROGRA~1"), "|"),
-    "Program Files|trailing",
-    "8.3: the long name after the alias, and a long name holding the alias as a word is a candidate too"
+    "Program Files",
+    "8.3: the long name in the column after the alias; the alias as a word inside a long name is not the column"
   )
   eq(
     table.concat(win_links.long_names(SHORT_LISTING, "progra~2"), "|"),
-    "Program Files (x86)",
-    "8.3: compared without case, blanks inside the long name kept"
+    "Program Files (x86)|padded",
+    "8.3: compared without case, blanks inside the long name kept; a long name padded like the column is a candidate"
+  )
+  eq(
+    table.concat(win_links.long_names(SHORT_LISTING, "EVIL~1"), "|"),
+    " evil",
+    "8.3: the long name is read by column, so a leading blank stays: ` evil` is not its sibling `evil`"
   )
   eq(
     table.concat(win_links.long_names(SHORT_LISTING, "DUMPST~1.LOG"), "|"),

@@ -512,11 +512,24 @@ return function(H)
     -- 8.3 aliases (D. below): `lfs.dir` lists the long names only, and only
     -- `dir /x` (`DIR_X`) says which alias belongs to which. `C:/alias` is not
     -- among the children of `C:/`, so nothing above meets it.
-    ["C:/alias"] = { kind = "directory", children = { "Long Folder", "other", "a PROGRA~1 b" } },
+    --
+    -- `a PROGRA~1     b` holds an alias that does not exist, padded like the
+    -- alias column, and `b` is listed: only the alias's own existence keeps
+    -- it from resolving to `b`. ` evil` (alias `EVIL~1`) has a sibling `evil`.
+    -- `Unl?sted` is on the disk but not in the listing (a name the console
+    -- garbled): only the "listed" filter keeps it out.
+    ["C:/alias"] = {
+      kind = "directory",
+      children = { "Long Folder", "other", "a PROGRA~1     b", "b", " evil", "evil" },
+    },
     ["C:/alias/Long Folder"] = { kind = "directory", children = { "f.txt" } },
     ["C:/alias/Long Folder/f.txt"] = { kind = "file" },
     ["C:/alias/other"] = { kind = "directory", children = {} },
-    ["C:/alias/a PROGRA~1 b"] = { kind = "directory", children = {} },
+    ["C:/alias/a PROGRA~1     b"] = { kind = "directory", children = {} },
+    ["C:/alias/b"] = { kind = "directory", children = {} },
+    ["C:/alias/ evil"] = { kind = "directory", children = {} },
+    ["C:/alias/evil"] = { kind = "directory", children = {} },
+    ["C:/alias/Unl?sted"] = { kind = "directory", children = {} },
   }
 
   -- What `dir /x` prints, by working directory: the alias column, then the
@@ -528,9 +541,22 @@ return function(H)
       " Directory of C:\\alias",
       "10/08/2026  06:24 PM    <DIR>          LONGFO~1     Long Folder",
       "10/08/2026  06:24 PM    <DIR>                       other",
-      "10/08/2026  06:24 PM    <DIR>          APROGR~1     a PROGRA~1 b",
+      "10/08/2026  06:24 PM    <DIR>          APROGR~1     a PROGRA~1     b",
+      "10/08/2026  06:24 PM    <DIR>                       b",
+      "10/08/2026  06:24 PM    <DIR>          EVIL~1        evil",
+      "10/08/2026  06:24 PM    <DIR>                       evil",
       "10/08/2026  06:24 PM    <DIR>          UNLIST~1     Unl?sted",
     }, "\r\n"),
+  }
+
+  -- The aliases Windows opens (compared without case), and what they open:
+  -- `lfs.attributes` answers for them the way the real one does. `PROGRA~1`
+  -- is not among them.
+  local ALIASES = {
+    ["c:/alias/longfo~1"] = "C:/alias/Long Folder",
+    ["c:/alias/aprogr~1"] = "C:/alias/a PROGRA~1     b",
+    ["c:/alias/evil~1"] = "C:/alias/ evil",
+    ["c:/alias/unlist~1"] = "C:/alias/Unl?sted",
   }
 
   -- What `dir /a:l` prints in each directory of the tree, without the end
@@ -582,6 +608,9 @@ return function(H)
         world.stats[#world.stats + 1] = path
         path = resolve(path)
         local entry = DISK[path:gsub("/+$", "")] or DISK[path]
+        if not entry and ALIASES[path:lower()] then
+          entry = DISK[ALIASES[path:lower()]]
+        end
         if entry and entry.link then
           world.linked_stats[#world.linked_stats + 1] = path
         end
@@ -989,10 +1018,23 @@ return function(H)
       eq(world.cwd, "C:/start", "D: ...and the working directory is put back")
 
       local resolved, _, code = shim.uv.fs_realpath("C:/alias/PROGRA~1")
-      eq(resolved, nil, "D: the alias inside another entry's long name is not that entry's alias")
+      eq(
+        resolved,
+        nil,
+        "D: an alias that does not exist is not the listed `b` a padded long name puts after it"
+      )
       eq(code, "ENOENT", "D: ...so the alias is kept and not found")
       resolved = shim.uv.fs_realpath("C:/alias/UNLIST~1")
-      eq(resolved, nil, "D: a long name the folder does not list is not taken")
+      eq(
+        resolved,
+        "C:\\alias\\UNLIST~1",
+        "D: a long name the folder does not list is not taken, though it is on the disk: the alias is kept"
+      )
+      eq(
+        shim.uv.fs_realpath("C:/alias/EVIL~1"),
+        "C:\\alias\\ evil",
+        "D: the long name is read by column, its leading blank kept: ` evil`, never its sibling `evil`"
+      )
 
       local asked = #world.dir_x
       eq(

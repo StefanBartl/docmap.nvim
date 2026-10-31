@@ -214,32 +214,50 @@ end
 --
 -- `uv.fs_realpath` in the editor answers the long name for an 8.3 alias
 -- (`C:/PROGRA~1` -> `C:\Program Files`), and `lfs` has no way to ask. `dir /x`
--- prints the alias in a column of its own in front of the long name, so the
--- long name is whatever follows the alias on its line. The date, time and size
--- columns are the locale's and are not read at all.
+-- prints the alias in a column of its own in front of the long name: 13
+-- characters wide (the 12 of an 8.3 name and one blank), padded with blanks,
+-- so the long name starts exactly 13 characters after the alias does
+-- (`DUMPST~1.LOG DumpStack.log`, `PROGRA~1     Program Files`). It is read by
+-- that column and never trimmed: ` evil` and `evil` are two entries. The
+-- date, time and size columns are the locale's and are not read at all.
 
----The names `dir /x` prints after `short` as a blank-delimited word: one per
----line that holds it, in listing order. A line may hold the alias inside a
----long name as well (`a PROGRA~1 b`), and the console may print a non-ASCII
----name in a code page the caller does not hold, so these are candidates: the
----caller keeps only one that the directory itself lists.
+---The alias column is this wide, the blank that ends it included.
+local ALIAS_COLUMN = 13
+
+---The names `dir /x` prints in the long-name column after `short`: one per
+---line that holds `short` in the alias column, in listing order. A long name
+---may hold the alias as a word too, padded the way the column is
+---(`a PROGRA~1     b`), and the console may print a non-ASCII name in a code
+---page the caller does not hold, so these are candidates: the caller keeps
+---only one that the directory itself lists, and only for an alias that exists.
 ---@param text string Everything `dir /x` wrote to stdout.
 ---@param short string The alias, e.g. `PROGRA~1`.
 ---@return string[]
 function M.long_names(text, short)
   local out = {}
   local want = short:lower()
-  if want == "" or want:find("%s") then
+  if want == "" or want:find("%s") or #want >= ALIAS_COLUMN then
     return out
   end
   for line in text:gmatch("[^\r\n]+") do
     -- `lower` is byte-wise, so positions in `lowered` are positions in `line`.
-    local _, to = line:lower():find(" " .. want .. " ", 1, true)
-    if to then
-      local long = line:sub(to + 1):match("^%s*(.-)%s*$")
-      if long ~= "" then
-        out[#out + 1] = long
+    local lowered = line:lower()
+    local init = 1
+    while true do
+      local from = lowered:find(" " .. want, init, true)
+      if not from then
+        break
       end
+      local alias_at = from + 1
+      local pad = line:sub(alias_at + #want, alias_at + ALIAS_COLUMN - 1)
+      local long = line:sub(alias_at + ALIAS_COLUMN)
+      -- The first place on the line where the alias fills the column is the
+      -- column: it comes before the long name.
+      if #pad == ALIAS_COLUMN - #want and not pad:find("[^ ]") and long ~= "" then
+        out[#out + 1] = long
+        break
+      end
+      init = from + 1
     end
   end
   return out
