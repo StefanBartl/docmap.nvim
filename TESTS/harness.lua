@@ -128,9 +128,18 @@ end
 --- at its end. The specs share one editor (`isolated = "none"`), and the
 --- state guard of testing.nvim (`.testing.lua`, `guards.state = "error"`)
 --- fails a spec that leaves buffers, windows, tabs, user commands or
---- autocmds behind.
+--- autocmds behind. `opts.vars` names the `vim.g` keys whose values to take
+--- now, so `H.restore` can put them back (the same `opts` it gets).
+---@param opts? { vars?: string[] }
 ---@return table snapshot
-function H.snapshot()
+function H.snapshot(opts)
+  opts = opts or {}
+  -- Values are taken key by key: `vim.deepcopy(vim.g)` copies the proxy's
+  -- metatable, not its values, so reading the copy later reads the live variable.
+  local g = {}
+  for _, name in ipairs(opts.vars or {}) do
+    g[name] = vim.deepcopy(vim.g[name])
+  end
   local autocmds = {}
   for _, a in ipairs(vim.api.nvim_get_autocmds({})) do
     if a.id then
@@ -147,7 +156,7 @@ function H.snapshot()
     tabs = set_of(vim.api.nvim_list_tabpages()),
     cmds = vim.api.nvim_get_commands({ builtin = false }),
     autocmds = autocmds,
-    g = vim.deepcopy(vim.g),
+    g = g,
   }
 end
 
@@ -182,7 +191,8 @@ end
 --- group whose name starts with one of `opts.groups`, or groupless ones on an
 --- event in `opts.events`, are deleted: the editor's own runtime creates
 --- autocmds lazily (LSP, filetypes) that must survive for later specs.
---- `opts.vars` names `vim.g` keys to put back.
+--- `opts.vars` names `vim.g` keys to put back; `H.snapshot(opts)` must have
+--- taken them (an unset key is unset again).
 ---@param snap table from `H.snapshot()`
 ---@param opts? { groups?: string[], events?: string[], vars?: string[] }
 function H.restore(snap, opts)
@@ -221,6 +231,28 @@ function H.restore(snap, opts)
   end
   for _, name in ipairs(opts.vars or {}) do
     vim.g[name] = snap.g[name]
+  end
+end
+
+--- Run a spec body between `H.snapshot(opts)` and its cleanup, and clean up
+--- even when the body raises: a failing spec must not leave its state to the
+--- specs after it (they share one editor), where the state guard would blame
+--- them. The body's error is raised again after the cleanup.
+--- `opts.wipe_only` cleans up with `H.wipe_new` alone (for a spec whose
+--- commands and autocmds are meant to outlive it); otherwise `H.restore`.
+---@param opts? { groups?: string[], events?: string[], vars?: string[], wipe_only?: boolean }
+---@param body fun(snap: table)
+function H.with_restore(opts, body)
+  opts = opts or {}
+  local snap = H.snapshot(opts)
+  local ok, err = pcall(body, snap)
+  if opts.wipe_only then
+    H.wipe_new(snap)
+  else
+    H.restore(snap, opts)
+  end
+  if not ok then
+    error(err, 0)
   end
 end
 

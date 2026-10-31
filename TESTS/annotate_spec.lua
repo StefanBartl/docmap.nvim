@@ -7,414 +7,420 @@
 -- fixture cannot exercise.
 
 return function(H)
-  local snap = H.snapshot()
-  local eq, ok = H.eq, H.ok
-  local scan = require("docmap.core.scan")
-  local annotate = require("docmap.core.annotate")
+  H.with_restore(nil, function()
+    local eq, ok = H.eq, H.ok
+    local scan = require("docmap.core.scan")
+    local annotate = require("docmap.core.annotate")
 
-  local dr = H.tmpfile("_annotate")
-  local function dwrite(rel, lines)
-    local abs = dr .. "/" .. rel
-    vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
-    -- Binary mode: this spec byte-compares before/after `apply`, and text
-    -- mode's "\n" -> "\r\n" rewrite on Windows would otherwise desync the
-    -- fixture from the `lib.nvim.fs.read`/`write.to_file` pair `annotate.lua`
-    -- itself uses, which are binary for the same reason.
-    local fd = assert(io.open(abs, "wb"), "annotate spec: fixture must be writable")
-    fd:write(table.concat(lines, "\n"))
-    fd:close()
-  end
-
-  -- No @module, table export, one function and one plain table field.
-  dwrite("lua/t/nohdr/init.lua", {
-    "local M = {}",
-    "",
-    "---@param path string",
-    "---@return boolean",
-    "function M.foo(path)",
-    "  return true",
-    "end",
-    "",
-    "M.cfg = {}",
-    "",
-    "return M",
-  })
-
-  -- No @module, table export, a field whose own assignment already carries
-  -- a ---@class — must be referenced, not replaced with a bare "table".
-  dwrite("lua/t/withclass/init.lua", {
-    "local M = {}",
-    "",
-    "---@class t.withclass.RateLimits",
-    "---@field per_minute integer",
-    "M.rate_limits = { per_minute = 60 }",
-    "",
-    "return M",
-  })
-
-  -- No @module, function export — no module table to describe, so no
-  -- ---@class/---@field block, only the bare header.
-  dwrite("lua/t/fnexport/init.lua", {
-    "return function(x)",
-    "  return x + 1",
-    "end",
-  })
-
-  -- Already has @module — must never be a candidate.
-  dwrite("lua/t/hasmodule/init.lua", {
-    "---@module 't.hasmodule'",
-    "--- Already documented.",
-    "local M = {}",
-    "function M.bar()",
-    "end",
-    "return M",
-  })
-
-  local ir = scan.scan({ root = dr, source = "lua/t", lua_root = "lua" })
-
-  -- candidates()
-  local ids = {}
-  for _, node in ipairs(annotate.candidates(ir)) do
-    ids[node.id] = true
-  end
-  ok(ids["lua/t/nohdr"], "annotate.candidates: includes a table-export file with no @module")
-  ok(ids["lua/t/withclass"], "annotate.candidates: includes a file with class-annotated fields")
-  ok(ids["lua/t/fnexport"], "annotate.candidates: includes a function-export file with no @module")
-  ok(not ids["lua/t/hasmodule"], "annotate.candidates: excludes a file that already has @module")
-
-  local function node_by_id(id)
-    return ir.nodes[id]
-  end
-
-  -- plan(): plain fields
-  local plan_nohdr = assert(
-    annotate.plan(node_by_id("lua/t/nohdr"), dr, "lua"),
-    "annotate.plan: builds a plan for the plain fixture"
-  )
-  eq(plan_nohdr.module, "t.nohdr", "annotate.plan: derives the dotted module name from the path")
-  eq(plan_nohdr.anchor, 1, "annotate.plan: anchors on the first line (`local M = {}` is line 1)")
-  ok(plan_nohdr.has_class, "annotate.plan: generates a class block when fields exist")
-  local header_nohdr = table.concat(plan_nohdr.header, "\n")
-  ok(
-    header_nohdr:find("---@module 't.nohdr'", 1, true) ~= nil,
-    "annotate.plan: header opens with the derived ---@module line"
-  )
-  ok(
-    header_nohdr:find("---@class t.nohdr", 1, true) ~= nil,
-    "annotate.plan: header declares a ---@class named after the module"
-  )
-  ok(
-    header_nohdr:find("---@field foo fun(path: string): boolean", 1, true) ~= nil,
-    "annotate.plan: reconstructs a fun(...) type from the function's own @param/@return"
-  )
-  ok(
-    header_nohdr:find("---@field cfg table", 1, true) ~= nil,
-    "annotate.plan: falls back to `table` for an untyped table field"
-  )
-
-  -- plan(): referenced class
-  local plan_withclass = assert(
-    annotate.plan(node_by_id("lua/t/withclass"), dr, "lua"),
-    "annotate.plan: builds a plan for the withclass fixture"
-  )
-  local header_withclass = table.concat(plan_withclass.header, "\n")
-  ok(
-    header_withclass:find("---@class t.withclass", 1, true) ~= nil,
-    "annotate.plan: still declares the module's own ---@class"
-  )
-  ok(
-    header_withclass:find("---@field rate_limits t.withclass.RateLimits", 1, true) ~= nil,
-    "annotate.plan: references an already-declared ---@class instead of writing `table`"
-  )
-  ok(
-    header_withclass:find("---@field per_minute", 1, true) == nil,
-    "annotate.plan: does not pull the referenced class's own fields into M's field list"
-  )
-
-  -- plan(): function export, no class block
-  local plan_fn = assert(
-    annotate.plan(node_by_id("lua/t/fnexport"), dr, "lua"),
-    "annotate.plan: builds a plan for the fnexport fixture"
-  )
-  eq(plan_fn.anchor, nil, "annotate.plan: no anchor for a function-export file")
-  eq(plan_fn.has_class, false, "annotate.plan: no class block for a function-export file")
-  eq(#plan_fn.header, 2, "annotate.plan: header is just @module + the TODO line")
-
-  -- Binary reads throughout, matching `dwrite` above and the binary
-  -- `lib.nvim.fs.read`/`write.to_file` pair `annotate.lua` itself uses.
-  local function dread(path)
-    local fd = io.open(path, "rb")
-    if not fd then
-      return nil
-    end
-    local content = fd:read("*a")
-    fd:close()
-    return content
-  end
-
-  -- apply(): sidecar never touches the original file.
-  local before = assert(dread(dr .. "/lua/t/nohdr/init.lua"))
-  local ok_sidecar = annotate.apply(plan_nohdr, dr, "sidecar")
-  ok(ok_sidecar, "annotate.apply(sidecar): reports success")
-  ok(
-    dread(dr .. "/lua/t/nohdr/init.lua.annot.lua") ~= nil,
-    "annotate.apply(sidecar): writes the *.annot.lua file"
-  )
-  local after = assert(dread(dr .. "/lua/t/nohdr/init.lua"))
-  eq(before, after, "annotate.apply(sidecar): the original file is byte-for-byte untouched")
-
-  -- apply(): inline splices above the anchor and leaves the code below it
-  -- byte-for-byte identical.
-  local ok_inline = annotate.apply(plan_nohdr, dr, "inline")
-  ok(ok_inline, "annotate.apply(inline): reports success")
-  local written = assert(dread(dr .. "/lua/t/nohdr/init.lua"))
-  ok(
-    written:find("---@module 't.nohdr'", 1, true) ~= nil,
-    "annotate.apply(inline): the header is now in the real file"
-  )
-  local original_tail = table.concat(plan_nohdr.lines, "\n"):match("local M = {}.*$")
-  ok(
-    written:find(original_tail, 1, true) ~= nil,
-    "annotate.apply(inline): everything from `local M = {}` down is byte-for-byte unchanged"
-  )
-
-  -- apply(): a stale plan (the file changed on disk after it was scanned) is
-  -- rejected instead of blindly overwritten (ERR-30).
-  do
-    local stale_path = dr .. "/lua/t/stale/init.lua"
-    dwrite("lua/t/stale/init.lua", {
-      "local M = {}",
-      "",
-      "function M.go() end",
-      "",
-      "return M",
-    })
-    local stale_ir = scan.scan({ root = dr, source = "lua/t", lua_root = "lua" })
-    local plan_stale = assert(annotate.plan(stale_ir.nodes["lua/t/stale"], dr, "lua"))
-
-    -- The file changes on disk after the plan above was taken.
-    local fd = assert(io.open(stale_path, "wb"))
-    fd:write(table.concat({
-      "local M = {}",
-      "",
-      "function M.go() end",
-      "function M.changed() end",
-      "",
-      "return M",
-    }, "\n"))
-    fd:close()
-    local changed = assert(dread(stale_path))
-
-    local ok_stale, err_stale = annotate.apply(plan_stale, dr, "inline")
-    ok(not ok_stale, "annotate.apply: a stale plan (file changed since it was scanned) is rejected")
-    ok(
-      type(err_stale) == "string" and err_stale:find("changed", 1, true) ~= nil,
-      "annotate.apply: the rejection names the file as changed"
-    )
-    eq(
-      assert(dread(stale_path)),
-      changed,
-      "annotate.apply: a stale plan leaves the file exactly as it was, not overwritten"
-    )
-  end
-
-  -- apply(): never through a link. The sidecar's name is derived from the
-  -- scanned path, so a repository can plant a link under it; the real
-  -- routines run over real links, and the places they lead to are looked at
-  -- afterwards -- "apply returned false" alone would pass a version that
-  -- wrote first.
-  do
-    local lr = H.tmpfile("_annotate_links")
-    vim.fn.mkdir(lr, "p")
-    lr = H.canonical(lr)
-    local outside = lr .. "/outside"
-    local proj = lr .. "/proj"
-    local source = { "local M = {}", "", "function M.go() end", "", "return M" }
-    local function lwrite(path, lines)
-      vim.fn.mkdir(vim.fs.dirname(path), "p")
-      local fd = assert(io.open(path, "wb"))
+    local dr = H.tmpfile("_annotate")
+    local function dwrite(rel, lines)
+      local abs = dr .. "/" .. rel
+      vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
+      -- Binary mode: this spec byte-compares before/after `apply`, and text
+      -- mode's "\n" -> "\r\n" rewrite on Windows would otherwise desync the
+      -- fixture from the `lib.nvim.fs.read`/`write.to_file` pair `annotate.lua`
+      -- itself uses, which are binary for the same reason.
+      local fd = assert(io.open(abs, "wb"), "annotate spec: fixture must be writable")
       fd:write(table.concat(lines, "\n"))
       fd:close()
     end
-    for _, name in ipairs({
-      "plain",
-      "existing",
-      "dangling",
-      "inside",
-      "swapped",
-      "dirswap",
-      "denied",
-    }) do
-      lwrite(proj .. "/lua/t/" .. name .. "/init.lua", source)
-    end
-    lwrite(outside .. "/victim.txt", { "VICTIM-ORIGINAL" })
-    lwrite(proj .. "/lua/t/inside/real.txt", { "INSIDE-ORIGINAL" })
 
-    local made_all = true
-    local function link(target, at, is_dir)
-      local made = H.link(target, at, is_dir)
-      made_all = made_all and made
-    end
-    link(outside .. "/victim.txt", proj .. "/lua/t/existing/init.lua.annot.lua", false)
-    link(outside .. "/never.txt", proj .. "/lua/t/dangling/init.lua.annot.lua", false)
-    link(proj .. "/lua/t/inside/real.txt", proj .. "/lua/t/inside/init.lua.annot.lua", false)
+    -- No @module, table export, one function and one plain table field.
+    dwrite("lua/t/nohdr/init.lua", {
+      "local M = {}",
+      "",
+      "---@param path string",
+      "---@return boolean",
+      "function M.foo(path)",
+      "  return true",
+      "end",
+      "",
+      "M.cfg = {}",
+      "",
+      "return M",
+    })
 
-    if not made_all then
-      -- Windows without the symlink privilege: a file link cannot be made, so
-      -- there is nothing to refuse.
-      ok(vim.fn.has("win32") == 1, "annotate.apply (links): a file link could not be made")
-    else
-      local lir = scan.scan({ root = proj, source = "lua/t", lua_root = "lua" })
-      local function plan_of(name)
-        return assert(annotate.plan(lir.nodes["lua/t/" .. name], proj, "lua"))
+    -- No @module, table export, a field whose own assignment already carries
+    -- a ---@class — must be referenced, not replaced with a bare "table".
+    dwrite("lua/t/withclass/init.lua", {
+      "local M = {}",
+      "",
+      "---@class t.withclass.RateLimits",
+      "---@field per_minute integer",
+      "M.rate_limits = { per_minute = 60 }",
+      "",
+      "return M",
+    })
+
+    -- No @module, function export — no module table to describe, so no
+    -- ---@class/---@field block, only the bare header.
+    dwrite("lua/t/fnexport/init.lua", {
+      "return function(x)",
+      "  return x + 1",
+      "end",
+    })
+
+    -- Already has @module — must never be a candidate.
+    dwrite("lua/t/hasmodule/init.lua", {
+      "---@module 't.hasmodule'",
+      "--- Already documented.",
+      "local M = {}",
+      "function M.bar()",
+      "end",
+      "return M",
+    })
+
+    local ir = scan.scan({ root = dr, source = "lua/t", lua_root = "lua" })
+
+    -- candidates()
+    local ids = {}
+    for _, node in ipairs(annotate.candidates(ir)) do
+      ids[node.id] = true
+    end
+    ok(ids["lua/t/nohdr"], "annotate.candidates: includes a table-export file with no @module")
+    ok(ids["lua/t/withclass"], "annotate.candidates: includes a file with class-annotated fields")
+    ok(
+      ids["lua/t/fnexport"],
+      "annotate.candidates: includes a function-export file with no @module"
+    )
+    ok(not ids["lua/t/hasmodule"], "annotate.candidates: excludes a file that already has @module")
+
+    local function node_by_id(id)
+      return ir.nodes[id]
+    end
+
+    -- plan(): plain fields
+    local plan_nohdr = assert(
+      annotate.plan(node_by_id("lua/t/nohdr"), dr, "lua"),
+      "annotate.plan: builds a plan for the plain fixture"
+    )
+    eq(plan_nohdr.module, "t.nohdr", "annotate.plan: derives the dotted module name from the path")
+    eq(plan_nohdr.anchor, 1, "annotate.plan: anchors on the first line (`local M = {}` is line 1)")
+    ok(plan_nohdr.has_class, "annotate.plan: generates a class block when fields exist")
+    local header_nohdr = table.concat(plan_nohdr.header, "\n")
+    ok(
+      header_nohdr:find("---@module 't.nohdr'", 1, true) ~= nil,
+      "annotate.plan: header opens with the derived ---@module line"
+    )
+    ok(
+      header_nohdr:find("---@class t.nohdr", 1, true) ~= nil,
+      "annotate.plan: header declares a ---@class named after the module"
+    )
+    ok(
+      header_nohdr:find("---@field foo fun(path: string): boolean", 1, true) ~= nil,
+      "annotate.plan: reconstructs a fun(...) type from the function's own @param/@return"
+    )
+    ok(
+      header_nohdr:find("---@field cfg table", 1, true) ~= nil,
+      "annotate.plan: falls back to `table` for an untyped table field"
+    )
+
+    -- plan(): referenced class
+    local plan_withclass = assert(
+      annotate.plan(node_by_id("lua/t/withclass"), dr, "lua"),
+      "annotate.plan: builds a plan for the withclass fixture"
+    )
+    local header_withclass = table.concat(plan_withclass.header, "\n")
+    ok(
+      header_withclass:find("---@class t.withclass", 1, true) ~= nil,
+      "annotate.plan: still declares the module's own ---@class"
+    )
+    ok(
+      header_withclass:find("---@field rate_limits t.withclass.RateLimits", 1, true) ~= nil,
+      "annotate.plan: references an already-declared ---@class instead of writing `table`"
+    )
+    ok(
+      header_withclass:find("---@field per_minute", 1, true) == nil,
+      "annotate.plan: does not pull the referenced class's own fields into M's field list"
+    )
+
+    -- plan(): function export, no class block
+    local plan_fn = assert(
+      annotate.plan(node_by_id("lua/t/fnexport"), dr, "lua"),
+      "annotate.plan: builds a plan for the fnexport fixture"
+    )
+    eq(plan_fn.anchor, nil, "annotate.plan: no anchor for a function-export file")
+    eq(plan_fn.has_class, false, "annotate.plan: no class block for a function-export file")
+    eq(#plan_fn.header, 2, "annotate.plan: header is just @module + the TODO line")
+
+    -- Binary reads throughout, matching `dwrite` above and the binary
+    -- `lib.nvim.fs.read`/`write.to_file` pair `annotate.lua` itself uses.
+    local function dread(path)
+      local fd = io.open(path, "rb")
+      if not fd then
+        return nil
       end
-
-      -- The control: the same call over a plain candidate writes its sidecar.
-      local plain_ok = annotate.apply(plan_of("plain"), proj, "sidecar")
-      ok(plain_ok, "annotate.apply (links): a plain candidate still gets its sidecar")
-      ok(dread(proj .. "/lua/t/plain/init.lua.annot.lua"), "annotate.apply (links): ...written")
-
-      -- The sidecar name is a link to a file outside the project.
-      local ok_existing, err_existing = annotate.apply(plan_of("existing"), proj, "sidecar")
-      eq(ok_existing, false, "annotate.apply (links): a sidecar that is a link is refused")
-      ok(
-        type(err_existing) == "string"
-          and err_existing:find("init.lua.annot.lua is a link", 1, true),
-        "annotate.apply (links): ...naming the link: " .. tostring(err_existing)
-      )
-      eq(
-        dread(outside .. "/victim.txt"),
-        "VICTIM-ORIGINAL",
-        "annotate.apply (links): target intact"
-      )
-
-      -- ...to a place that is not there yet: writing would create it.
-      local ok_dangling = annotate.apply(plan_of("dangling"), proj, "sidecar")
-      eq(ok_dangling, false, "annotate.apply (links): a dangling sidecar link is refused")
-      eq(
-        vim.fn.filereadable(outside .. "/never.txt"),
-        0,
-        "annotate.apply (links): ...nothing created"
-      )
-
-      -- ...to a file inside the project, which is a link all the same.
-      local ok_inside = annotate.apply(plan_of("inside"), proj, "sidecar")
-      eq(ok_inside, false, "annotate.apply (links): a sidecar link that stays inside is refused")
-      eq(
-        dread(proj .. "/lua/t/inside/real.txt"),
-        "INSIDE-ORIGINAL",
-        "annotate.apply (links): ...and its target is intact"
-      )
-
-      -- A name that cannot be looked at is not taken to be a plain one.
-      local safe_fs = require("docmap.core.safe_fs")
-      local real_lstat = safe_fs.host.lstat
-      safe_fs.host.lstat = function(path)
-        if path:find("/denied/init.lua.annot.lua", 1, true) then
-          return nil, "EACCES: permission denied", "EACCES"
-        end
-        return real_lstat(path)
-      end
-      local ran, ok_denied, err_denied = pcall(annotate.apply, plan_of("denied"), proj, "sidecar")
-      safe_fs.host.lstat = real_lstat
-      safe_fs.forget()
-      assert(ran, ok_denied)
-      eq(ok_denied, false, "annotate.apply (links): a sidecar name that cannot be inspected")
-      ok(
-        type(err_denied) == "string" and err_denied:find("cannot be inspected", 1, true),
-        "annotate.apply (links): ...is refused, and says so: " .. tostring(err_denied)
-      )
-      eq(
-        vim.fn.filereadable(proj .. "/lua/t/denied/init.lua.annot.lua"),
-        0,
-        "annotate.apply (links): ...and nothing is written"
-      )
-
-      -- A plan outlives the scan, and the tree can change in between: the
-      -- source is now a link to a file with the very same content, so the
-      -- stale-plan check passes and only the link check is left to stop it.
-      local swapped = plan_of("swapped")
-      lwrite(outside .. "/swapped.lua", source)
-      vim.fn.delete(proj .. "/lua/t/swapped/init.lua")
-      link(outside .. "/swapped.lua", proj .. "/lua/t/swapped/init.lua", false)
-      local ok_swapped, err_swapped = annotate.apply(swapped, proj, "inline")
-      eq(ok_swapped, false, "annotate.apply (links): inline refuses a source that became a link")
-      ok(
-        type(err_swapped) == "string" and err_swapped:find("is a link", 1, true),
-        "annotate.apply (links): ...and says why: " .. tostring(err_swapped)
-      )
-      eq(
-        dread(outside .. "/swapped.lua"),
-        table.concat(source, "\n"),
-        "annotate.apply (links): ...and the file it led to is intact"
-      )
-
-      -- ...and so can a directory on the way.
-      local dirswap = plan_of("dirswap")
-      lwrite(outside .. "/dirswap/init.lua", source)
-      vim.fn.delete(proj .. "/lua/t/dirswap", "rf")
-      link(outside .. "/dirswap", proj .. "/lua/t/dirswap", true)
-      local ok_dirswap, err_dirswap = annotate.apply(dirswap, proj, "sidecar")
-      eq(ok_dirswap, false, "annotate.apply (links): a directory on the way that is a link")
-      ok(
-        type(err_dirswap) == "string" and err_dirswap:find("lua/t/dirswap is a link", 1, true),
-        "annotate.apply (links): ...names that directory: " .. tostring(err_dirswap)
-      )
-      eq(
-        vim.fn.filereadable(outside .. "/dirswap/init.lua.annot.lua"),
-        0,
-        "annotate.apply (links): ...and nothing appeared behind it"
-      )
-    end
-    vim.fn.delete(lr, "rf")
-  end
-
-  -- ── bindings :DocMap annotate --write over a wide candidate set ────────────
-  -- More than CHUNK (10) files missing ---@module: the command must plan and
-  -- write them in chunks across event-loop ticks (never one blocking loop)
-  -- and still annotate every one.
-  do
-    local wr = H.tmpfile("_annotate_wide")
-    local n = 15
-    for i = 1, n do
-      local abs = string.format("%s/lua/w/m%02d/init.lua", wr, i)
-      vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
-      local fd = assert(io.open(abs, "wb"))
-      fd:write(table.concat({ "local M = {}", "function M.go() end", "return M" }, "\n"))
+      local content = fd:read("*a")
       fd:close()
+      return content
     end
 
-    local wide_ir = scan.scan({ root = wr, source = "lua/w", lua_root = "lua" })
-    local done_msg
-    local ctx = {
-      cfg = { root = wr, lua_root = "lua", progress_style = "notify" },
-      notify = {
-        info = function(m)
-          done_msg = m
-        end,
-        warn = function() end,
-      },
-      handle = {
-        ir = function()
-          return wide_ir
-        end,
-      },
-    }
+    -- apply(): sidecar never touches the original file.
+    local before = assert(dread(dr .. "/lua/t/nohdr/init.lua"))
+    local ok_sidecar = annotate.apply(plan_nohdr, dr, "sidecar")
+    ok(ok_sidecar, "annotate.apply(sidecar): reports success")
+    ok(
+      dread(dr .. "/lua/t/nohdr/init.lua.annot.lua") ~= nil,
+      "annotate.apply(sidecar): writes the *.annot.lua file"
+    )
+    local after = assert(dread(dr .. "/lua/t/nohdr/init.lua"))
+    eq(before, after, "annotate.apply(sidecar): the original file is byte-for-byte untouched")
 
-    require("docmap.bindings.usrcmds.annotate").run(ctx, "--write")
-    local settled = vim.wait(5000, function()
-      return done_msg ~= nil
-    end)
-    ok(settled, "annotate --write (wide): the command settled")
+    -- apply(): inline splices above the anchor and leaves the code below it
+    -- byte-for-byte identical.
+    local ok_inline = annotate.apply(plan_nohdr, dr, "inline")
+    ok(ok_inline, "annotate.apply(inline): reports success")
+    local written = assert(dread(dr .. "/lua/t/nohdr/init.lua"))
     ok(
-      done_msg and done_msg:find(("%d file(s) annotated"):format(n), 1, true) ~= nil,
-      "annotate --write (wide): every candidate was annotated"
+      written:find("---@module 't.nohdr'", 1, true) ~= nil,
+      "annotate.apply(inline): the header is now in the real file"
     )
-    local last = assert(dread(string.format("%s/lua/w/m%02d/init.lua", wr, n)))
+    local original_tail = table.concat(plan_nohdr.lines, "\n"):match("local M = {}.*$")
     ok(
-      last:find("---@module 'w.m%d+'") ~= nil,
-      "annotate --write (wide): the last file got its header on disk"
+      written:find(original_tail, 1, true) ~= nil,
+      "annotate.apply(inline): everything from `local M = {}` down is byte-for-byte unchanged"
     )
-  end
-  H.restore(snap)
+
+    -- apply(): a stale plan (the file changed on disk after it was scanned) is
+    -- rejected instead of blindly overwritten (ERR-30).
+    do
+      local stale_path = dr .. "/lua/t/stale/init.lua"
+      dwrite("lua/t/stale/init.lua", {
+        "local M = {}",
+        "",
+        "function M.go() end",
+        "",
+        "return M",
+      })
+      local stale_ir = scan.scan({ root = dr, source = "lua/t", lua_root = "lua" })
+      local plan_stale = assert(annotate.plan(stale_ir.nodes["lua/t/stale"], dr, "lua"))
+
+      -- The file changes on disk after the plan above was taken.
+      local fd = assert(io.open(stale_path, "wb"))
+      fd:write(table.concat({
+        "local M = {}",
+        "",
+        "function M.go() end",
+        "function M.changed() end",
+        "",
+        "return M",
+      }, "\n"))
+      fd:close()
+      local changed = assert(dread(stale_path))
+
+      local ok_stale, err_stale = annotate.apply(plan_stale, dr, "inline")
+      ok(
+        not ok_stale,
+        "annotate.apply: a stale plan (file changed since it was scanned) is rejected"
+      )
+      ok(
+        type(err_stale) == "string" and err_stale:find("changed", 1, true) ~= nil,
+        "annotate.apply: the rejection names the file as changed"
+      )
+      eq(
+        assert(dread(stale_path)),
+        changed,
+        "annotate.apply: a stale plan leaves the file exactly as it was, not overwritten"
+      )
+    end
+
+    -- apply(): never through a link. The sidecar's name is derived from the
+    -- scanned path, so a repository can plant a link under it; the real
+    -- routines run over real links, and the places they lead to are looked at
+    -- afterwards -- "apply returned false" alone would pass a version that
+    -- wrote first.
+    do
+      local lr = H.tmpfile("_annotate_links")
+      vim.fn.mkdir(lr, "p")
+      lr = H.canonical(lr)
+      local outside = lr .. "/outside"
+      local proj = lr .. "/proj"
+      local source = { "local M = {}", "", "function M.go() end", "", "return M" }
+      local function lwrite(path, lines)
+        vim.fn.mkdir(vim.fs.dirname(path), "p")
+        local fd = assert(io.open(path, "wb"))
+        fd:write(table.concat(lines, "\n"))
+        fd:close()
+      end
+      for _, name in ipairs({
+        "plain",
+        "existing",
+        "dangling",
+        "inside",
+        "swapped",
+        "dirswap",
+        "denied",
+      }) do
+        lwrite(proj .. "/lua/t/" .. name .. "/init.lua", source)
+      end
+      lwrite(outside .. "/victim.txt", { "VICTIM-ORIGINAL" })
+      lwrite(proj .. "/lua/t/inside/real.txt", { "INSIDE-ORIGINAL" })
+
+      local made_all = true
+      local function link(target, at, is_dir)
+        local made = H.link(target, at, is_dir)
+        made_all = made_all and made
+      end
+      link(outside .. "/victim.txt", proj .. "/lua/t/existing/init.lua.annot.lua", false)
+      link(outside .. "/never.txt", proj .. "/lua/t/dangling/init.lua.annot.lua", false)
+      link(proj .. "/lua/t/inside/real.txt", proj .. "/lua/t/inside/init.lua.annot.lua", false)
+
+      if not made_all then
+        -- Windows without the symlink privilege: a file link cannot be made, so
+        -- there is nothing to refuse.
+        ok(vim.fn.has("win32") == 1, "annotate.apply (links): a file link could not be made")
+      else
+        local lir = scan.scan({ root = proj, source = "lua/t", lua_root = "lua" })
+        local function plan_of(name)
+          return assert(annotate.plan(lir.nodes["lua/t/" .. name], proj, "lua"))
+        end
+
+        -- The control: the same call over a plain candidate writes its sidecar.
+        local plain_ok = annotate.apply(plan_of("plain"), proj, "sidecar")
+        ok(plain_ok, "annotate.apply (links): a plain candidate still gets its sidecar")
+        ok(dread(proj .. "/lua/t/plain/init.lua.annot.lua"), "annotate.apply (links): ...written")
+
+        -- The sidecar name is a link to a file outside the project.
+        local ok_existing, err_existing = annotate.apply(plan_of("existing"), proj, "sidecar")
+        eq(ok_existing, false, "annotate.apply (links): a sidecar that is a link is refused")
+        ok(
+          type(err_existing) == "string"
+            and err_existing:find("init.lua.annot.lua is a link", 1, true),
+          "annotate.apply (links): ...naming the link: " .. tostring(err_existing)
+        )
+        eq(
+          dread(outside .. "/victim.txt"),
+          "VICTIM-ORIGINAL",
+          "annotate.apply (links): target intact"
+        )
+
+        -- ...to a place that is not there yet: writing would create it.
+        local ok_dangling = annotate.apply(plan_of("dangling"), proj, "sidecar")
+        eq(ok_dangling, false, "annotate.apply (links): a dangling sidecar link is refused")
+        eq(
+          vim.fn.filereadable(outside .. "/never.txt"),
+          0,
+          "annotate.apply (links): ...nothing created"
+        )
+
+        -- ...to a file inside the project, which is a link all the same.
+        local ok_inside = annotate.apply(plan_of("inside"), proj, "sidecar")
+        eq(ok_inside, false, "annotate.apply (links): a sidecar link that stays inside is refused")
+        eq(
+          dread(proj .. "/lua/t/inside/real.txt"),
+          "INSIDE-ORIGINAL",
+          "annotate.apply (links): ...and its target is intact"
+        )
+
+        -- A name that cannot be looked at is not taken to be a plain one.
+        local safe_fs = require("docmap.core.safe_fs")
+        local real_lstat = safe_fs.host.lstat
+        safe_fs.host.lstat = function(path)
+          if path:find("/denied/init.lua.annot.lua", 1, true) then
+            return nil, "EACCES: permission denied", "EACCES"
+          end
+          return real_lstat(path)
+        end
+        local ran, ok_denied, err_denied = pcall(annotate.apply, plan_of("denied"), proj, "sidecar")
+        safe_fs.host.lstat = real_lstat
+        safe_fs.forget()
+        assert(ran, ok_denied)
+        eq(ok_denied, false, "annotate.apply (links): a sidecar name that cannot be inspected")
+        ok(
+          type(err_denied) == "string" and err_denied:find("cannot be inspected", 1, true),
+          "annotate.apply (links): ...is refused, and says so: " .. tostring(err_denied)
+        )
+        eq(
+          vim.fn.filereadable(proj .. "/lua/t/denied/init.lua.annot.lua"),
+          0,
+          "annotate.apply (links): ...and nothing is written"
+        )
+
+        -- A plan outlives the scan, and the tree can change in between: the
+        -- source is now a link to a file with the very same content, so the
+        -- stale-plan check passes and only the link check is left to stop it.
+        local swapped = plan_of("swapped")
+        lwrite(outside .. "/swapped.lua", source)
+        vim.fn.delete(proj .. "/lua/t/swapped/init.lua")
+        link(outside .. "/swapped.lua", proj .. "/lua/t/swapped/init.lua", false)
+        local ok_swapped, err_swapped = annotate.apply(swapped, proj, "inline")
+        eq(ok_swapped, false, "annotate.apply (links): inline refuses a source that became a link")
+        ok(
+          type(err_swapped) == "string" and err_swapped:find("is a link", 1, true),
+          "annotate.apply (links): ...and says why: " .. tostring(err_swapped)
+        )
+        eq(
+          dread(outside .. "/swapped.lua"),
+          table.concat(source, "\n"),
+          "annotate.apply (links): ...and the file it led to is intact"
+        )
+
+        -- ...and so can a directory on the way.
+        local dirswap = plan_of("dirswap")
+        lwrite(outside .. "/dirswap/init.lua", source)
+        vim.fn.delete(proj .. "/lua/t/dirswap", "rf")
+        link(outside .. "/dirswap", proj .. "/lua/t/dirswap", true)
+        local ok_dirswap, err_dirswap = annotate.apply(dirswap, proj, "sidecar")
+        eq(ok_dirswap, false, "annotate.apply (links): a directory on the way that is a link")
+        ok(
+          type(err_dirswap) == "string" and err_dirswap:find("lua/t/dirswap is a link", 1, true),
+          "annotate.apply (links): ...names that directory: " .. tostring(err_dirswap)
+        )
+        eq(
+          vim.fn.filereadable(outside .. "/dirswap/init.lua.annot.lua"),
+          0,
+          "annotate.apply (links): ...and nothing appeared behind it"
+        )
+      end
+      vim.fn.delete(lr, "rf")
+    end
+
+    -- ── bindings :DocMap annotate --write over a wide candidate set ────────────
+    -- More than CHUNK (10) files missing ---@module: the command must plan and
+    -- write them in chunks across event-loop ticks (never one blocking loop)
+    -- and still annotate every one.
+    do
+      local wr = H.tmpfile("_annotate_wide")
+      local n = 15
+      for i = 1, n do
+        local abs = string.format("%s/lua/w/m%02d/init.lua", wr, i)
+        vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
+        local fd = assert(io.open(abs, "wb"))
+        fd:write(table.concat({ "local M = {}", "function M.go() end", "return M" }, "\n"))
+        fd:close()
+      end
+
+      local wide_ir = scan.scan({ root = wr, source = "lua/w", lua_root = "lua" })
+      local done_msg
+      local ctx = {
+        cfg = { root = wr, lua_root = "lua", progress_style = "notify" },
+        notify = {
+          info = function(m)
+            done_msg = m
+          end,
+          warn = function() end,
+        },
+        handle = {
+          ir = function()
+            return wide_ir
+          end,
+        },
+      }
+
+      require("docmap.bindings.usrcmds.annotate").run(ctx, "--write")
+      local settled = vim.wait(5000, function()
+        return done_msg ~= nil
+      end)
+      ok(settled, "annotate --write (wide): the command settled")
+      ok(
+        done_msg and done_msg:find(("%d file(s) annotated"):format(n), 1, true) ~= nil,
+        "annotate --write (wide): every candidate was annotated"
+      )
+      local last = assert(dread(string.format("%s/lua/w/m%02d/init.lua", wr, n)))
+      ok(
+        last:find("---@module 'w.m%d+'") ~= nil,
+        "annotate --write (wide): the last file got its header on disk"
+      )
+    end
+  end)
 end

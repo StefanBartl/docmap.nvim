@@ -6,55 +6,55 @@
 -- The handle `setup()` returns is lazy now: the first read scans.
 
 return function(H)
-  local snap = H.snapshot()
-  local eq, ok = H.eq, H.ok
+  H.with_restore(nil, function()
+    local eq, ok = H.eq, H.ok
 
-  local root = vim.fn.tempname():gsub("\\", "/")
-  vim.fn.mkdir(root .. "/lua/lazyfix", "p")
-  vim.fn.writefile({ "local M = {}", "return M" }, root .. "/lua/lazyfix/init.lua")
+    local root = vim.fn.tempname():gsub("\\", "/")
+    vim.fn.mkdir(root .. "/lua/lazyfix", "p")
+    vim.fn.writefile({ "local M = {}", "return M" }, root .. "/lua/lazyfix/init.lua")
 
-  local scan_full = require("docmap").scan_full
-  local scans = 0
-  require("docmap").scan_full = function(...)
-    scans = scans + 1
-    return scan_full(...)
-  end
+    local scan_full = require("docmap").scan_full
+    local scans = 0
+    require("docmap").scan_full = function(...)
+      scans = scans + 1
+      return scan_full(...)
+    end
 
-  local handle = require("docmap.bindings.usrcmds").setup({
-    root = root,
-    command_name = "DocMapLazySpec",
-    browse_command_name = "DocBrowseLazySpec",
-    hover = false,
-    telemetry = false,
-  })
+    local handle = require("docmap.bindings.usrcmds").setup({
+      root = root,
+      command_name = "DocMapLazySpec",
+      browse_command_name = "DocBrowseLazySpec",
+      hover = false,
+      telemetry = false,
+    })
 
-  eq(scans, 0, "setup(): no scan before the first read")
-  eq(handle.scanned(), false, "setup(): the handle reports it is not scanned yet")
+    eq(scans, 0, "setup(): no scan before the first read")
+    eq(handle.scanned(), false, "setup(): the handle reports it is not scanned yet")
 
-  local ir = handle.ir()
-  eq(scans, 1, "the first ir() read scans")
-  eq(handle.scanned(), true, "after the read the handle is scanned")
-  ok(ir and ir.nodes, "ir() hands back a real IR")
+    local ir = handle.ir()
+    eq(scans, 1, "the first ir() read scans")
+    eq(handle.scanned(), true, "after the read the handle is scanned")
+    ok(ir and ir.nodes, "ir() hands back a real IR")
 
-  handle.ir()
-  handle.findings()
-  eq(scans, 1, "later reads reuse the scan")
+    handle.ir()
+    handle.findings()
+    eq(scans, 1, "later reads reuse the scan")
 
-  -- findings() on its own is also a first read.
-  require("docmap.editor.registry").uninstall(root)
-  local second = require("docmap.bindings.usrcmds").setup({
-    root = root,
-    command_name = "DocMapLazySpec",
-    browse_command_name = "DocBrowseLazySpec",
-    hover = false,
-    telemetry = false,
-  })
-  local before = scans
-  ok(type(second.findings()) == "table", "findings() on a fresh lazy handle scans and answers")
-  eq(scans, before + 1, "findings() as first read costs one scan")
+    -- findings() on its own is also a first read.
+    require("docmap.editor.registry").uninstall(root)
+    local second = require("docmap.bindings.usrcmds").setup({
+      root = root,
+      command_name = "DocMapLazySpec",
+      browse_command_name = "DocBrowseLazySpec",
+      hover = false,
+      telemetry = false,
+    })
+    local before = scans
+    ok(type(second.findings()) == "table", "findings() on a fresh lazy handle scans and answers")
+    eq(scans, before + 1, "findings() as first read costs one scan")
 
-  require("docmap.editor.registry").uninstall(root)
-  require("docmap").scan_full = scan_full
-  vim.fn.delete(root, "rf")
-  H.restore(snap)
+    require("docmap.editor.registry").uninstall(root)
+    require("docmap").scan_full = scan_full
+    vim.fn.delete(root, "rf")
+  end)
 end

@@ -15,119 +15,122 @@
 -- through `telemetry.load()`) only runs when a real checkout is reachable.
 
 return function(H)
-  local snap = H.snapshot()
-  local eq, ok = H.eq, H.ok
-  local telemetry_self = require("docmap.core.telemetry_self")
+  H.with_restore({ groups = { "ra_telemetry_" } }, function()
+    local eq, ok = H.eq, H.ok
+    local telemetry_self = require("docmap.core.telemetry_self")
 
-  -- opts.telemetry == false is a hard opt-out, checked before anything else
-  -- — true regardless of whether runtime-analysis.nvim is even installed,
-  -- so this assertion is meaningful in both the default and the
-  -- real-checkout run.
-  do
-    telemetry_self._reset_for_test()
-    local inst = telemetry_self.setup({ telemetry = false, title = "should-not-matter" })
-    eq(inst, nil, "setup: opts.telemetry = false is a hard opt-out")
-  end
-
-  local ok_ra = pcall(require, "runtime-analysis.telemetry")
-
-  if not ok_ra then
-    -- The default, real "not installed" case for a plain local run.
+    -- opts.telemetry == false is a hard opt-out, checked before anything else
+    -- — true regardless of whether runtime-analysis.nvim is even installed,
+    -- so this assertion is meaningful in both the default and the
+    -- real-checkout run.
     do
       telemetry_self._reset_for_test()
-      local inst = telemetry_self.setup({ title = "demo.nvim" })
-      eq(inst, nil, "setup: nil (not an error) when runtime-analysis.nvim is not installed")
-    end
-  else
-    -- Real runtime-analysis.nvim on the rtp (RUNTIME_ANALYSIS_DIR).
-    local telemetry = require("runtime-analysis.telemetry")
-    local store = require("runtime-analysis.telemetry.store")
-    local cache_dir = vim.fn.stdpath("cache") .. "/runtime-analysis.nvim/cache"
-
-    -- No namespace resolvable at all (neither title nor telemetry_namespace)
-    -- — nil, not a guessed name, not an error.
-    do
-      telemetry_self._reset_for_test()
-      local inst = telemetry_self.setup({})
-      eq(inst, nil, "setup: nil when no namespace can be resolved at all")
+      local inst = telemetry_self.setup({ telemetry = false, title = "should-not-matter" })
+      eq(inst, nil, "setup: opts.telemetry = false is a hard opt-out")
     end
 
-    -- telemetry_namespace overrides title, the identical precedence
-    -- telemetry_join.namespace (the read side) already documents — checked
-    -- here by confirming the instance's own namespace, not by inspecting
-    -- private state.
-    do
-      telemetry_self._reset_for_test()
-      local ns = "docmap-nvim-self-telemetry-spec-override"
-      store.clear(ns, { dir = cache_dir })
-      local inst = assert(
-        telemetry_self.setup({ title = "wrong-name", telemetry_namespace = ns }),
-        "setup: a real instance when a namespace resolves"
-      )
-      eq(inst.namespace, ns, "setup: telemetry_namespace overrides title")
-      inst.stop()
-      store.clear(ns, { dir = cache_dir })
-    end
+    local ok_ra = pcall(require, "runtime-analysis.telemetry")
 
-    -- Idempotency: a second call before the namespace changes returns the
-    -- SAME instance rather than creating a duplicate "docmap.nvim"
-    -- namespace writer (which `telemetry.new`'s own "already has a live
-    -- instance" warning exists specifically to catch).
-    do
-      telemetry_self._reset_for_test()
-      local ns = "docmap-nvim-self-telemetry-spec-idempotent"
-      store.clear(ns, { dir = cache_dir })
-      local first =
-        assert(telemetry_self.setup({ title = ns }), "setup: first call returns a real instance")
-      local second = assert(
-        telemetry_self.setup({ title = ns }),
-        "setup: second call also returns a real instance"
-      )
-      eq(first, second, "setup: a second call returns the identical instance, not a new one")
-      first.stop()
-      store.clear(ns, { dir = cache_dir })
-    end
-
-    -- The real end-to-end path: `main = "docmap"` actually wraps
-    -- this repo's own already-loaded modules, a real call is counted, and
-    -- it survives a flush + telemetry.load() the way the browse telemetry
-    -- mode itself reads it back.
-    do
-      telemetry_self._reset_for_test()
-      local ns = "docmap-nvim-self-telemetry-spec-e2e"
-      store.clear(ns, { dir = cache_dir })
-
-      -- `docmap.core.telemetry_self` is itself already loaded (this
-      -- spec just required it) and lives under the `docmap.` prefix
-      -- `main = "docmap"` wraps — calling its own already-defined
-      -- `_reset_for_test` through the wrapped table is exactly the kind of
-      -- already-loaded call `M.setup`'s own honest-limits note describes.
-      local inst = telemetry_self.setup({ title = ns })
-      ok(inst ~= nil, "setup (e2e): a real instance")
-
-      -- A function on the resolved module map — resolved_modules() proves
-      -- at least one real `docmap.*` path actually got wrapped,
-      -- not just the bare require("docmap") facade table itself.
-      local resolved = inst.resolved_modules()
-      local any_docmap_module = false
-      for _, path in pairs(resolved) do
-        if path:find("^docmap%.") or path == "docmap" then
-          any_docmap_module = true
-          break
-        end
+    if not ok_ra then
+      -- The default, real "not installed" case for a plain local run.
+      do
+        telemetry_self._reset_for_test()
+        local inst = telemetry_self.setup({ title = "demo.nvim" })
+        eq(inst, nil, "setup: nil (not an error) when runtime-analysis.nvim is not installed")
       end
-      ok(any_docmap_module, "setup (e2e): resolved_modules() names at least one real docmap.* path")
+    else
+      -- Real runtime-analysis.nvim on the rtp (RUNTIME_ANALYSIS_DIR).
+      local telemetry = require("runtime-analysis.telemetry")
+      local store = require("runtime-analysis.telemetry.store")
+      local cache_dir = vim.fn.stdpath("cache") .. "/runtime-analysis.nvim/cache"
 
-      inst.flush()
-      inst.stop()
+      -- No namespace resolvable at all (neither title nor telemetry_namespace)
+      -- — nil, not a guessed name, not an error.
+      do
+        telemetry_self._reset_for_test()
+        local inst = telemetry_self.setup({})
+        eq(inst, nil, "setup: nil when no namespace can be resolved at all")
+      end
 
-      local data = telemetry.load(ns)
-      ok(data ~= nil, "setup (e2e): the namespace is readable back via telemetry.load()")
+      -- telemetry_namespace overrides title, the identical precedence
+      -- telemetry_join.namespace (the read side) already documents — checked
+      -- here by confirming the instance's own namespace, not by inspecting
+      -- private state.
+      do
+        telemetry_self._reset_for_test()
+        local ns = "docmap-nvim-self-telemetry-spec-override"
+        store.clear(ns, { dir = cache_dir })
+        local inst = assert(
+          telemetry_self.setup({ title = "wrong-name", telemetry_namespace = ns }),
+          "setup: a real instance when a namespace resolves"
+        )
+        eq(inst.namespace, ns, "setup: telemetry_namespace overrides title")
+        inst.stop()
+        store.clear(ns, { dir = cache_dir })
+      end
 
-      store.clear(ns, { dir = cache_dir })
+      -- Idempotency: a second call before the namespace changes returns the
+      -- SAME instance rather than creating a duplicate "docmap.nvim"
+      -- namespace writer (which `telemetry.new`'s own "already has a live
+      -- instance" warning exists specifically to catch).
+      do
+        telemetry_self._reset_for_test()
+        local ns = "docmap-nvim-self-telemetry-spec-idempotent"
+        store.clear(ns, { dir = cache_dir })
+        local first =
+          assert(telemetry_self.setup({ title = ns }), "setup: first call returns a real instance")
+        local second = assert(
+          telemetry_self.setup({ title = ns }),
+          "setup: second call also returns a real instance"
+        )
+        eq(first, second, "setup: a second call returns the identical instance, not a new one")
+        first.stop()
+        store.clear(ns, { dir = cache_dir })
+      end
+
+      -- The real end-to-end path: `main = "docmap"` actually wraps
+      -- this repo's own already-loaded modules, a real call is counted, and
+      -- it survives a flush + telemetry.load() the way the browse telemetry
+      -- mode itself reads it back.
+      do
+        telemetry_self._reset_for_test()
+        local ns = "docmap-nvim-self-telemetry-spec-e2e"
+        store.clear(ns, { dir = cache_dir })
+
+        -- `docmap.core.telemetry_self` is itself already loaded (this
+        -- spec just required it) and lives under the `docmap.` prefix
+        -- `main = "docmap"` wraps — calling its own already-defined
+        -- `_reset_for_test` through the wrapped table is exactly the kind of
+        -- already-loaded call `M.setup`'s own honest-limits note describes.
+        local inst = telemetry_self.setup({ title = ns })
+        ok(inst ~= nil, "setup (e2e): a real instance")
+
+        -- A function on the resolved module map — resolved_modules() proves
+        -- at least one real `docmap.*` path actually got wrapped,
+        -- not just the bare require("docmap") facade table itself.
+        local resolved = inst.resolved_modules()
+        local any_docmap_module = false
+        for _, path in pairs(resolved) do
+          if path:find("^docmap%.") or path == "docmap" then
+            any_docmap_module = true
+            break
+          end
+        end
+        ok(
+          any_docmap_module,
+          "setup (e2e): resolved_modules() names at least one real docmap.* path"
+        )
+
+        inst.flush()
+        inst.stop()
+
+        local data = telemetry.load(ns)
+        ok(data ~= nil, "setup (e2e): the namespace is readable back via telemetry.load()")
+
+        store.clear(ns, { dir = cache_dir })
+      end
+
+      telemetry_self._reset_for_test()
     end
-
-    telemetry_self._reset_for_test()
-  end
-  H.restore(snap, { groups = { "ra_telemetry_" } })
+  end)
 end

@@ -433,6 +433,9 @@ function M.reset()
   db, hydrated, dirty = nil, {}, {}
   attached = false
   pcall(vim.api.nvim_clear_autocmds, { group = "docmap.trail_store" })
+  -- The hook was made through lib.nvim, which keeps a record of it: forget
+  -- that too, else its registry describes a hook that is gone (one per cycle).
+  require("lib.nvim.bindings.autocmd").forget_group("docmap.trail_store")
 end
 
 return M

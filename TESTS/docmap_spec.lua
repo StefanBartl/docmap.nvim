@@ -5,2586 +5,2632 @@
 -- TESTS/docmap_spec.lua — docmap.core.functions, docmap.core.check
 
 return function(H)
-  local snap = H.snapshot()
-  local fmsg = require("docmap.core.findings").format
-  local eq, ok = H.eq, H.ok
+  H.with_restore({ wipe_only = true }, function(snap)
+    local fmsg = require("docmap.core.findings").format
+    local eq, ok = H.eq, H.ok
 
-  -- Scoped, because this file sits at Lua's 200-local-per-function
-  -- ceiling: a `local` at the spec's top level holds its slot for the
-  -- whole run, and adding this block was what first hit the limit.
-  do
-    -- ------------------------------------------------------------- docmap.json
-    --
-    -- The property the whole `--check` design rests on, and until now the only
-    -- one with no direct test. `--check` regenerates in memory and compares BYTE
-    -- FOR BYTE, so an encoder whose object-key order follows Lua's table
-    -- iteration reports the map as stale immediately after generating it. That
-    -- is what happened, and it is why this module exists instead of
-    -- `vim.json.encode` — but nothing was asserting it since.
-    local json = require("docmap.core.json")
+    -- Scoped, because this file sits at Lua's 200-local-per-function
+    -- ceiling: a `local` at the spec's top level holds its slot for the
+    -- whole run, and adding this block was what first hit the limit.
+    do
+      -- ------------------------------------------------------------- docmap.json
+      --
+      -- The property the whole `--check` design rests on, and until now the only
+      -- one with no direct test. `--check` regenerates in memory and compares BYTE
+      -- FOR BYTE, so an encoder whose object-key order follows Lua's table
+      -- iteration reports the map as stale immediately after generating it. That
+      -- is what happened, and it is why this module exists instead of
+      -- `vim.json.encode` — but nothing was asserting it since.
+      local json = require("docmap.core.json")
 
-    eq(
-      json.encode({ b = 1, a = 2, c = 3 }),
-      '{"a":2,"b":1,"c":3}',
-      "docmap.json: object keys are sorted, whatever order they were built in"
-    )
-    eq(json.encode({ z = { y = 1, x = 2 } }), '{"z":{"x":2,"y":1}}', "docmap.json: nested too")
+      eq(
+        json.encode({ b = 1, a = 2, c = 3 }),
+        '{"a":2,"b":1,"c":3}',
+        "docmap.json: object keys are sorted, whatever order they were built in"
+      )
+      eq(json.encode({ z = { y = 1, x = 2 } }), '{"z":{"x":2,"y":1}}', "docmap.json: nested too")
 
-    -- Arrays are a sequence, not a set: sorting them would reorder `ir.order`
-    -- and every `children` list, which are meaningful orders.
-    eq(json.encode({ "c", "a", "b" }), '["c","a","b"]', "docmap.json: arrays keep their order")
-    -- An empty Lua table is ambiguous, and the encoder resolves it to `[]` on
-    -- purpose: every empty container the IR actually produces is a list
-    -- (`children`, `types`, `functions`, `symbols`). The one record that could
-    -- collide with this rule, `stats`, always carries counts and so is never
-    -- empty. Asserted because the choice is invisible from the output and a
-    -- future "fix" towards `{}` would silently retype four fields.
-    eq(json.encode({}), "[]", "docmap.json: an empty table encodes as an empty list")
+      -- Arrays are a sequence, not a set: sorting them would reorder `ir.order`
+      -- and every `children` list, which are meaningful orders.
+      eq(json.encode({ "c", "a", "b" }), '["c","a","b"]', "docmap.json: arrays keep their order")
+      -- An empty Lua table is ambiguous, and the encoder resolves it to `[]` on
+      -- purpose: every empty container the IR actually produces is a list
+      -- (`children`, `types`, `functions`, `symbols`). The one record that could
+      -- collide with this rule, `stats`, always carries counts and so is never
+      -- empty. Asserted because the choice is invisible from the output and a
+      -- future "fix" towards `{}` would silently retype four fields.
+      eq(json.encode({}), "[]", "docmap.json: an empty table encodes as an empty list")
 
-    -- The contract stated directly: same input, same bytes.
-    local shaped = { name = "x", list = { 3, 1, 2 }, nested = { q = true, p = false } }
-    eq(json.encode(shaped), json.encode(shaped), "docmap.json: encoding is stable across calls")
+      -- The contract stated directly: same input, same bytes.
+      local shaped = { name = "x", list = { 3, 1, 2 }, nested = { q = true, p = false } }
+      eq(json.encode(shaped), json.encode(shaped), "docmap.json: encoding is stable across calls")
 
-    -- Scalars still have to survive a real decoder — that half is delegated
-    -- rather than reimplemented, and delegation is exactly what stops being
-    -- obvious once it is someone else's library.
-    local tricky = { s = 'a "quoted" \\ back', nl = "one\ntwo", tab = "a\tb" }
-    local round = vim.json.decode(json.encode(tricky))
-    eq(round.s, tricky.s, "docmap.json: quotes and backslashes round-trip")
-    eq(round.nl, tricky.nl, "docmap.json: newlines round-trip")
-    eq(round.tab, tricky.tab, "docmap.json: tabs round-trip")
-  end
-
-  -- --------------------------------------------------------- docmap.functions
-  local functions = require("docmap.core.functions")
-
-  local fixture = H.tmpfile(".lua")
-  local fw = assert(io.open(fixture, "w"), "docmap spec: fixture must be writable")
-  fw:write(table.concat({
-    "local M = {}",
-    "",
-    "---Does the old thing.",
-    "---@generic T",
-    "---@param x string the input",
-    "---@param opts table? extra options",
-    "---@return boolean ok",
-    "---@return string? err",
-    "---@overload fun(x: string): boolean",
-    "---@deprecated use new_thing instead",
-    "---@async",
-    "---@nodiscard",
-    "---@see M.new_thing",
-    "---@see nowhere.at.all",
-    "---@since v1.2.0",
-    "---@example",
-    '--- local ok = M.old_thing("x")',
-    "--- assert(ok)",
-    "function M.old_thing(x, opts)",
-    "  return true",
-    "end",
-    "",
-    "---The replacement.",
-    "function M.new_thing()",
-    "  local function helper()", -- nested: must NOT be scanned
-    "    return 1",
-    "  end",
-    "  return helper()",
-    "end",
-    "",
-    "local function bare_helper(a, b)", -- top-level local function: must be scanned
-    "  return a + b",
-    "end",
-    "",
-    "return M",
-  }, "\n"))
-  fw:close()
-
-  local fns = functions.scan_file(fixture)
-  eq(#fns, 3, "docmap.functions: finds exactly the 3 top-level functions, not the nested one")
-
-  local old_thing, new_thing, bare
-  for _, f in ipairs(fns) do
-    if f.name == "M.old_thing" then
-      old_thing = f
+      -- Scalars still have to survive a real decoder — that half is delegated
+      -- rather than reimplemented, and delegation is exactly what stops being
+      -- obvious once it is someone else's library.
+      local tricky = { s = 'a "quoted" \\ back', nl = "one\ntwo", tab = "a\tb" }
+      local round = vim.json.decode(json.encode(tricky))
+      eq(round.s, tricky.s, "docmap.json: quotes and backslashes round-trip")
+      eq(round.nl, tricky.nl, "docmap.json: newlines round-trip")
+      eq(round.tab, tricky.tab, "docmap.json: tabs round-trip")
     end
-    if f.name == "M.new_thing" then
-      new_thing = f
-    end
-    if f.name == "bare_helper" then
-      bare = f
-    end
-  end
 
-  ok(old_thing, "docmap.functions: M.old_thing found")
-  eq(
-    old_thing.signature,
-    "M.old_thing(x, opts)",
-    "docmap.functions: signature is the qualified name plus params"
-  )
-  eq(#old_thing.params, 2, "docmap.functions: 2 @param entries")
-  eq(old_thing.params[1].name, "x", "docmap.functions: first param name")
-  eq(old_thing.params[1].type, "string", "docmap.functions: first param type")
-  eq(old_thing.params[1].desc, "the input", "docmap.functions: first param desc")
-  eq(old_thing.params[2].optional, true, "docmap.functions: 'opts?' marks optional")
-  eq(#old_thing.returns, 2, "docmap.functions: 2 @return entries")
-  eq(old_thing.returns[1].type, "boolean", "docmap.functions: first return type")
-  eq(old_thing.returns[1].name, "ok", "docmap.functions: first return name")
-  eq(old_thing.deprecated, "use new_thing instead", "docmap.functions: @deprecated text")
-  eq(old_thing.async, true, "docmap.functions: @async flag")
-  eq(old_thing.nodiscard, true, "docmap.functions: @nodiscard flag")
-  eq(#old_thing.see, 2, "docmap.functions: 2 @see targets")
-  eq(old_thing.see[1], "M.new_thing", "docmap.functions: first @see target")
-  eq(old_thing.since, "v1.2.0", "docmap.functions: @since text")
-  eq(old_thing.generic[1], "T", "docmap.functions: @generic name")
-  eq(#old_thing.overload, 1, "docmap.functions: 1 @overload entry")
-  eq(
-    old_thing.overload[1].raw,
-    "fun(x: string): boolean",
-    "docmap.functions: @overload raw text preserved verbatim"
-  )
-  eq(#old_thing.overload[1].params, 1, "docmap.functions: @overload parsed 1 param")
-  eq(old_thing.overload[1].params[1].name, "x", "docmap.functions: @overload param name")
-  eq(old_thing.overload[1].params[1].type, "string", "docmap.functions: @overload param type")
-  eq(
-    old_thing.overload[1].params[1].optional,
-    false,
-    "docmap.functions: @overload param not optional"
-  )
-  eq(#old_thing.overload[1].returns, 1, "docmap.functions: @overload parsed 1 return")
-  eq(old_thing.overload[1].returns[1].type, "boolean", "docmap.functions: @overload return type")
-  ok(
-    old_thing.example and old_thing.example:match("assert%(ok%)"),
-    "docmap.functions: @example block captured across multiple lines"
-  )
-  eq(old_thing.summary, "Does the old thing.", "docmap.functions: leading prose becomes summary")
+    -- --------------------------------------------------------- docmap.functions
+    local functions = require("docmap.core.functions")
 
-  ok(new_thing, "docmap.functions: M.new_thing found")
-  eq(#new_thing.params, 0, "docmap.functions: M.new_thing has no params")
-  eq(new_thing.deprecated, nil, "docmap.functions: undecorated function has no @deprecated")
-
-  ok(bare, "docmap.functions: top-level 'local function bare_helper' is scanned")
-  eq(bare.signature, "bare_helper(a, b)", "docmap.functions: bare local function signature")
-  eq(old_thing.internal, false, "docmap.functions: @internal defaults to false")
-
-  -- @overload edge cases: several on one function, a nested generic type
-  -- (proving the same `{}/()/<>` depth tracking `split_type` uses is applied
-  -- to the comma split), a no-param/no-return shape, an anonymous
-  -- (unnamed) parameter, and a value that is not `fun(...)` at all — which
-  -- must degrade to "shown as written" rather than error, since `@overload`
-  -- is free-form text someone typed.
-  --
-  -- Scoped in `do...end`, same reason as the file's other scoped blocks: a
-  -- top-level `local` holds its slot for the whole spec run, and this file
-  -- already sits at Lua's 200-local ceiling.
-  do
-    local fixture_ov = H.tmpfile(".lua")
-    local fw_ov = assert(io.open(fixture_ov, "w"))
-    fw_ov:write(table.concat({
+    local fixture = H.tmpfile(".lua")
+    local fw = assert(io.open(fixture, "w"), "docmap spec: fixture must be writable")
+    fw:write(table.concat({
       "local M = {}",
       "",
-      "---Reads from several sources.",
-      "---@overload fun(): nil",
-      "---@overload fun(cache: table<string, string>): boolean, string",
-      "---@overload fun(string): boolean", -- anonymous (unnamed) positional param
-      "---@overload not a function type at all",
-      "---@param path string",
-      "---@param opts table?",
-      "---@return boolean",
-      "function M.read(path, opts)",
+      "---Does the old thing.",
+      "---@generic T",
+      "---@param x string the input",
+      "---@param opts table? extra options",
+      "---@return boolean ok",
+      "---@return string? err",
+      "---@overload fun(x: string): boolean",
+      "---@deprecated use new_thing instead",
+      "---@async",
+      "---@nodiscard",
+      "---@see M.new_thing",
+      "---@see nowhere.at.all",
+      "---@since v1.2.0",
+      "---@example",
+      '--- local ok = M.old_thing("x")',
+      "--- assert(ok)",
+      "function M.old_thing(x, opts)",
       "  return true",
+      "end",
+      "",
+      "---The replacement.",
+      "function M.new_thing()",
+      "  local function helper()", -- nested: must NOT be scanned
+      "    return 1",
+      "  end",
+      "  return helper()",
+      "end",
+      "",
+      "local function bare_helper(a, b)", -- top-level local function: must be scanned
+      "  return a + b",
       "end",
       "",
       "return M",
     }, "\n"))
-    fw_ov:close()
+    fw:close()
 
-    local ov_fns = functions.scan_file(fixture_ov)
-    local read_fn
-    for _, f in ipairs(ov_fns) do
-      if f.name == "M.read" then
-        read_fn = f
+    local fns = functions.scan_file(fixture)
+    eq(#fns, 3, "docmap.functions: finds exactly the 3 top-level functions, not the nested one")
+
+    local old_thing, new_thing, bare
+    for _, f in ipairs(fns) do
+      if f.name == "M.old_thing" then
+        old_thing = f
+      end
+      if f.name == "M.new_thing" then
+        new_thing = f
+      end
+      if f.name == "bare_helper" then
+        bare = f
       end
     end
-    ok(read_fn, "docmap.functions: M.read found")
-    eq(#read_fn.overload, 4, "docmap.functions: 4 @overload entries, one per line")
 
-    eq(#read_fn.overload[1].params, 0, "docmap.functions: fun() has no params")
-    eq(#read_fn.overload[1].returns, 1, "docmap.functions: fun(): nil has 1 return")
-    eq(read_fn.overload[1].returns[1].type, "nil", "docmap.functions: fun(): nil return type")
-
-    eq(#read_fn.overload[2].params, 1, "docmap.functions: nested-generic overload has 1 param")
+    ok(old_thing, "docmap.functions: M.old_thing found")
     eq(
-      read_fn.overload[2].params[1].type,
-      "table<string, string>",
-      "docmap.functions: comma inside table<...> does not split the param list early"
+      old_thing.signature,
+      "M.old_thing(x, opts)",
+      "docmap.functions: signature is the qualified name plus params"
     )
-    eq(#read_fn.overload[2].returns, 2, "docmap.functions: fun(...): boolean, string has 2 returns")
-    eq(read_fn.overload[2].returns[2].type, "string", "docmap.functions: second return type")
-
-    eq(#read_fn.overload[3].params, 1, "docmap.functions: anonymous param still counts as 1 param")
+    eq(#old_thing.params, 2, "docmap.functions: 2 @param entries")
+    eq(old_thing.params[1].name, "x", "docmap.functions: first param name")
+    eq(old_thing.params[1].type, "string", "docmap.functions: first param type")
+    eq(old_thing.params[1].desc, "the input", "docmap.functions: first param desc")
+    eq(old_thing.params[2].optional, true, "docmap.functions: 'opts?' marks optional")
+    eq(#old_thing.returns, 2, "docmap.functions: 2 @return entries")
+    eq(old_thing.returns[1].type, "boolean", "docmap.functions: first return type")
+    eq(old_thing.returns[1].name, "ok", "docmap.functions: first return name")
+    eq(old_thing.deprecated, "use new_thing instead", "docmap.functions: @deprecated text")
+    eq(old_thing.async, true, "docmap.functions: @async flag")
+    eq(old_thing.nodiscard, true, "docmap.functions: @nodiscard flag")
+    eq(#old_thing.see, 2, "docmap.functions: 2 @see targets")
+    eq(old_thing.see[1], "M.new_thing", "docmap.functions: first @see target")
+    eq(old_thing.since, "v1.2.0", "docmap.functions: @since text")
+    eq(old_thing.generic[1], "T", "docmap.functions: @generic name")
+    eq(#old_thing.overload, 1, "docmap.functions: 1 @overload entry")
     eq(
-      read_fn.overload[3].params[1].type,
-      "string",
-      "docmap.functions: a bare type with no 'name:' prefix is used as the type"
+      old_thing.overload[1].raw,
+      "fun(x: string): boolean",
+      "docmap.functions: @overload raw text preserved verbatim"
     )
-
+    eq(#old_thing.overload[1].params, 1, "docmap.functions: @overload parsed 1 param")
+    eq(old_thing.overload[1].params[1].name, "x", "docmap.functions: @overload param name")
+    eq(old_thing.overload[1].params[1].type, "string", "docmap.functions: @overload param type")
     eq(
-      #read_fn.overload[4].params,
-      0,
-      "docmap.functions: a non-'fun(...)' @overload value parses to no params"
+      old_thing.overload[1].params[1].optional,
+      false,
+      "docmap.functions: @overload param not optional"
     )
-    eq(
-      #read_fn.overload[4].returns,
-      0,
-      "docmap.functions: a non-'fun(...)' @overload value parses to no returns"
+    eq(#old_thing.overload[1].returns, 1, "docmap.functions: @overload parsed 1 return")
+    eq(old_thing.overload[1].returns[1].type, "boolean", "docmap.functions: @overload return type")
+    ok(
+      old_thing.example and old_thing.example:match("assert%(ok%)"),
+      "docmap.functions: @example block captured across multiple lines"
     )
-    eq(
-      read_fn.overload[4].raw,
-      "not a function type at all",
-      "docmap.functions: an unparseable @overload keeps its raw text rather than erroring"
-    )
-  end
+    eq(old_thing.summary, "Does the old thing.", "docmap.functions: leading prose becomes summary")
 
-  -- `@internal` marks implementation rather than published surface. It is
-  -- what lets every "is this used" question stop guessing from the shape of
-  -- a name.
-  local fixture3 = H.tmpfile(".lua")
-  local fw3 = assert(io.open(fixture3, "w"))
-  fw3:write(table.concat({
-    "local M = {}",
-    "---Plumbing.",
-    "---@internal",
-    "---@param a string",
-    "function M.plumbing(a, b)",
-    "  return a, b",
-    "end",
-    "return M",
-  }, "\n"))
-  fw3:close()
-  local fns3 = functions.scan_file(fixture3)
-  eq(fns3[1].internal, true, "docmap.functions: @internal is parsed")
+    ok(new_thing, "docmap.functions: M.new_thing found")
+    eq(#new_thing.params, 0, "docmap.functions: M.new_thing has no params")
+    eq(new_thing.deprecated, nil, "docmap.functions: undecorated function has no @deprecated")
 
-  -- `@todo`/`@bug`/`@test` feed the Notes tab's aggregate lists (Doxygen's
-  -- Todo/Bug/Test lists). Arrays rather than single strings on purpose: one
-  -- list entry per occurrence, so a function with two open todos keeps both.
-  -- lua-language-server ignores these tags rather than diagnosing them as
-  -- unknown, which is what makes them safe to introduce (checked against
-  -- 3.18.2 with --check before they were added).
-  local fixture4 = H.tmpfile(".lua")
-  local fw4 = assert(io.open(fixture4, "w"))
-  fw4:write(table.concat({
-    "local M = {}",
-    "---Needs work.",
-    "---@todo make this async",
-    "---@todo and handle cancellation",
-    "---@bug leaks a handle on error",
-    "---@test covered by t_spec.lua",
-    "function M.rough() end",
-    "---Nothing flagged.",
-    "function M.clean() end",
-    "return M",
-  }, "\n"))
-  fw4:close()
-  local fns4 = functions.scan_file(fixture4)
-  local rough, clean
-  for _, f in ipairs(fns4) do
-    if f.name == "M.rough" then
-      rough = f
-    end
-    if f.name == "M.clean" then
-      clean = f
-    end
-  end
-  eq(#rough.todo, 2, "docmap.functions: a repeated @todo keeps every occurrence")
-  eq(rough.todo[1], "make this async", "docmap.functions: @todo text, first occurrence")
-  eq(rough.todo[2], "and handle cancellation", "docmap.functions: @todo entries stay in order")
-  eq(rough.bug[1], "leaks a handle on error", "docmap.functions: @bug is parsed")
-  eq(rough.test[1], "covered by t_spec.lua", "docmap.functions: @test is parsed")
-  eq(#clean.todo, 0, "docmap.functions: an untagged function gets empty todo/bug/test arrays")
-  eq(#clean.bug, 0, "docmap.functions: @bug defaults to an empty array, never nil")
-  eq(#clean.test, 0, "docmap.functions: @test defaults to an empty array, never nil")
+    ok(bare, "docmap.functions: top-level 'local function bare_helper' is scanned")
+    eq(bare.signature, "bare_helper(a, b)", "docmap.functions: bare local function signature")
+    eq(old_thing.internal, false, "docmap.functions: @internal defaults to false")
 
-  -- cyclomatic_complexity: one decision point each for if/elseif/while/for/
-  -- repeat, plus one per and/or — verified against the exact shape used to
-  -- design the treesitter query in the first place (real inspection of a
-  -- parsed tree, not a guess at node types).
-  eq(old_thing.complexity, 1, "docmap.functions: a straight-line function has complexity 1")
-  eq(
-    new_thing.complexity,
-    1,
-    "docmap.functions: a nested closure with no branches of its own adds nothing"
-  )
+    -- @overload edge cases: several on one function, a nested generic type
+    -- (proving the same `{}/()/<>` depth tracking `split_type` uses is applied
+    -- to the comma split), a no-param/no-return shape, an anonymous
+    -- (unnamed) parameter, and a value that is not `fun(...)` at all — which
+    -- must degrade to "shown as written" rather than error, since `@overload`
+    -- is free-form text someone typed.
+    --
+    -- Scoped in `do...end`, same reason as the file's other scoped blocks: a
+    -- top-level `local` holds its slot for the whole spec run, and this file
+    -- already sits at Lua's 200-local ceiling.
+    do
+      local fixture_ov = H.tmpfile(".lua")
+      local fw_ov = assert(io.open(fixture_ov, "w"))
+      fw_ov:write(table.concat({
+        "local M = {}",
+        "",
+        "---Reads from several sources.",
+        "---@overload fun(): nil",
+        "---@overload fun(cache: table<string, string>): boolean, string",
+        "---@overload fun(string): boolean", -- anonymous (unnamed) positional param
+        "---@overload not a function type at all",
+        "---@param path string",
+        "---@param opts table?",
+        "---@return boolean",
+        "function M.read(path, opts)",
+        "  return true",
+        "end",
+        "",
+        "return M",
+      }, "\n"))
+      fw_ov:close()
 
-  local fixture5 = H.tmpfile(".lua")
-  local fw5 = assert(io.open(fixture5, "w"))
-  fw5:write(table.concat({
-    "local M = {}",
-    "function M.branchy(x)",
-    "  if x == 1 then",
-    "    return 1",
-    "  elseif x == 2 then",
-    "    return 2",
-    "  end",
-    "  while x > 0 do",
-    "    x = x - 1",
-    "  end",
-    "  for i = 1, 10 do",
-    "    print(i)",
-    "  end",
-    "  repeat",
-    "    x = x + 1",
-    "  until x > 5",
-    "  local y = x and 1 or 2",
-    "  return y",
-    "end",
-    "return M",
-  }, "\n"))
-  fw5:close()
-  local branchy = functions.scan_file(fixture5)[1]
-  -- 1 (base) + if + elseif + while + for + repeat + and + or = 8
-  eq(
-    branchy.complexity,
-    8,
-    "docmap.functions: complexity counts if/elseif/while/for/repeat/and/or, one each"
-  )
-
-  -- Undocumented function (no doc comment at all) still gets a FunctionInfo
-  -- with empty fields, not skipped — dead-see-target/undocumented-param need
-  -- to see it too.
-  local fixture2 = H.tmpfile(".lua")
-  local fw2 = assert(io.open(fixture2, "w"))
-  fw2:write("local M = {}\nfunction M.raw(a, b)\n  return a\nend\nreturn M\n")
-  fw2:close()
-  local fns2 = functions.scan_file(fixture2)
-  eq(#fns2, 1, "docmap.functions: undocumented function is still scanned")
-  eq(#fns2[1].params, 0, "docmap.functions: undocumented function has an empty params list")
-
-  -- ------------------------------------------------------------ docmap.plugins
-  --
-  -- Scoped: this file sits at Lua's 200-local-per-function ceiling.
-  do
-    local spec_fixture = H.tmpfile(".lua")
-    local pf = assert(io.open(spec_fixture, "w"))
-    pf:write(table.concat({
-      "---@module 'plugins.sample'",
-      "return {",
-      "  {",
-      '    "kdheepak/lazygit.nvim",',
-      "    lazy = true,",
-      '    cmd = { "LazyGit", "LazyGitConfig" },',
-      '    dependencies = { "nvim-lua/plenary.nvim", { "other/dep", opts = {} } },',
-      "    keys = {",
-      '      { "<leader>lg", "<cmd>LazyGit<cr>", desc = "Open UI" },',
-      "    },",
-      "    config = function()",
-      "      vim.g.x = 1",
-      "    end,",
-      "  },",
-      "  {",
-      '    "lewis6991/gitsigns.nvim",',
-      '    event = { "BufReadPre", "BufNewFile" },',
-      "    config = true,",
-      "  },",
-      '  "sindrets/diffview.nvim",',
-      "  {",
-      '    name = "custom-thing",',
-      '    dir = "/local/path",',
-      "    enabled = false,",
-      "    priority = 100,",
-      "  },",
-      "  a_variable_no_docmap_can_read,",
-      "}",
-    }, "\n"))
-    pf:close()
-
-    local _, _, _, _, specs = functions.scan_file(spec_fixture)
-    eq(#specs, 4, "docmap.plugins: 4 readable entries; the bare variable is skipped, not guessed")
-
-    eq(specs[1].repo, "kdheepak/lazygit.nvim", "docmap.plugins: positional string is the repo")
-    eq(specs[1].lazy, true, "docmap.plugins: lazy = true read")
-    eq(#specs[1].cmd, 2, "docmap.plugins: cmd array normalised")
-    eq(
-      #specs[1].dependencies,
-      2,
-      "docmap.plugins: dependencies unwraps both the bare-string and the nested-spec-table form"
-    )
-    eq(specs[1].dependencies[2], "other/dep", "docmap.plugins: ... to just the nested repo string")
-    eq(specs[1].keys[1], "<leader>lg", "docmap.plugins: keys collects the lhs, not the rhs command")
-    eq(specs[1].has_config, true, "docmap.plugins: config = function(...) counts as has_config")
-    eq(specs[1].has_opts, false, "docmap.plugins: and has_opts is false, not nil, when unset")
-
-    eq(specs[2].event[1], "BufReadPre", "docmap.plugins: event array read")
-    eq(specs[2].has_config, true, "docmap.plugins: config = true also counts as has_config")
-
-    eq(specs[3].repo, "sindrets/diffview.nvim", "docmap.plugins: the bare-string shorthand form")
-    eq(#specs[3].dependencies, 0, "docmap.plugins: ... with every other field a real empty array")
-
-    eq(
-      specs[4].repo,
-      "custom-thing",
-      "docmap.plugins: falls back to name= when no positional string"
-    )
-    eq(specs[4].dir, "/local/path", "docmap.plugins: dir= read")
-    eq(specs[4].enabled, false, "docmap.plugins: enabled = false read")
-    eq(specs[4].priority, 100, "docmap.plugins: priority read as a number")
-
-    -- Files unrelated to plugin specs are unaffected — nothing here should
-    -- ever fire on an ordinary module.
-    local _, _, _, _, ordinary_specs = functions.scan_file(fixture2)
-    eq(#ordinary_specs, 0, "docmap.plugins: an ordinary function file has no spec entries")
-
-    -- The documented non-goal: `local M = {...}; return M` is not traced.
-    -- Getting this wrong would mean guessing at an assignment miles away from
-    -- the `return`, which is the class of guess this scanner declines to make
-    -- everywhere else (see deps.lua on `require(expr .. var)`).
-    local indirect_fixture = H.tmpfile(".lua")
-    local ivf = assert(io.open(indirect_fixture, "w"))
-    ivf:write('local M = {\n  { "author/repo" },\n}\nreturn M\n')
-    ivf:close()
-    local _, _, _, _, indirect_specs = functions.scan_file(indirect_fixture)
-    eq(#indirect_specs, 0, "docmap.plugins: indirection through a local is not traced, by design")
-
-    -- Two false positives found live, against a real Neovim config, both
-    -- fixed structurally rather than by special-casing the file that
-    -- surfaced them.
-
-    -- A bare-string array is not unique to plugin specs: a plain list of
-    -- command names is the identical shape. Rejected on content — none of
-    -- these strings contain "/", the one thing every real spec sampled from
-    -- that config had.
-    local cmdlist_fixture = H.tmpfile(".lua")
-    local cf = assert(io.open(cmdlist_fixture, "w"))
-    cf:write('return {\n  "NeotestRunNearest",\n  "NeotestDebugNearest",\n}\n')
-    cf:close()
-    local _, _, _, _, cmdlist_specs = functions.scan_file(cmdlist_fixture)
-    eq(#cmdlist_specs, 0, "docmap.plugins: a bare-string list with no '/' is not plugins")
-
-    -- `return { "repo", event = "…" }` is ONE spec (a config split one file
-    -- per plugin), not an array whose fields are each their own entry —
-    -- treating `event`'s value as a positional element produced a spec
-    -- whose repo was literally the string "VeryLazy". The two return shapes
-    -- parse to the same node type; the distinguishing signal is whether the
-    -- table has ANY named field, which an array of specs never does.
-    local single_fixture = H.tmpfile(".lua")
-    local sf = assert(io.open(single_fixture, "w"))
-    sf:write('return {\n  "nvzone/menu",\n  event = "VeryLazy",\n  config = function() end,\n}\n')
-    sf:close()
-    local _, _, _, _, single_specs = functions.scan_file(single_fixture)
-    eq(
-      #single_specs,
-      1,
-      "docmap.plugins: a single spec returned directly is one entry, not several"
-    )
-    eq(single_specs[1].repo, "nvzone/menu", "docmap.plugins: ... with the repo read correctly")
-    eq(
-      single_specs[1].event[1],
-      "VeryLazy",
-      "docmap.plugins: ... and event read as a trigger, not mistaken for a second repo"
-    )
-
-    -- The mirror image of the command-list case: EVERY field bracket-keyed
-    -- or named, no positional string anywhere. A real keymap table
-    -- (`["dd"] = "buffer_delete"`), not a plugin spec with no repo.
-    local keymap_fixture = H.tmpfile(".lua")
-    local kf = assert(io.open(keymap_fixture, "w"))
-    kf:write('return {\n  ["dd"] = "buffer_delete",\n  ["+"] = "noop",\n}\n')
-    kf:close()
-    local _, _, _, _, keymap_specs = functions.scan_file(keymap_fixture)
-    eq(#keymap_specs, 0, "docmap.plugins: an all-named-fields table with no repo is not a spec")
-  end
-
-  -- ------------------------------------------------------------- docmap.check
-  local check = require("docmap.core.check")
-
-  local function make_ir(functions_by_node, edges)
-    local nodes, order = {}, {}
-    for id, fns_ in pairs(functions_by_node) do
-      nodes[id] = {
-        id = id,
-        kind = "module",
-        name = id,
-        path = id,
-        source = id .. "/init.lua",
-        module = id:gsub("/", "."),
-        summary = "x",
-        body = "",
-        readme = "x.md",
-        types = {},
-        export = "table",
-        parent = nil,
-        depth = 0,
-        children = {},
-        functions = fns_,
-      }
-      order[#order + 1] = id
-    end
-    table.sort(order)
-    return {
-      meta = {
-        title = "t",
-        source = "lua",
-        types_dir = "@types",
-        branch = "main",
-        schema = 1,
-        counts = { module = #order, namespace = 0, file = 0 },
-      },
-      root = order[1],
-      order = order,
-      nodes = nodes,
-      edges = edges or {},
-    }
-  end
-
-  local ir = make_ir({
-    ["a"] = {
-      {
-        name = "M.foo",
-        signature = "foo(x, y)",
-        summary = "",
-        line = 1,
-        params = { { name = "x", type = "string", optional = false, desc = "" } },
-        returns = {},
-        generic = {},
-        deprecated = nil,
-        async = false,
-        nodiscard = false,
-        see = { "b.bar", "nowhere.real" },
-        overload = {},
-        example = nil,
-        since = nil,
-      },
-    },
-    ["b"] = {
-      {
-        name = "M.bar",
-        signature = "bar()",
-        summary = "",
-        line = 1,
-        params = {},
-        returns = {},
-        generic = {},
-        deprecated = nil,
-        async = false,
-        nodiscard = false,
-        see = {},
-        overload = {},
-        example = nil,
-        since = nil,
-      },
-    },
-  })
-
-  local opts = { root = "/fake", lua_root = "lua", extra_checks = {} }
-  local findings = check.run(ir, opts)
-
-  local has_dead_see, has_undoc_param = false, false
-  for _, f in ipairs(findings) do
-    if f.check == "dead-see-target" then
-      has_dead_see = true
-      ok(fmsg(f):match("nowhere%.real"), "docmap.check: dead-see-target names the bad target")
-    end
-    if f.check == "undocumented-param" then
-      has_undoc_param = true
-      eq(f.severity, "info", "docmap.check: undocumented-param is info-severity")
-    end
-  end
-  ok(has_dead_see, "docmap.check: dead-see-target fires for an unresolvable @see target")
-  ok(
-    not (function()
-        for _, f in ipairs(findings) do
-          if f.check == "dead-see-target" and fmsg(f):match("b%.bar") then
-            return true
-          end
+      local ov_fns = functions.scan_file(fixture_ov)
+      local read_fn
+      for _, f in ipairs(ov_fns) do
+        if f.name == "M.read" then
+          read_fn = f
         end
-        return false
-      end)(),
-    "docmap.check: dead-see-target does NOT fire for 'b.bar', which resolves via module+bare-name"
-  )
-  ok(
-    has_undoc_param,
-    "docmap.check: undocumented-param fires when signature has more params than @param lines"
-  )
-
-  -- The same function marked `@internal` must not be nagged about: its
-  -- documentation bar is the author's own, and nagging is how a heuristic
-  -- check earns a place on someone's ignore list.
-  local internal_ir = make_ir({ ["a"] = fns3 })
-  local internal_nagged = false
-  for _, f in ipairs(check.run(internal_ir, opts)) do
-    if f.check == "undocumented-param" then
-      internal_nagged = true
-    end
-  end
-  eq(internal_nagged, false, "docmap.check: undocumented-param skips an @internal function")
-
-  -- ------------------------------------------------- param-name-mismatch (R5)
-  -- undocumented-param only ever compares counts, so a renamed parameter
-  -- whose @param line was never updated passes silently as long as both
-  -- lists are the same length. This is the case it cannot see.
-  local function param(name)
-    return { name = name, type = "any", optional = false, desc = "" }
-  end
-
-  local mismatch_ir = make_ir({
-    ["a"] = {
-      {
-        name = "M.resize",
-        signature = "resize(width, height)",
-        summary = "",
-        line = 1,
-        params = { param("w"), param("height") }, -- renamed width -> w in code, doc not updated
-        returns = {},
-        generic = {},
-        async = false,
-        nodiscard = false,
-        see = {},
-        overload = {},
-      },
-      -- A colon-declared method whose own `self` is documented explicitly —
-      -- real, legitimate LuaCATS style (verified against this repo's own
-      -- Lru:get/Lru:put) that the implicit-self exclusion must not flag.
-      {
-        name = "M:put",
-        signature = "put(key, value)",
-        summary = "",
-        line = 5,
-        params = { param("self"), param("key"), param("value") },
-        returns = {},
-        generic = {},
-        async = false,
-        nodiscard = false,
-        see = {},
-        overload = {},
-      },
-    },
-  })
-  local mismatch_findings = check.run(mismatch_ir, opts)
-
-  local resize_mismatch, put_mismatch = {}, {}
-  for _, f in ipairs(mismatch_findings) do
-    if f.check == "param-name-mismatch" then
-      if fmsg(f):match("^M%.resize") then
-        resize_mismatch[#resize_mismatch + 1] = f
-      elseif fmsg(f):match("^M:put") then
-        put_mismatch[#put_mismatch + 1] = f
       end
+      ok(read_fn, "docmap.functions: M.read found")
+      eq(#read_fn.overload, 4, "docmap.functions: 4 @overload entries, one per line")
+
+      eq(#read_fn.overload[1].params, 0, "docmap.functions: fun() has no params")
+      eq(#read_fn.overload[1].returns, 1, "docmap.functions: fun(): nil has 1 return")
+      eq(read_fn.overload[1].returns[1].type, "nil", "docmap.functions: fun(): nil return type")
+
+      eq(#read_fn.overload[2].params, 1, "docmap.functions: nested-generic overload has 1 param")
+      eq(
+        read_fn.overload[2].params[1].type,
+        "table<string, string>",
+        "docmap.functions: comma inside table<...> does not split the param list early"
+      )
+      eq(
+        #read_fn.overload[2].returns,
+        2,
+        "docmap.functions: fun(...): boolean, string has 2 returns"
+      )
+      eq(read_fn.overload[2].returns[2].type, "string", "docmap.functions: second return type")
+
+      eq(
+        #read_fn.overload[3].params,
+        1,
+        "docmap.functions: anonymous param still counts as 1 param"
+      )
+      eq(
+        read_fn.overload[3].params[1].type,
+        "string",
+        "docmap.functions: a bare type with no 'name:' prefix is used as the type"
+      )
+
+      eq(
+        #read_fn.overload[4].params,
+        0,
+        "docmap.functions: a non-'fun(...)' @overload value parses to no params"
+      )
+      eq(
+        #read_fn.overload[4].returns,
+        0,
+        "docmap.functions: a non-'fun(...)' @overload value parses to no returns"
+      )
+      eq(
+        read_fn.overload[4].raw,
+        "not a function type at all",
+        "docmap.functions: an unparseable @overload keeps its raw text rather than erroring"
+      )
     end
-  end
-  eq(
-    #resize_mismatch,
-    1,
-    "docmap.check: param-name-mismatch fires once for the one renamed parameter"
-  )
-  ok(
-    resize_mismatch[1]
-      and fmsg(resize_mismatch[1]):match("'w'")
-      and fmsg(resize_mismatch[1]):match("'width'"),
-    "docmap.check: param-name-mismatch names both the doc's name and the signature's"
-  )
-  eq(
-    resize_mismatch[1] and resize_mismatch[1].severity,
-    "info",
-    "docmap.check: param-name-mismatch is info-severity, same as undocumented-param"
-  )
-  eq(
-    #put_mismatch,
-    0,
-    "docmap.check: an explicitly-documented 'self' on a colon method is not a mismatch"
-  )
 
-  -- dead-function: local functions and @internal ones are checked
-  -- unconditionally; an ordinary exported function only under opts.dead_code.
-  local function fn_info(name, over)
-    over = over or {}
-    return vim.tbl_extend("force", {
-      name = name,
-      signature = name .. "()",
-      summary = "",
-      line = 1,
-      params = {},
-      returns = {},
-      generic = {},
-      deprecated = nil,
-      async = false,
-      nodiscard = false,
-      internal = false,
-      see = {},
-      overload = {},
-      example = nil,
-      since = nil,
-    }, over)
-  end
-
-  local function has_dead_function(list, name)
-    for _, f in ipairs(list) do
-      if f.check == "dead-function" and fmsg(f):match("^" .. name:gsub("%.", "%%.")) then
-        return true
-      end
-    end
-    return false
-  end
-
-  local dead_ir = make_ir({
-    ["a"] = {
-      fn_info("bare_dead"), -- local function, no caller -> dead
-      fn_info("bare_called"), -- local function, has a caller -> not dead
-      fn_info("M.internal_dead", { internal = true }), -- @internal, no caller -> dead
-      fn_info("M.internal_called", { internal = true }), -- @internal, has a caller -> not dead
-      fn_info("M.public_uncalled"), -- ordinary export, no caller -> only under dead_code
-      fn_info("M.public_called"), -- ordinary export, has a caller -> never dead
-    },
-  }, {
-    { kind = "call", from = "a", to = "a", from_fn = "M.public_called", to_fn = "bare_called" },
-    {
-      kind = "call",
-      from = "a",
-      to = "a",
-      from_fn = "M.public_called",
-      to_fn = "M.internal_called",
-    },
-    { kind = "call", from = "a", to = "a", from_fn = "bare_called", to_fn = "M.public_called" },
-  })
-
-  local default_findings = check.run(dead_ir, opts)
-  ok(
-    has_dead_function(default_findings, "bare_dead"),
-    "docmap.check: dead-function fires for an uncalled local function"
-  )
-  ok(
-    not has_dead_function(default_findings, "bare_called"),
-    "docmap.check: dead-function does not fire for a called local function"
-  )
-  ok(
-    has_dead_function(default_findings, "M.internal_dead"),
-    "docmap.check: dead-function fires for an uncalled @internal function"
-  )
-  ok(
-    not has_dead_function(default_findings, "M.internal_called"),
-    "docmap.check: dead-function does not fire for a called @internal function"
-  )
-  ok(
-    not has_dead_function(default_findings, "M.public_uncalled"),
-    "docmap.check: dead-function does NOT fire for an uncalled exported function by default"
-  )
-  ok(
-    not has_dead_function(default_findings, "M.public_called"),
-    "docmap.check: dead-function never fires for a called exported function"
-  )
-  for _, f in ipairs(default_findings) do
-    if f.check == "dead-function" then
-      eq(f.severity, "info", "docmap.check: dead-function is always info-severity")
-    end
-  end
-
-  local dead_code_findings = check.run(dead_ir, vim.tbl_extend("force", opts, { dead_code = true }))
-  ok(
-    has_dead_function(dead_code_findings, "M.public_uncalled"),
-    "docmap.check: opts.dead_code = true also fires for an uncalled exported function"
-  )
-  ok(
-    not has_dead_function(dead_code_findings, "M.public_called"),
-    "docmap.check: opts.dead_code = true still skips a called exported function"
-  )
-
-  -- ------------------------------------------------------------ docmap.luals
-  -- `merge` is the half of luals.lua that needs no lua-language-server: IR +
-  -- parsed doc.json in, mutated IR out. The fixture below reproduces the real
-  -- --doc shapes exactly as verified against lua-language-server 3.18.2 —
-  -- notably that a class's parents live on `defines[1].extends` (an array,
-  -- one element per parent) and NOT on the entry, and that each element is
-  -- `{ type = "doc.extends.name", view = "<ParentName>" }`. An alias never
-  -- carries `extends`, even when it aliases a class; that was checked too,
-  -- because the opposite would manufacture inheritance that does not exist.
-  local luals = require("docmap.core.luals")
-
-  local function ext(view)
-    return { type = "doc.extends.name", view = view }
-  end
-  local function class_entry(name, extends_list)
-    return {
-      name = name,
-      desc = "",
-      fields = {},
-      defines = { { type = "doc.class", file = "@types/init.lua", extends = extends_list } },
-    }
-  end
-
-  local luals_ir = {
-    order = { "n" },
-    nodes = {
-      n = {
-        id = "n",
-        parent = nil,
-        types = { "lua/@types/init.lua" },
-        stats = { types = 0 },
-      },
-    },
-    edges = {},
-  }
-
-  luals.merge(luals_ir, {
-    class_entry("D.Root", nil), -- no parent: no `extends` key at all
-    class_entry("D.Child", { ext("D.Root") }),
-    class_entry("D.Multi", { ext("D.Root"), ext("D.Other") }),
-    class_entry("D.Other", nil),
-    class_entry("D.Orphan", { ext("D.Missing") }), -- parent not declared anywhere
-    class_entry("D.Self", { ext("D.Self") }), -- degenerate, must not self-loop
-    {
-      name = "D.Alias",
-      desc = "",
-      fields = {},
-      defines = { { type = "doc.alias", file = "@types/init.lua" } },
-    },
-  }, "lua")
-
-  local by_class = {}
-  for _, t in ipairs(luals_ir.nodes.n.types_detail or {}) do
-    by_class[t.name] = t
-  end
-
-  eq(
-    #(by_class["D.Root"].extends or {}),
-    0,
-    "docmap.luals: a class with no parent gets an empty extends"
-  )
-  eq(
-    by_class["D.Child"].extends[1],
-    "D.Root",
-    "docmap.luals: single parent parsed from defines[1].extends"
-  )
-  eq(#by_class["D.Multi"].extends, 2, "docmap.luals: multiple inheritance keeps both parents")
-  eq(by_class["D.Multi"].extends[2], "D.Other", "docmap.luals: parents stay in source order")
-  eq(#(by_class["D.Alias"].extends or {}), 0, "docmap.luals: an alias never carries extends")
-  eq(
-    by_class["D.Orphan"].extends[1],
-    "D.Missing",
-    "docmap.luals: an unresolvable parent is still recorded on the class"
-  )
-
-  local ext_pairs = {}
-  for _, e in ipairs(luals_ir.edges) do
-    if e.kind == "extends" then
-      ext_pairs[e.from_class .. " -> " .. e.to_class] = true
-      eq(e.from, "n", "docmap.luals: extends edge carries the owning node id")
-      eq(e.via, nil, "docmap.luals: extends edges have no `via` — nothing mediates inheritance")
-    end
-  end
-  ok(ext_pairs["D.Child -> D.Root"], "docmap.luals: a resolvable parent produces an extends edge")
-  ok(
-    ext_pairs["D.Multi -> D.Root"],
-    "docmap.luals: multiple inheritance emits an edge per parent (1/2)"
-  )
-  ok(
-    ext_pairs["D.Multi -> D.Other"],
-    "docmap.luals: multiple inheritance emits an edge per parent (2/2)"
-  )
-  ok(
-    not ext_pairs["D.Orphan -> D.Missing"],
-    "docmap.luals: a parent outside the map produces no edge (kept readable on the class instead)"
-  )
-  ok(
-    not ext_pairs["D.Self -> D.Self"],
-    "docmap.luals: a class listing itself never becomes a self-loop"
-  )
-
-  -- Deterministic order: --check compares the artifact byte for byte, so two
-  -- runs over unchanged input must emit these in the same sequence.
-  local ext_seq = {}
-  for _, e in ipairs(luals_ir.edges) do
-    if e.kind == "extends" then
-      ext_seq[#ext_seq + 1] = e.from_class .. ">" .. e.to_class
-    end
-  end
-  eq(
-    table.concat(ext_seq, ","),
-    "D.Child>D.Root,D.Multi>D.Other,D.Multi>D.Root",
-    "docmap.luals: extends edges are emitted sorted by class name pair"
-  )
-
-  -- ------------------------------------------------------------- docmap.deps
-  local deps = require("docmap.core.deps")
-
-  local extracted = deps.extract_source(table.concat({
-    'local fs = require("demo.fs")',
-    'local read = require("demo.io").read',
-    'require("demo.side_effect")',
-    '---   local x = require("demo.docs_only")', -- a usage example, not a require
-    '-- require("demo.commented_out")',
-    "function M.lazy()",
-    '  return require("demo.deferred")',
-    "end",
-  }, "\n"))
-
-  eq(#extracted, 4, "docmap.deps: comment lines are not requires")
-
-  -- A dynamic require puts a string literal exactly where the pattern looks,
-  -- and yields a dangling prefix that is not a module path at all.
-  local dynamic = deps.extract_source(table.concat({
-    'local mod = require("demo.lua." .. key)',
-    'return require("demo." .. name)',
-    'require("..weird")',
-    'local ok = require("demo.real")',
-  }, "\n"))
-  eq(#dynamic, 1, "docmap.deps: dynamic require concatenations are not module paths")
-  eq(dynamic[1].module, "demo.real", "docmap.deps: the one real require on those lines survives")
-
-  eq(extracted[1].alias, "fs", "docmap.deps: local binding is captured as an alias")
-  eq(extracted[1].module, "demo.fs", "docmap.deps: alias form resolves the module path")
-  eq(extracted[2].member, "read", "docmap.deps: trailing field access is captured")
-  eq(extracted[3].alias, nil, "docmap.deps: a bare require has no alias")
-  eq(extracted[3].module, "demo.side_effect", "docmap.deps: bare require module path")
-  eq(extracted[4].module, "demo.deferred", "docmap.deps: requires inside functions are found")
-
-  local no_comment_modules = true
-  for _, req in ipairs(extracted) do
-    if req.module:match("docs_only") or req.module:match("commented_out") then
-      no_comment_modules = false
-    end
-  end
-  ok(no_comment_modules, "docmap.deps: no require is taken from a comment line")
-
-  -- The optional-dependency idiom. `pcall(require, "m")` puts a comma where
-  -- the paren-or-nothing pattern used to stop, so every optional edge in the
-  -- tree was missing -- and missing in the direction that produces a false
-  -- "unreferenced module" finding rather than a visible error.
-  --
-  -- Scoped in a `do` block, not because the block is separable but because
-  -- this function sits against Lua's 200-active-locals limit; two more at
-  -- file scope is a compile error two hundred lines further down.
-  do
-    local optional = deps.extract_source(table.concat({
-      'local ok, m = pcall(require, "demo.optional")',
-      'local plain = require("demo.plain")',
-      'require "demo.bare_string"',
-      "for _, mod in ipairs(DEPS) do",
-      "  if not pcall(require, mod) then return end", -- a variable: nothing to resolve
+    -- `@internal` marks implementation rather than published surface. It is
+    -- what lets every "is this used" question stop guessing from the shape of
+    -- a name.
+    local fixture3 = H.tmpfile(".lua")
+    local fw3 = assert(io.open(fixture3, "w"))
+    fw3:write(table.concat({
+      "local M = {}",
+      "---Plumbing.",
+      "---@internal",
+      "---@param a string",
+      "function M.plumbing(a, b)",
+      "  return a, b",
       "end",
+      "return M",
     }, "\n"))
-    eq(#optional, 3, "docmap.deps: pcall(require, ...) is found without swallowing the other forms")
-    eq(optional[1].module, "demo.optional", "docmap.deps: the comma form resolves the module path")
-    eq(optional[1].alias, nil, "docmap.deps: `local ok, m =` is not an alias binding")
-    eq(optional[2].module, "demo.plain", "docmap.deps: the paren form still matches")
-    eq(optional[2].alias, "plain", "docmap.deps: and is still recognised as an alias first")
-    eq(optional[3].module, "demo.bare_string", "docmap.deps: the parenless form still matches")
+    fw3:close()
+    local fns3 = functions.scan_file(fixture3)
+    eq(fns3[1].internal, true, "docmap.functions: @internal is parsed")
 
-    local variable_only = deps.extract_source("if not pcall(require, mod) then return end")
-    eq(#variable_only, 0, "docmap.deps: a require of a variable resolves to no edge")
-  end
-
-  -- ----------------------------------------------- deps + calls over a tree
-  -- A real scan, not a hand-built IR: resolution is the whole point of these
-  -- two stages, and it only exists once a module index and require aliases
-  -- are in play. Two modules, one requiring and calling into the other.
-  local scan = require("docmap.core.scan")
-  local root = H.tmpfile("_tree")
-  local function write(rel, lines)
-    local abs = root .. "/" .. rel
-    vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
-    local fd = assert(io.open(abs, "w"), "docmap spec: fixture tree must be writable")
-    fd:write(table.concat(lines, "\n"))
-    fd:close()
-  end
-
-  write("lua/demo/util/init.lua", {
-    "---@module 'demo.util'",
-    "--- Utilities.",
-    "local M = {}",
-    "---Trim it.",
-    "function M.trim(s)",
-    "  return s",
-    "end",
-    "return M",
-  })
-  write("lua/demo/app/init.lua", {
-    "---@module 'demo.app'",
-    "--- The app.",
-    'local util = require("demo.util")',
-    'local outside = require("plenary.async")',
-    "local M = {}",
-    "---Run it.",
-    "function M.run(s)",
-    "  return util.trim(helper(s))",
-    "end",
-    "---Helper.",
-    "function helper(s)",
-    '  return require("demo.util").trim(s)',
-    "end",
-    "return M",
-  })
-
-  local tree = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
-
-  local app, util = "lua/demo/app", "lua/demo/util"
-  eq(#tree.nodes[app].requires, 1, "docmap.deps: app requires exactly one in-tree module")
-  eq(tree.nodes[app].requires[1], util, "docmap.deps: the require resolves to the util node")
-  eq(tree.nodes[util].required_by[1], app, "docmap.deps: required_by is the reverse index")
-
-  local req_edge, lazy_edge, call_cross, call_local
-  for _, e in ipairs(tree.edges) do
-    if e.kind == "require" and e.from == app then
-      req_edge = e
-    end
-    if e.kind == "call" and e.from_fn == "M.run" and e.to == util then
-      call_cross = e
-    end
-    if e.kind == "call" and e.from_fn == "M.run" and e.to_fn == "helper" then
-      call_local = e
-    end
-    if e.kind == "call" and e.from_fn == "helper" then
-      lazy_edge = e
-    end
-  end
-
-  -- Stats aggregate over the subtree, not just the node's own directory.
-  local root_stats = tree.nodes[tree.root].stats
-  eq(root_stats.modules, 2, "docmap.stats: both modules are counted at the root")
-  eq(root_stats.files_lua, 2, "docmap.stats: lua files roll up")
-  ok(root_stats.lines > 0, "docmap.stats: lines of Lua are counted")
-  eq(
-    root_stats.functions,
-    tree.nodes[app].stats.functions + tree.nodes[util].stats.functions,
-    "docmap.stats: the root's function count is the sum of its children's"
-  )
-  eq(tree.nodes[util].stats.modules, 1, "docmap.stats: a leaf module counts itself")
-
-  ok(req_edge, "docmap.deps: a require edge exists between the two modules")
-  -- Unresolvable requires are kept as plain module strings rather than
-  -- dropped or turned into invented nodes, so the Deps view can draw them.
-  eq(
-    #tree.nodes[app].requires_external,
-    1,
-    "docmap.deps: a require outside the tree is recorded, not discarded"
-  )
-  eq(
-    tree.nodes[app].requires_external[1],
-    "plenary.async",
-    "docmap.deps: it is kept as the module path as written"
-  )
-  eq(
-    #tree.nodes[util].requires_external,
-    0,
-    "docmap.deps: a module with only in-tree requires has none"
-  )
-  local invented = false
-  for _, e in ipairs(tree.edges) do
-    if e.kind == "require" and e.to_module == "plenary.async" then
-      invented = true
-    end
-  end
-  ok(
-    not invented,
-    "docmap.deps: an external require produces no edge to a node that does not exist"
-  )
-  eq(req_edge.deferred, nil, "docmap.deps: a top-level require is not marked deferred")
-  ok(call_cross, "docmap.calls: a call through a require alias resolves across modules")
-  eq(call_cross.to_fn, "M.trim", "docmap.calls: resolves to the declared name in the target")
-  eq(call_cross.confidence, "exact", "docmap.calls: alias-resolved calls are exact")
-  ok(call_local, "docmap.calls: a bare call to a same-file function resolves locally")
-  ok(lazy_edge, "docmap.calls: calls inside a lazily-requiring function still resolve")
-
-  -- Deduped to one edge per (from, to), and the load-time occurrence wins the
-  -- `deferred` flag over the lazy one inside `helper`.
-  local req_count = 0
-  for _, e in ipairs(tree.edges) do
-    if e.kind == "require" and e.from == app and e.to == util then
-      req_count = req_count + 1
-    end
-  end
-  eq(req_count, 1, "docmap.deps: repeated requires of one module collapse to a single edge")
-
-  -- A cycle among *deferred* requires must not be reported: that is the
-  -- deliberate lazy-load pattern, and reporting it drowns the real ones.
-  write("lua/demo/util/init.lua", {
-    "---@module 'demo.util'",
-    "--- Utilities.",
-    "local M = {}",
-    "---Trim it.",
-    "function M.trim(s)",
-    '  return require("demo.app") and s',
-    "end",
-    "return M",
-  })
-  local cyc = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
-  local cyc_findings = check.run(cyc, { root = root, source = "lua/demo", lua_root = "lua" })
-  local reported_cycle = false
-  for _, f in ipairs(cyc_findings) do
-    if f.check == "require-cycle" then
-      reported_cycle = true
-    end
-  end
-  ok(not reported_cycle, "docmap.check: a cycle closed by a deferred require is not reported")
-
-  -- ------------------------------------------------- require-not-declared
-  --
-  -- A require that resolves to nothing lands in `requires_external`, which is
-  -- also where a genuine third-party dependency lands. That is right for
-  -- `plenary.async` and silently wrong for a typo inside the tree's own
-  -- namespace: both break at runtime, neither looks different in the map. The
-  -- check separates them on the first path segment, so this fixture needs one
-  -- of each in the same file — asserting only the positive would pass on a
-  -- check that flagged every external require there is.
-  write("lua/demo/broken/init.lua", {
-    "---@module 'demo.broken'",
-    "--- Requires one module that does not exist and one that is not ours.",
-    'local gone = require("demo.nowhere")',
-    'local async = require("plenary.async")',
-    "local M = {}",
-    "---Do it.",
-    "function M.go()",
-    "  return gone, async",
-    "end",
-    "return M",
-  })
-  local broken_opts = { root = root, source = "lua/demo", lua_root = "lua" }
-  local broken = scan.scan(broken_opts)
-  local rnd = {}
-  for _, f in ipairs(check.run(broken, broken_opts)) do
-    if f.check == "require-not-declared" then
-      rnd[#rnd + 1] = f
-    end
-  end
-  eq(#rnd, 1, "docmap.check: require-not-declared fires once, for the in-namespace miss")
-  ok(fmsg(rnd[1]):match("demo%.nowhere"), "docmap.check: ... naming the module that is missing")
-  ok(fmsg(rnd[1]):match("line 3"), "docmap.check: ... and the line, since a file can miss twice")
-  eq(rnd[1].severity, "warn", "docmap.check: require-not-declared is a warning")
-
-  -- The escape hatch that already existed: `tag_files` declares that a prefix
-  -- lives in another project's map, so a namespace split across repositories
-  -- is not a finding here.
-  local tagged_opts = vim.tbl_extend("force", broken_opts, {
-    tag_files = { ["demo.nowhere"] = "../other/docs/map" },
-  })
-  local still = false
-  for _, f in ipairs(check.run(broken, tagged_opts)) do
-    if f.check == "require-not-declared" then
-      still = true
-    end
-  end
-  ok(not still, "docmap.check: a prefix covered by tag_files is somebody else's to declare")
-
-  -- ---------------------------------------------------- command.find_node
-  -- `:DocMap graph <name>` has to resolve the names people actually type.
-  -- A namespace declares no @module at all, so matching on that alone missed
-  -- exactly the directories a dependency graph is most interesting at.
-  local command = require("docmap.editor.command")
-
-  eq(
-    command.find_node(cyc, "demo.app", "lua"),
-    "lua/demo/app",
-    "docmap.command: resolves a declared @module path"
-  )
-  eq(
-    command.find_node(cyc, "lua/demo/util", "lua"),
-    "lua/demo/util",
-    "docmap.command: resolves a raw node id"
-  )
-  eq(
-    command.find_node(cyc, "demo", "lua"),
-    "lua/demo",
-    "docmap.command: resolves a namespace by its path-implied module name"
-  )
-  eq(
-    command.find_node(cyc, "nope.nope", "lua"),
-    nil,
-    "docmap.command: an unknown name resolves to nil rather than a wrong node"
-  )
-
-  -- ------------------------------------------------------ tagfiles.resolve
-  -- `demo.app` (built above) requires `plenary.async`, which resolves to
-  -- nothing *in this tree* — exactly the requires_external case tag_files
-  -- exists to resolve against another project's own committed artifact,
-  -- instead of leaving the Deps view an inert dead end.
-  local tagfiles = require("docmap.core.tagfiles")
-  local docmap = require("docmap")
-
-  local ext_root = H.tmpfile("_plenary")
-  local function ext_write(rel, lines)
-    local abs = ext_root .. "/" .. rel
-    vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
-    local fd = assert(io.open(abs, "w"), "docmap spec: tag-file fixture must be writable")
-    fd:write(table.concat(lines, "\n"))
-    fd:close()
-  end
-  ext_write("lua/plenary/async/init.lua", {
-    "---@module 'plenary.async'",
-    "--- Fixture standing in for a real external project.",
-    "local M = {}",
-    "return M",
-  })
-  local ext_ir = scan.scan({ root = ext_root, source = "lua/plenary", lua_root = "lua" })
-  vim.fn.mkdir(ext_root .. "/docs/map", "p")
-  local ext_fd =
-    assert(io.open(ext_root .. "/docs/map/module_map.json", "w"), "docmap spec: writable")
-  ext_fd:write(docmap.to_json(ext_ir))
-  ext_fd:close()
-
-  tagfiles.resolve(tree, {
-    root = root,
-    lua_root = "lua",
-    tag_files = { plenary = ext_root .. "/docs/map" },
-  })
-  ok(tree.tag_links["plenary.async"], "docmap.tagfiles: resolves against the external artifact")
-  eq(
-    tree.tag_links["plenary.async"].title,
-    "plenary.async",
-    "docmap.tagfiles: title is the external node's declared @module"
-  )
-  eq(
-    tree.tag_links["plenary.async"].html,
-    (ext_root:gsub("\\", "/")) .. "/docs/map/index.html#lua/plenary/async",
-    "docmap.tagfiles: html is that project's own page, fragment = its node id"
-  )
-
-  local tree_none = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
-  tagfiles.resolve(tree_none, { root = root, lua_root = "lua" })
-  eq(
-    next(tree_none.tag_links),
-    nil,
-    "docmap.tagfiles: an empty table, not nil, when opts.tag_files is unset"
-  )
-
-  local tree_miss = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
-  tagfiles.resolve(tree_miss, {
-    root = root,
-    lua_root = "lua",
-    tag_files = { ["some.other.project"] = ext_root .. "/docs/map" },
-  })
-  eq(
-    next(tree_miss.tag_links),
-    nil,
-    "docmap.tagfiles: a prefix that matches nothing resolves nothing, not an error"
-  )
-
-  -- ------------------------------------------------------------ duplicates
-  --
-  -- Two halves: the grouping is pure and gets a synthetic IR, and the
-  -- fingerprint itself needs a real parse, so it gets real files.
-  local duplicates = require("docmap.core.duplicates")
-
-  local function dup_ir(by_node)
-    local synth = { root = "lua/d", order = {}, nodes = {} }
-    for node_id, list in pairs(by_node) do
-      synth.order[#synth.order + 1] = node_id
-      synth.nodes[node_id] = { id = node_id, module = node_id:gsub("/", "."), functions = list }
-    end
-    table.sort(synth.order)
-    return synth
-  end
-
-  local dres = duplicates.resolve(
-    dup_ir({
-      ["lua/d/a"] = {
-        { name = "M.x", signature = "x()", line = 1, shape = "aa-bb", shape_size = 90 },
-      },
-      ["lua/d/b"] = {
-        { name = "M.y", signature = "y()", line = 2, shape = "aa-bb", shape_size = 90 },
-      },
-      ["lua/d/c"] = {
-        { name = "M.z", signature = "z()", line = 3, shape = "cc-dd", shape_size = 90 },
-      },
-    }),
-    40
-  )
-  eq(#dres.groups, 1, "duplicates: only shapes shared by two or more are a group")
-  eq(#dres.groups[1].members, 2, "duplicates: with both members in it")
-  eq(dres.groups[1].members[1].node, "lua/d/a", "duplicates: members sorted by node id")
-  eq(dres.functions, 2, "duplicates: the covered-function count")
-  eq(dres.considered, 3, "duplicates: everything above the floor was compared")
-
-  -- The floor is the whole reason this is readable: every tree has a dozen
-  -- one-line accessors that match each other and mean nothing.
-  local small = duplicates.resolve(
-    dup_ir({
-      ["lua/d/a"] = {
-        { name = "M.x", signature = "x()", line = 1, shape = "ee-ff", shape_size = 9 },
-      },
-      ["lua/d/b"] = {
-        { name = "M.y", signature = "y()", line = 2, shape = "ee-ff", shape_size = 9 },
-      },
-    }),
-    40
-  )
-  eq(#small.groups, 0, "duplicates: shapes below the size floor are not compared")
-  eq(small.considered, 0, "duplicates: and the count says so, so 'none found' stays honest")
-
-  -- An artifact written before `shape` existed has none. Skipped, not an
-  -- error: this tool is the wrong place to discover a map is a few versions
-  -- old, the same tolerance `diff.lua` extends to older schemas.
-  local old = duplicates.resolve(
-    dup_ir({ ["lua/d/a"] = { { name = "M.x", signature = "x()", line = 1 } } }),
-    40
-  )
-  eq(#old.groups, 0, "duplicates: a function with no shape is skipped, not fatal")
-
-  -- The claim the fingerprint actually rests on: a copy-paste gets RENAMED on
-  -- the way in. Byte-identical bodies are the one case nobody ships, so if
-  -- different identifier and literal names broke the match the tool would
-  -- find nothing that matters. Real files, because only a real parse produces
-  -- a shape at all.
-  write("lua/demo/clone_a/init.lua", {
-    "---@module 'demo.clone_a'",
-    "--- One.",
-    "local M = {}",
-    "---Sum the odd ones.",
-    "---@param items integer[]",
-    "---@return integer",
-    "function M.total(items)",
-    "  local acc = 0",
-    "  for _, item in ipairs(items) do",
-    "    if item % 2 == 1 then",
-    "      acc = acc + item",
-    "    end",
-    "  end",
-    "  return acc",
-    "end",
-    "return M",
-  })
-  write("lua/demo/clone_b/init.lua", {
-    "---@module 'demo.clone_b'",
-    "--- Two.",
-    "local M = {}",
-    "---Sum the odd ones, with every name changed.",
-    "---@param values integer[]",
-    "---@return integer",
-    "function M.tally(values)",
-    "  local running = 999",
-    "  for _, value in ipairs(values) do",
-    "    if value % 7 == 3 then",
-    "      running = running + value",
-    "    end",
-    "  end",
-    "  return running",
-    "end",
-    "return M",
-  })
-  local clone_ir = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
-  local shape_a, shape_b, size_a
-  for _, id in ipairs(clone_ir.order) do
-    for _, fn in ipairs(clone_ir.nodes[id].functions or {}) do
-      if fn.name == "M.total" then
-        shape_a, size_a = fn.shape, fn.shape_size
-      elseif fn.name == "M.tally" then
-        shape_b = fn.shape
+    -- `@todo`/`@bug`/`@test` feed the Notes tab's aggregate lists (Doxygen's
+    -- Todo/Bug/Test lists). Arrays rather than single strings on purpose: one
+    -- list entry per occurrence, so a function with two open todos keeps both.
+    -- lua-language-server ignores these tags rather than diagnosing them as
+    -- unknown, which is what makes them safe to introduce (checked against
+    -- 3.18.2 with --check before they were added).
+    local fixture4 = H.tmpfile(".lua")
+    local fw4 = assert(io.open(fixture4, "w"))
+    fw4:write(table.concat({
+      "local M = {}",
+      "---Needs work.",
+      "---@todo make this async",
+      "---@todo and handle cancellation",
+      "---@bug leaks a handle on error",
+      "---@test covered by t_spec.lua",
+      "function M.rough() end",
+      "---Nothing flagged.",
+      "function M.clean() end",
+      "return M",
+    }, "\n"))
+    fw4:close()
+    local fns4 = functions.scan_file(fixture4)
+    local rough, clean
+    for _, f in ipairs(fns4) do
+      if f.name == "M.rough" then
+        rough = f
+      end
+      if f.name == "M.clean" then
+        clean = f
       end
     end
-  end
-  ok(shape_a ~= nil, "duplicates: the scan produces a shape for every function")
-  eq(shape_b, shape_a, "duplicates: renaming every identifier and literal keeps the shape")
-  ok(size_a > 40, "duplicates: and a body this size clears the floor")
+    eq(#rough.todo, 2, "docmap.functions: a repeated @todo keeps every occurrence")
+    eq(rough.todo[1], "make this async", "docmap.functions: @todo text, first occurrence")
+    eq(rough.todo[2], "and handle cancellation", "docmap.functions: @todo entries stay in order")
+    eq(rough.bug[1], "leaks a handle on error", "docmap.functions: @bug is parsed")
+    eq(rough.test[1], "covered by t_spec.lua", "docmap.functions: @test is parsed")
+    eq(#clean.todo, 0, "docmap.functions: an untagged function gets empty todo/bug/test arrays")
+    eq(#clean.bug, 0, "docmap.functions: @bug defaults to an empty array, never nil")
+    eq(#clean.test, 0, "docmap.functions: @test defaults to an empty array, never nil")
 
-  -- The other direction, which is what keeps the assertion above from passing
-  -- on a fingerprint that returns a constant: a different structure must not
-  -- collide.
-  local other_shape
-  for _, id in ipairs(clone_ir.order) do
-    for _, fn in ipairs(clone_ir.nodes[id].functions or {}) do
-      if fn.name == "M.go" then
-        other_shape = fn.shape
+    -- cyclomatic_complexity: one decision point each for if/elseif/while/for/
+    -- repeat, plus one per and/or — verified against the exact shape used to
+    -- design the treesitter query in the first place (real inspection of a
+    -- parsed tree, not a guess at node types).
+    eq(old_thing.complexity, 1, "docmap.functions: a straight-line function has complexity 1")
+    eq(
+      new_thing.complexity,
+      1,
+      "docmap.functions: a nested closure with no branches of its own adds nothing"
+    )
+
+    local fixture5 = H.tmpfile(".lua")
+    local fw5 = assert(io.open(fixture5, "w"))
+    fw5:write(table.concat({
+      "local M = {}",
+      "function M.branchy(x)",
+      "  if x == 1 then",
+      "    return 1",
+      "  elseif x == 2 then",
+      "    return 2",
+      "  end",
+      "  while x > 0 do",
+      "    x = x - 1",
+      "  end",
+      "  for i = 1, 10 do",
+      "    print(i)",
+      "  end",
+      "  repeat",
+      "    x = x + 1",
+      "  until x > 5",
+      "  local y = x and 1 or 2",
+      "  return y",
+      "end",
+      "return M",
+    }, "\n"))
+    fw5:close()
+    local branchy = functions.scan_file(fixture5)[1]
+    -- 1 (base) + if + elseif + while + for + repeat + and + or = 8
+    eq(
+      branchy.complexity,
+      8,
+      "docmap.functions: complexity counts if/elseif/while/for/repeat/and/or, one each"
+    )
+
+    -- Undocumented function (no doc comment at all) still gets a FunctionInfo
+    -- with empty fields, not skipped — dead-see-target/undocumented-param need
+    -- to see it too.
+    local fixture2 = H.tmpfile(".lua")
+    local fw2 = assert(io.open(fixture2, "w"))
+    fw2:write("local M = {}\nfunction M.raw(a, b)\n  return a\nend\nreturn M\n")
+    fw2:close()
+    local fns2 = functions.scan_file(fixture2)
+    eq(#fns2, 1, "docmap.functions: undocumented function is still scanned")
+    eq(#fns2[1].params, 0, "docmap.functions: undocumented function has an empty params list")
+
+    -- ------------------------------------------------------------ docmap.plugins
+    --
+    -- Scoped: this file sits at Lua's 200-local-per-function ceiling.
+    do
+      local spec_fixture = H.tmpfile(".lua")
+      local pf = assert(io.open(spec_fixture, "w"))
+      pf:write(table.concat({
+        "---@module 'plugins.sample'",
+        "return {",
+        "  {",
+        '    "kdheepak/lazygit.nvim",',
+        "    lazy = true,",
+        '    cmd = { "LazyGit", "LazyGitConfig" },',
+        '    dependencies = { "nvim-lua/plenary.nvim", { "other/dep", opts = {} } },',
+        "    keys = {",
+        '      { "<leader>lg", "<cmd>LazyGit<cr>", desc = "Open UI" },',
+        "    },",
+        "    config = function()",
+        "      vim.g.x = 1",
+        "    end,",
+        "  },",
+        "  {",
+        '    "lewis6991/gitsigns.nvim",',
+        '    event = { "BufReadPre", "BufNewFile" },',
+        "    config = true,",
+        "  },",
+        '  "sindrets/diffview.nvim",',
+        "  {",
+        '    name = "custom-thing",',
+        '    dir = "/local/path",',
+        "    enabled = false,",
+        "    priority = 100,",
+        "  },",
+        "  a_variable_no_docmap_can_read,",
+        "}",
+      }, "\n"))
+      pf:close()
+
+      local _, _, _, _, specs = functions.scan_file(spec_fixture)
+      eq(#specs, 4, "docmap.plugins: 4 readable entries; the bare variable is skipped, not guessed")
+
+      eq(specs[1].repo, "kdheepak/lazygit.nvim", "docmap.plugins: positional string is the repo")
+      eq(specs[1].lazy, true, "docmap.plugins: lazy = true read")
+      eq(#specs[1].cmd, 2, "docmap.plugins: cmd array normalised")
+      eq(
+        #specs[1].dependencies,
+        2,
+        "docmap.plugins: dependencies unwraps both the bare-string and the nested-spec-table form"
+      )
+      eq(
+        specs[1].dependencies[2],
+        "other/dep",
+        "docmap.plugins: ... to just the nested repo string"
+      )
+      eq(
+        specs[1].keys[1],
+        "<leader>lg",
+        "docmap.plugins: keys collects the lhs, not the rhs command"
+      )
+      eq(specs[1].has_config, true, "docmap.plugins: config = function(...) counts as has_config")
+      eq(specs[1].has_opts, false, "docmap.plugins: and has_opts is false, not nil, when unset")
+
+      eq(specs[2].event[1], "BufReadPre", "docmap.plugins: event array read")
+      eq(specs[2].has_config, true, "docmap.plugins: config = true also counts as has_config")
+
+      eq(specs[3].repo, "sindrets/diffview.nvim", "docmap.plugins: the bare-string shorthand form")
+      eq(#specs[3].dependencies, 0, "docmap.plugins: ... with every other field a real empty array")
+
+      eq(
+        specs[4].repo,
+        "custom-thing",
+        "docmap.plugins: falls back to name= when no positional string"
+      )
+      eq(specs[4].dir, "/local/path", "docmap.plugins: dir= read")
+      eq(specs[4].enabled, false, "docmap.plugins: enabled = false read")
+      eq(specs[4].priority, 100, "docmap.plugins: priority read as a number")
+
+      -- Files unrelated to plugin specs are unaffected — nothing here should
+      -- ever fire on an ordinary module.
+      local _, _, _, _, ordinary_specs = functions.scan_file(fixture2)
+      eq(#ordinary_specs, 0, "docmap.plugins: an ordinary function file has no spec entries")
+
+      -- The documented non-goal: `local M = {...}; return M` is not traced.
+      -- Getting this wrong would mean guessing at an assignment miles away from
+      -- the `return`, which is the class of guess this scanner declines to make
+      -- everywhere else (see deps.lua on `require(expr .. var)`).
+      local indirect_fixture = H.tmpfile(".lua")
+      local ivf = assert(io.open(indirect_fixture, "w"))
+      ivf:write('local M = {\n  { "author/repo" },\n}\nreturn M\n')
+      ivf:close()
+      local _, _, _, _, indirect_specs = functions.scan_file(indirect_fixture)
+      eq(#indirect_specs, 0, "docmap.plugins: indirection through a local is not traced, by design")
+
+      -- Two false positives found live, against a real Neovim config, both
+      -- fixed structurally rather than by special-casing the file that
+      -- surfaced them.
+
+      -- A bare-string array is not unique to plugin specs: a plain list of
+      -- command names is the identical shape. Rejected on content — none of
+      -- these strings contain "/", the one thing every real spec sampled from
+      -- that config had.
+      local cmdlist_fixture = H.tmpfile(".lua")
+      local cf = assert(io.open(cmdlist_fixture, "w"))
+      cf:write('return {\n  "NeotestRunNearest",\n  "NeotestDebugNearest",\n}\n')
+      cf:close()
+      local _, _, _, _, cmdlist_specs = functions.scan_file(cmdlist_fixture)
+      eq(#cmdlist_specs, 0, "docmap.plugins: a bare-string list with no '/' is not plugins")
+
+      -- `return { "repo", event = "…" }` is ONE spec (a config split one file
+      -- per plugin), not an array whose fields are each their own entry —
+      -- treating `event`'s value as a positional element produced a spec
+      -- whose repo was literally the string "VeryLazy". The two return shapes
+      -- parse to the same node type; the distinguishing signal is whether the
+      -- table has ANY named field, which an array of specs never does.
+      local single_fixture = H.tmpfile(".lua")
+      local sf = assert(io.open(single_fixture, "w"))
+      sf:write('return {\n  "nvzone/menu",\n  event = "VeryLazy",\n  config = function() end,\n}\n')
+      sf:close()
+      local _, _, _, _, single_specs = functions.scan_file(single_fixture)
+      eq(
+        #single_specs,
+        1,
+        "docmap.plugins: a single spec returned directly is one entry, not several"
+      )
+      eq(single_specs[1].repo, "nvzone/menu", "docmap.plugins: ... with the repo read correctly")
+      eq(
+        single_specs[1].event[1],
+        "VeryLazy",
+        "docmap.plugins: ... and event read as a trigger, not mistaken for a second repo"
+      )
+
+      -- The mirror image of the command-list case: EVERY field bracket-keyed
+      -- or named, no positional string anywhere. A real keymap table
+      -- (`["dd"] = "buffer_delete"`), not a plugin spec with no repo.
+      local keymap_fixture = H.tmpfile(".lua")
+      local kf = assert(io.open(keymap_fixture, "w"))
+      kf:write('return {\n  ["dd"] = "buffer_delete",\n  ["+"] = "noop",\n}\n')
+      kf:close()
+      local _, _, _, _, keymap_specs = functions.scan_file(keymap_fixture)
+      eq(#keymap_specs, 0, "docmap.plugins: an all-named-fields table with no repo is not a spec")
+    end
+
+    -- ------------------------------------------------------------- docmap.check
+    local check = require("docmap.core.check")
+
+    local function make_ir(functions_by_node, edges)
+      local nodes, order = {}, {}
+      for id, fns_ in pairs(functions_by_node) do
+        nodes[id] = {
+          id = id,
+          kind = "module",
+          name = id,
+          path = id,
+          source = id .. "/init.lua",
+          module = id:gsub("/", "."),
+          summary = "x",
+          body = "",
+          readme = "x.md",
+          types = {},
+          export = "table",
+          parent = nil,
+          depth = 0,
+          children = {},
+          functions = fns_,
+        }
+        order[#order + 1] = id
+      end
+      table.sort(order)
+      return {
+        meta = {
+          title = "t",
+          source = "lua",
+          types_dir = "@types",
+          branch = "main",
+          schema = 1,
+          counts = { module = #order, namespace = 0, file = 0 },
+        },
+        root = order[1],
+        order = order,
+        nodes = nodes,
+        edges = edges or {},
+      }
+    end
+
+    local ir = make_ir({
+      ["a"] = {
+        {
+          name = "M.foo",
+          signature = "foo(x, y)",
+          summary = "",
+          line = 1,
+          params = { { name = "x", type = "string", optional = false, desc = "" } },
+          returns = {},
+          generic = {},
+          deprecated = nil,
+          async = false,
+          nodiscard = false,
+          see = { "b.bar", "nowhere.real" },
+          overload = {},
+          example = nil,
+          since = nil,
+        },
+      },
+      ["b"] = {
+        {
+          name = "M.bar",
+          signature = "bar()",
+          summary = "",
+          line = 1,
+          params = {},
+          returns = {},
+          generic = {},
+          deprecated = nil,
+          async = false,
+          nodiscard = false,
+          see = {},
+          overload = {},
+          example = nil,
+          since = nil,
+        },
+      },
+    })
+
+    local opts = { root = "/fake", lua_root = "lua", extra_checks = {} }
+    local findings = check.run(ir, opts)
+
+    local has_dead_see, has_undoc_param = false, false
+    for _, f in ipairs(findings) do
+      if f.check == "dead-see-target" then
+        has_dead_see = true
+        ok(fmsg(f):match("nowhere%.real"), "docmap.check: dead-see-target names the bad target")
+      end
+      if f.check == "undocumented-param" then
+        has_undoc_param = true
+        eq(f.severity, "info", "docmap.check: undocumented-param is info-severity")
       end
     end
-  end
-  ok(
-    other_shape ~= nil and other_shape ~= shape_a,
-    "duplicates: a differently-shaped function gets a different fingerprint"
-  )
+    ok(has_dead_see, "docmap.check: dead-see-target fires for an unresolvable @see target")
+    ok(
+      not (function()
+          for _, f in ipairs(findings) do
+            if f.check == "dead-see-target" and fmsg(f):match("b%.bar") then
+              return true
+            end
+          end
+          return false
+        end)(),
+      "docmap.check: dead-see-target does NOT fire for 'b.bar', which resolves via module+bare-name"
+    )
+    ok(
+      has_undoc_param,
+      "docmap.check: undocumented-param fires when signature has more params than @param lines"
+    )
 
-  -- ----------------------------------------------------------------- churn
-  --
-  -- The scoring only, which is all of it that is pure: counting commits is
-  -- git's job and lives in `command.lua`, the same split `history.lua`
-  -- follows. The fixture is built so the ranking has to get the *argument*
-  -- right, not just sort a column — each of the three losing modules loses
-  -- for a different reason.
-  local churn = require("docmap.core.churn")
-
-  local churn_ir = {
-    root = "lua/c",
-    order = { "lua/c/hot", "lua/c/stable", "lua/c/simple", "lua/c/notes" },
-    nodes = {
-      -- Changed often AND complex: the intersection, and the whole point.
-      ["lua/c/hot"] = {
-        id = "lua/c/hot",
-        module = "c.hot",
-        source = "lua/c/hot/init.lua",
-        functions = { { name = "M.a", signature = "a()", complexity = 10 } },
-      },
-      -- Complex but finished. Not a problem — it is done.
-      ["lua/c/stable"] = {
-        id = "lua/c/stable",
-        module = "c.stable",
-        source = "lua/c/stable/init.lua",
-        functions = { { name = "M.b", signature = "b()", complexity = 20 } },
-      },
-      -- Churned constantly but trivial. Not a problem either — that is what a
-      -- config file looks like. Scored to TIE with `c.stable`, so the pair
-      -- also pins the tie-break rather than only the ordering.
-      ["lua/c/simple"] = {
-        id = "lua/c/simple",
-        module = "c.simple",
-        source = "lua/c/simple/init.lua",
-        functions = { { name = "M.c", signature = "c()", complexity = 2 } },
-      },
-      -- No documented functions, so no complexity to multiply.
-      ["lua/c/notes"] = {
-        id = "lua/c/notes",
-        module = "c.notes",
-        source = "lua/c/notes/init.lua",
-        functions = {},
-      },
-    },
-  }
-
-  local cres = churn.rank({
-    ["lua/c/hot/init.lua"] = 8,
-    ["lua/c/stable/init.lua"] = 2,
-    ["lua/c/simple/init.lua"] = 20,
-    ["lua/c/notes/init.lua"] = 12,
-    ["README.md"] = 4,
-    [".github/workflows/ci.yml"] = 2,
-  }, churn_ir, 40)
-
-  -- 8x10 = 80 beats 20x2 = 40 and 2x20 = 40. `c.hot` is highest on NEITHER
-  -- axis on its own — fewer commits than `c.simple`, less complexity than
-  -- `c.stable` — which is exactly the claim: the intersection is the signal,
-  -- and sorting by either column alone would put the wrong module first.
-  eq(cres.entries[1].module, "c.hot", "churn: the intersection outranks either factor alone")
-  eq(cres.entries[1].score, 80, "churn: score is commits x complexity")
-  eq(cres.entries[2].score, 40, "churn: the two single-factor modules tie below it")
-  eq(cres.entries[3].score, 40, "churn: ...both of them")
-  eq(cres.entries[2].module, "c.simple", "churn: a tie breaks toward the more-churned module")
-  eq(#cres.entries, 3, "churn: a module with no documented functions is dropped, not scored 0")
-  eq(cres.entries[1].hottest, "a()", "churn: every row names where to start reading")
-
-  -- Paths that changed but back no scanned module — READMEs, CI config,
-  -- anything deleted since. Counted rather than silently dropped: a number
-  -- with no idea how much it ignored is worse than no number.
-  eq(cres.unmatched, 2, "churn: unmatched paths are reported, not swallowed")
-  eq(cres.commits, 40, "churn: and the range's commit count travels with the result")
-
-  local churn_qf = churn.quickfix_items(cres, "/repo")
-  eq(#churn_qf, 3, "churn: one quickfix row per ranked module")
-  ok(churn_qf[1].filename:find("hot", 1, true) ~= nil, "churn: pointing at the module's source")
-  eq(churn_qf[1].lnum, 1, "churn: at line 1 — the finding is about the file, not a line in it")
-
-  -- ------------------------------------------------------ coverage.resolve
-  -- Real spec-file text, not a hand-built name list: the whole point is
-  -- that a bare name mentioned in a test file — the way a spec actually
-  -- calls a function — is what lights `tested` up.
-  local coverage = require("docmap.core.coverage")
-  write("TESTS/demo_spec.lua", {
-    "local util = require('demo.util')",
-    "assert(util.trim('x') ~= nil)",
-  })
-
-  local cov_tree = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
-  coverage.resolve(cov_tree, { root = root, lua_root = "lua" })
-
-  local trim_fn, run_fn
-  for _, fn in ipairs(cov_tree.nodes[util].functions) do
-    if fn.name == "M.trim" then
-      trim_fn = fn
+    -- The same function marked `@internal` must not be nagged about: its
+    -- documentation bar is the author's own, and nagging is how a heuristic
+    -- check earns a place on someone's ignore list.
+    local internal_ir = make_ir({ ["a"] = fns3 })
+    local internal_nagged = false
+    for _, f in ipairs(check.run(internal_ir, opts)) do
+      if f.check == "undocumented-param" then
+        internal_nagged = true
+      end
     end
-  end
-  for _, fn in ipairs(cov_tree.nodes[app].functions) do
-    if fn.name == "M.run" then
-      run_fn = fn
+    eq(internal_nagged, false, "docmap.check: undocumented-param skips an @internal function")
+
+    -- ------------------------------------------------- param-name-mismatch (R5)
+    -- undocumented-param only ever compares counts, so a renamed parameter
+    -- whose @param line was never updated passes silently as long as both
+    -- lists are the same length. This is the case it cannot see.
+    local function param(name)
+      return { name = name, type = "any", optional = false, desc = "" }
     end
-  end
-  ok(trim_fn.tested, "docmap.coverage: a function named in a spec file is tested = true")
-  ok(
-    not run_fn.tested,
-    "docmap.coverage: a function never mentioned in any spec stays tested = false"
-  )
 
-  local tested_n, total_n = coverage.summary(cov_tree)
-  eq(tested_n, 1, "docmap.coverage: summary counts exactly the one tested function")
-  ok(total_n >= 2, "docmap.coverage: summary's total covers every function in the tree")
+    local mismatch_ir = make_ir({
+      ["a"] = {
+        {
+          name = "M.resize",
+          signature = "resize(width, height)",
+          summary = "",
+          line = 1,
+          params = { param("w"), param("height") }, -- renamed width -> w in code, doc not updated
+          returns = {},
+          generic = {},
+          async = false,
+          nodiscard = false,
+          see = {},
+          overload = {},
+        },
+        -- A colon-declared method whose own `self` is documented explicitly —
+        -- real, legitimate LuaCATS style (verified against this repo's own
+        -- Lru:get/Lru:put) that the implicit-self exclusion must not flag.
+        {
+          name = "M:put",
+          signature = "put(key, value)",
+          summary = "",
+          line = 5,
+          params = { param("self"), param("key"), param("value") },
+          returns = {},
+          generic = {},
+          async = false,
+          nodiscard = false,
+          see = {},
+          overload = {},
+        },
+      },
+    })
+    local mismatch_findings = check.run(mismatch_ir, opts)
 
-  local cov_none = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
-  coverage.resolve(cov_none, { root = root, lua_root = "lua", tests_dir = "no/such/dir" })
-  local none_tested = coverage.summary(cov_none)
-  eq(
-    none_tested,
-    0,
-    "docmap.coverage: a missing tests_dir leaves every function untested, not an error"
-  )
+    local resize_mismatch, put_mismatch = {}, {}
+    for _, f in ipairs(mismatch_findings) do
+      if f.check == "param-name-mismatch" then
+        if fmsg(f):match("^M%.resize") then
+          resize_mismatch[#resize_mismatch + 1] = f
+        elseif fmsg(f):match("^M:put") then
+          put_mismatch[#put_mismatch + 1] = f
+        end
+      end
+    end
+    eq(
+      #resize_mismatch,
+      1,
+      "docmap.check: param-name-mismatch fires once for the one renamed parameter"
+    )
+    ok(
+      resize_mismatch[1]
+        and fmsg(resize_mismatch[1]):match("'w'")
+        and fmsg(resize_mismatch[1]):match("'width'"),
+      "docmap.check: param-name-mismatch names both the doc's name and the signature's"
+    )
+    eq(
+      resize_mismatch[1] and resize_mismatch[1].severity,
+      "info",
+      "docmap.check: param-name-mismatch is info-severity, same as undocumented-param"
+    )
+    eq(
+      #put_mismatch,
+      0,
+      "docmap.check: an explicitly-documented 'self' on a colon method is not a mismatch"
+    )
 
-  -- --------------------------------------------------- doccoverage (R4)
-  local doccoverage = require("docmap.core.doccoverage")
-  local doc_ir = make_ir({
-    ["a"] = {
-      { -- fully documented: summary + matching params
-        name = "M.documented",
-        signature = "documented(x)",
-        summary = "Does the thing.",
+    -- dead-function: local functions and @internal ones are checked
+    -- unconditionally; an ordinary exported function only under opts.dead_code.
+    local function fn_info(name, over)
+      over = over or {}
+      return vim.tbl_extend("force", {
+        name = name,
+        signature = name .. "()",
+        summary = "",
         line = 1,
-        params = { param("x") },
-        returns = {},
-        generic = {},
-        async = false,
-        nodiscard = false,
-        see = {},
-        overload = {},
-      },
-      { -- no summary at all
-        name = "M.no_summary",
-        signature = "no_summary()",
-        summary = "",
-        line = 5,
         params = {},
         returns = {},
         generic = {},
+        deprecated = nil,
         async = false,
         nodiscard = false,
+        internal = false,
         see = {},
         overload = {},
-      },
-      { -- summary present, but a parameter has no matching @param line
-        name = "M.bad_params",
-        signature = "bad_params(x, y)",
-        summary = "Half documented.",
-        line = 9,
-        params = { param("x") },
-        returns = {},
-        generic = {},
-        async = false,
-        nodiscard = false,
-        see = {},
-        overload = {},
-      },
-      { -- @internal: excluded from the total entirely, documented or not
-        name = "M.internal_thing",
-        signature = "internal_thing()",
-        summary = "",
-        line = 13,
-        params = {},
-        returns = {},
-        generic = {},
-        async = false,
-        nodiscard = false,
-        see = {},
-        overload = {},
-        internal = true,
-      },
-    },
-  })
-
-  local doc_documented, doc_total = doccoverage.summary(doc_ir)
-  eq(doc_total, 3, "docmap.doccoverage: @internal functions are excluded from the total")
-  eq(
-    doc_documented,
-    1,
-    "docmap.doccoverage: only the summary+matching-params function counts as documented"
-  )
-
-  local svg = doccoverage.badge_svg(doc_ir)
-  ok(svg:match("^<svg"), "docmap.doccoverage: badge_svg produces an <svg> document")
-  ok(svg:match("33%%"), "docmap.doccoverage: badge_svg's percentage matches the summary (1/3)")
-  ok(svg:match("doc coverage"), "docmap.doccoverage: badge_svg labels itself")
-
-  local empty_documented, empty_total = doccoverage.summary(make_ir({ ["a"] = {} }))
-  eq(empty_documented, 0, "docmap.doccoverage: a tree with no functions documents zero")
-  eq(empty_total, 0, "docmap.doccoverage: a tree with no functions has zero total")
-
-  -- `M.resolve` stamps `fn.documented` in place — what the Analysis tab's
-  -- Documentation panel reads instead of reimplementing is_documented in
-  -- JS. Must agree exactly with M.summary's own count over the same IR, or
-  -- the panel and the CLI/badge number would quietly disagree.
-  doccoverage.resolve(doc_ir)
-  local stamped_documented, stamped_total = 0, 0
-  for _, id in ipairs(doc_ir.order) do
-    for _, fn in ipairs(doc_ir.nodes[id].functions) do
-      if not fn.internal then
-        stamped_total = stamped_total + 1
-      end
-      if fn.documented then
-        stamped_documented = stamped_documented + 1
-      end
+        example = nil,
+        since = nil,
+      }, over)
     end
-  end
-  eq(
-    stamped_documented,
-    doc_documented,
-    "docmap.doccoverage: resolve's stamped fn.documented count matches summary's"
-  )
-  eq(
-    stamped_total,
-    doc_total,
-    "docmap.doccoverage: resolve never stamps documented=true on an @internal function"
-  )
-  ok(
-    (function()
-      for _, fn in ipairs(doc_ir.nodes["a"].functions) do
-        if fn.name == "M.internal_thing" then
-          return fn.documented == false
+
+    local function has_dead_function(list, name)
+      for _, f in ipairs(list) do
+        if f.check == "dead-function" and fmsg(f):match("^" .. name:gsub("%.", "%%.")) then
+          return true
         end
       end
       return false
-    end)(),
-    "docmap.doccoverage: an @internal function is always documented = false, never true"
-  )
-
-  -- ------------------------------------------------------- history (R11 P1)
-  local history = require("docmap.core.history")
-
-  ---@param name string
-  ---@param line integer
-  ---@param line_end integer?
-  local function hfn(name, line, line_end)
-    return {
-      name = name,
-      signature = name .. "()",
-      summary = "s",
-      line = line,
-      line_end = line_end,
-      params = {},
-      returns = {},
-      generic = {},
-      async = false,
-      nodiscard = false,
-      see = {},
-      overload = {},
-    }
-  end
-
-  -- parse_diff: the four hunk shapes git actually emits at --unified=0.
-  local parsed = history.parse_diff(table.concat({
-    "diff --git a/a/init.lua b/a/init.lua",
-    "index 1111111..2222222 100644",
-    "--- a/a/init.lua",
-    "+++ b/a/init.lua",
-    "@@ -12,3 +12,4 @@ function M.alpha()",
-    "@@ -20 +21 @@ function M.alpha()",
-    "@@ -30,0 +32,2 @@ function M.beta()",
-    "diff --git a/b/init.lua b/b/init.lua",
-    "new file mode 100644",
-    "--- /dev/null",
-    "+++ b/b/init.lua",
-    "@@ -0,0 +1,5 @@",
-  }, "\n"))
-
-  eq(#parsed, 2, "docmap.history: parse_diff finds both files")
-  eq(parsed[1].new_path, "a/init.lua", "docmap.history: strips git's b/ prefix")
-  eq(#parsed[1].old, 2, "docmap.history: a -N,0 hunk contributes no old range")
-  eq(parsed[1].old[1].first, 12, "docmap.history: old range start")
-  eq(parsed[1].old[1].last, 14, "docmap.history: old range end (start + count - 1)")
-  eq(parsed[1].old[2].first, 20, "docmap.history: a missing count means exactly one line")
-  eq(parsed[1].old[2].last, 20, "docmap.history: …so first == last")
-  eq(parsed[1].new[3].first, 32, "docmap.history: pure insertion keeps its new range")
-  eq(parsed[1].new[3].last, 33, "docmap.history: …spanning `count` lines")
-  eq(parsed[2].old_path, nil, "docmap.history: /dev/null on the old side means added file")
-  eq(parsed[2].new_path, "b/init.lua", "docmap.history: added file still has a new path")
-
-  -- analyze, exact spans: alpha 10-20, beta 30-40, with a real gap between.
-  local hist_ir = make_ir({
-    ["a"] = { hfn("M.alpha", 10, 20), hfn("M.beta", 30, 40) },
-    ["b"] = { hfn("M.caller", 5, 8) },
-  }, {
-    { kind = "call", from = "b", from_fn = "M.caller", to = "a", to_fn = "M.alpha", line = 6 },
-  })
-
-  ---@param hunk string
-  ---@param path string?
-  local function diff_for(hunk, path)
-    path = path or "a/init.lua"
-    return table.concat({
-      "diff --git a/" .. path .. " b/" .. path,
-      "--- a/" .. path,
-      "+++ b/" .. path,
-      hunk,
-    }, "\n")
-  end
-
-  local mid = history.analyze(diff_for("@@ -15,2 +15,2 @@"), hist_ir, hist_ir)
-  eq(#mid.touched, 1, "docmap.history: a change inside one function touches exactly it")
-  eq(mid.touched[1].fn, "M.alpha", "docmap.history: …and names that function")
-  eq(mid.approximate, false, "docmap.history: exact line_end needs no approximation")
-
-  -- Both boundaries are inclusive: the `function` line and the `end` line are
-  -- part of the function, and an off-by-one either way would silently drop
-  -- exactly the single-line signature changes most worth catching.
-  eq(
-    #history.analyze(diff_for("@@ -10 +10 @@"), hist_ir, hist_ir).touched,
-    1,
-    "docmap.history: a change on the declaration line counts"
-  )
-  eq(
-    #history.analyze(diff_for("@@ -20 +20 @@"), hist_ir, hist_ir).touched,
-    1,
-    "docmap.history: a change on the closing `end` line counts"
-  )
-
-  local gap = history.analyze(diff_for("@@ -25 +25 @@"), hist_ir, hist_ir)
-  eq(#gap.touched, 0, "docmap.history: a change between two functions touches neither")
-  eq(gap.unattributed[1], "a/init.lua", "docmap.history: …and is reported as unattributed")
-
-  -- Callers, and the two answers they feed.
-  local cs = mid.callers["a#M.alpha"]
-  eq(#cs, 1, "docmap.history: the call edge into a touched function is found")
-  eq(cs[1].fn, "M.caller", "docmap.history: caller is named by its declared function")
-  eq(cs[1].node, "b", "docmap.history: …and by the node it lives in")
-  eq(mid.calling_modules[1], "b", "docmap.history: calling_modules is the precise answer")
-
-  -- Degradation: an artifact without line_end (every revision older than the
-  -- field itself). Spans fall back to the next function's start, which
-  -- over-attributes the gap — and must say so.
-  local old_ir = make_ir({ ["a"] = { hfn("M.alpha", 10), hfn("M.beta", 30) } })
-  local approx = history.analyze(diff_for("@@ -25 +25 @@"), old_ir, old_ir)
-  eq(approx.approximate, true, "docmap.history: a missing line_end is flagged as approximate")
-  eq(#approx.touched, 1, "docmap.history: the fallback still attributes the change")
-  eq(
-    approx.touched[1].fn,
-    "M.alpha",
-    "docmap.history: …to the preceding function, erring toward over-attribution"
-  )
-
-  -- A path the map does not know is reported, not silently dropped.
-  local unknown = history.analyze(diff_for("@@ -1 +1 @@", "README.md"), hist_ir, hist_ir)
-  eq(#unknown.touched, 0, "docmap.history: an unscanned path touches no function")
-  eq(unknown.unattributed[1], "README.md", "docmap.history: …and is listed as unattributed")
-  eq(unknown.files[1], "README.md", "docmap.history: every changed path is reported in files")
-
-  -- Missing IRs (a first commit has no parent) degrade to files-only rather
-  -- than erroring.
-  local no_ir = history.analyze(diff_for("@@ -15 +15 @@"), nil, nil)
-  eq(#no_ir.touched, 0, "docmap.history: no IR means no attribution, not a crash")
-  eq(#no_ir.files, 1, "docmap.history: …but the changed file is still reported")
-
-  -- quickfix_items (R11 P2): the shape `:DocMap impact` puts in the list.
-  -- Here rather than in command.lua so it is testable without a repository —
-  -- the same split diff.lua uses for `render`.
-  local qf = history.quickfix_items(mid, hist_ir, "/repo")
-  eq(#qf, 2, "docmap.history: one entry for the touched function, one per call site")
-  eq(
-    qf[1].filename,
-    "/repo/a/init.lua",
-    "docmap.history: the touched entry points at the node's own source"
-  )
-  eq(qf[1].lnum, 10, "docmap.history: …at the function's declaration line")
-  ok(
-    qf[1].text:match("^changed: M%.alpha") and qf[1].text:match("1 caller%)"),
-    "docmap.history: the touched entry names the function and its caller count"
-  )
-  eq(qf[2].filename, "/repo/b/init.lua", "docmap.history: the caller entry points at the caller")
-  eq(qf[2].lnum, 6, "docmap.history: …at the call site line, not the callee's")
-  ok(qf[2].text:match("M%.caller calls it"), "docmap.history: the caller entry says who calls it")
-
-  -- Singular/plural is a detail, but "1 callers" in every review list is the
-  -- kind of wrong that erodes trust in the rest of the output.
-  local zero_qf = history.quickfix_items(
-    history.analyze(diff_for("@@ -35 +35 @@"), hist_ir, hist_ir),
-    hist_ir,
-    "/repo"
-  )
-  ok(
-    zero_qf[1].text:match("%(0 callers%)"),
-    "docmap.history: a function with no caller reads '0 callers', not '0 caller'"
-  )
-
-  -- Unattributed files come last: they explain the count but are not
-  -- findings, so they must never push the actionable entries down.
-  local mixed = history.analyze(
-    diff_for("@@ -15 +15 @@") .. "\n" .. diff_for("@@ -1 +1 @@", "README.md"),
-    hist_ir,
-    hist_ir
-  )
-  local mixed_qf = history.quickfix_items(mixed, hist_ir, "/repo")
-  eq(#mixed_qf, 3, "docmap.history: touched + caller + unattributed all appear")
-  ok(
-    mixed_qf[#mixed_qf].text:match("nothing to trace"),
-    "docmap.history: the unattributed file sorts last"
-  )
-  eq(
-    mixed_qf[#mixed_qf].filename,
-    "/repo/README.md",
-    "docmap.history: an unattributed path is still an openable location"
-  )
-
-  -- ---------------------------------------------------------- serve (R11 P3)
-  -- The route table and socket handling are verified by running the thing and
-  -- talking to it, which a spec cannot do without an event loop. What *is*
-  -- tested here is the part that must never be wrong: the whitelist standing
-  -- between a URL path and a git subprocess, and the lifecycle, since a
-  -- listening socket left behind is the cost of having a runtime at all.
-  local serve = require("docmap.editor.serve")
-
-  for _, good in ipairs({
-    "1ce752e",
-    "08b4494",
-    "7bdfb3ab5762e42806c228625ee095d72c18d0b2",
-    "abcdef0123456789",
-  }) do
-    eq(serve.safe_sha(good), good, "docmap.serve: accepts a real hash (" .. good:sub(1, 10) .. ")")
-  end
-
-  -- Every one of these is a value someone could put in a URL path. None may
-  -- reach git: the first is argument injection, the rest are either shell
-  -- metacharacters or simply not hashes.
-  for _, bad in ipairs({
-    "--upload-pack=evil",
-    "--output=/tmp/x",
-    "HEAD",
-    "HEAD~1",
-    "abc;id",
-    "$(id)",
-    "../../etc/passwd",
-    "zzzzzzz",
-    "1234", -- too short: 7 hex digits minimum
-    "0123456789012345678901234567890123456789a", -- 41, one over
-    "",
-  }) do
-    eq(serve.safe_sha(bad), nil, ("docmap.serve: refuses %q"):format(bad))
-  end
-  -- Both calls hand it the wrong type on purpose: refusing those is the
-  -- behaviour under test, so the mismatch is the point rather than a defect.
-  ---@diagnostic disable-next-line: param-type-mismatch
-  eq(serve.safe_sha(nil), nil, "docmap.serve: refuses a nil path segment")
-  ---@diagnostic disable-next-line: param-type-mismatch
-  eq(serve.safe_sha(42), nil, "docmap.serve: refuses a non-string")
-
-  -- The other half of the server's security surface: the static route may
-  -- only ever hand out a bare filename inside `out_dir`. Same reasoning as
-  -- `safe_sha` — the property is the whole point of the route, so it is
-  -- exported and tested rather than asserted in a comment.
-  eq(
-    serve.safe_static_name(""),
-    "index.html",
-    "docmap.serve: an empty path is the index, not a traversal"
-  )
-  eq(
-    serve.safe_static_name("module_map.json"),
-    "module_map.json",
-    "docmap.serve: a bare filename is served"
-  )
-  for _, bad in ipairs({
-    "../.git/config",
-    "..",
-    "../../etc/passwd",
-    "sub/dir.html",
-    "sub\\dir.html", -- backslash: a separator on the platform this runs on
-    "..%2f..%2fetc", -- already-decoded escape, so the `..` check is what catches it
-    "a/../b",
-  }) do
-    eq(serve.safe_static_name(bad), nil, ("docmap.serve: refuses static path %q"):format(bad))
-  end
-  ---@diagnostic disable-next-line: param-type-mismatch
-  eq(serve.safe_static_name(nil), nil, "docmap.serve: refuses a nil static path")
-  ---@diagnostic disable-next-line: param-type-mismatch
-  eq(serve.safe_static_name(42), nil, "docmap.serve: refuses a non-string static path")
-
-  -- `route_static` builds its path as `cfg.root/cfg.out_dir/safe`, and
-  -- `cfg.out_dir` is the same repository-controlled value `write_artifacts`
-  -- guards against (SEC-42) -- `config/file.lua`'s `REPO_KEYS.out_dir` lets a
-  -- cloned tree's own `.docmap.json` set it. `safe_static_name` above only
-  -- constrains the request-path half of that join; this is the other half,
-  -- shared via `core/safe_out_dir` rather than re-derived in `serve.lua`.
-  -- Scoped in its own `do...end` block (this function is already at Lua's
-  -- 200-local ceiling): the locals below must not outlive this check.
-  do
-    local safe_out_dir = require("docmap.core.safe_out_dir")
-    eq(
-      safe_out_dir("generated/map"),
-      "generated/map",
-      "docmap.safe_out_dir: an ordinary relative out_dir passes through"
-    )
-    eq(safe_out_dir(nil), "docs/map", "docmap.safe_out_dir: nil falls back to the default")
-    for _, bad in ipairs({
-      "../../../../somewhere_outside",
-      "..\\..\\somewhere_outside",
-      "/etc/somewhere_outside",
-      "C:/somewhere_outside",
-    }) do
-      eq(safe_out_dir(bad), nil, ("docmap.safe_out_dir: refuses %q"):format(bad))
     end
-  end
 
-  -- `M.start` now runs `out_dir` through the same whitelist once, up front,
-  -- rather than leaving `route_static` to fail every request against a
-  -- server that "started" fine. A malicious `out_dir` must refuse to start
-  -- at all, and must not leave anything listening behind.
-  do
-    local bad_url, bad_err = serve.start({ root = root, out_dir = "../../../../evil" })
-    eq(bad_url, nil, "docmap.serve: start refuses an out_dir that escapes the repository")
-    ok(bad_err and bad_err:match("out_dir"), "docmap.serve: ...and says why, naming out_dir")
-    eq(serve.is_running(), false, "docmap.serve: ...and nothing was left listening")
-  end
+    local dead_ir = make_ir({
+      ["a"] = {
+        fn_info("bare_dead"), -- local function, no caller -> dead
+        fn_info("bare_called"), -- local function, has a caller -> not dead
+        fn_info("M.internal_dead", { internal = true }), -- @internal, no caller -> dead
+        fn_info("M.internal_called", { internal = true }), -- @internal, has a caller -> not dead
+        fn_info("M.public_uncalled"), -- ordinary export, no caller -> only under dead_code
+        fn_info("M.public_called"), -- ordinary export, has a caller -> never dead
+      },
+    }, {
+      { kind = "call", from = "a", to = "a", from_fn = "M.public_called", to_fn = "bare_called" },
+      {
+        kind = "call",
+        from = "a",
+        to = "a",
+        from_fn = "M.public_called",
+        to_fn = "M.internal_called",
+      },
+      { kind = "call", from = "a", to = "a", from_fn = "bare_called", to_fn = "M.public_called" },
+    })
 
-  -- Lifecycle. Bound to loopback on an OS-assigned port, idempotent both
-  -- ways: a second start must not orphan the first socket, and stopping what
-  -- never ran is a no-op rather than an error (same tolerance `uninstall`
-  -- has).
-  eq(serve.is_running(), false, "docmap.serve: nothing is running before start")
-  eq(serve.stop(), false, "docmap.serve: stopping when idle is a no-op, not an error")
-
-  local serve_url = serve.start({ root = root, out_dir = "docs/map" })
-  ok(serve_url ~= nil, "docmap.serve: start returns a URL")
-  ok(
-    serve_url and serve_url:match("^http://127%.0%.0%.1:%d+/$") ~= nil,
-    "docmap.serve: binds loopback only, on an OS-assigned port"
-  )
-  eq(serve.is_running(), true, "docmap.serve: reports itself running")
-
-  local first_port = serve.info().port
-  eq(serve.start({ root = root }), serve_url, "docmap.serve: a second start returns the same URL")
-  eq(serve.info().port, first_port, "docmap.serve: …on the same port, not a second socket")
-
-  eq(serve.stop(), true, "docmap.serve: stop reports that it stopped something")
-  eq(serve.is_running(), false, "docmap.serve: …and is no longer running")
-  eq(serve.info(), nil, "docmap.serve: info is nil once stopped")
-  eq(serve.stop(), false, "docmap.serve: stopping twice is a no-op")
-
-  -- ---------------------------------------------- symbols and subtree stats
-  local sym_fixture = H.tmpfile(".lua")
-  local sfw = assert(io.open(sym_fixture, "w"), "docmap spec: symbol fixture must be writable")
-  sfw:write(table.concat({
-    "local M = {}",
-    "---Cache of resolved roots.",
-    "local CACHE = { a = 1, b = 2, c = 3 }",
-    "local MAX = 42",
-    'local fs = require("demo.fs")', -- a dependency, not a symbol
-    "local uv = vim.uv or vim.loop",
-    "M.defaults = { x = 1 }",
-    "M.handler = function() return 1 end", -- a function, not a symbol
-    "function M.go()",
-    "  local inner = {}", -- nested: not module scope
-    "  return inner",
-    "end",
-    "return M",
-  }, "\n"))
-  sfw:close()
-
-  -- `select(4, ...)` rather than three leading `_`s: this file sits at Lua's
-  -- 200-local-per-function ceiling, and `select` costs no local slots for the
-  -- values being skipped. Four names now, not three: `scan_file` returns
-  -- symbols, plugins, endpoints, lines from this position on, since the
-  -- endpoints recognizer widened the shared seven-value contract.
-  local syms, _, _, loc = select(4, functions.scan_file(sym_fixture))
-  local by_sym = {}
-  for _, s in ipairs(syms) do
-    by_sym[s.name] = s
-  end
-
-  eq(loc, 13, "docmap.functions: reports the file's line count")
-  ok(by_sym.CACHE, "docmap.symbols: a module-scope table is reported")
-  eq(by_sym.CACHE.kind, "table", "docmap.symbols: a table constructor is a table")
-  eq(by_sym.CACHE.detail, "3 fields", "docmap.symbols: a table's detail is its field count")
-  eq(
-    by_sym.CACHE.summary,
-    "Cache of resolved roots.",
-    "docmap.symbols: the doc comment above it becomes the summary"
-  )
-  eq(by_sym.MAX.kind, "constant", "docmap.symbols: a literal is a constant")
-  eq(by_sym.MAX.detail, "42", "docmap.symbols: a constant's detail is the literal")
-  eq(by_sym.uv.kind, "binding", "docmap.symbols: anything else is a binding")
-  eq(by_sym["M.defaults"].kind, "table", "docmap.symbols: M.x = {} is reported too")
-
-  -- The two exclusions are the point: another stage owns each of them, and
-  -- reporting them twice would be two places to keep in sync.
-  eq(by_sym.fs, nil, "docmap.symbols: a require binding is left to docmap.deps")
-  eq(by_sym["M.handler"], nil, "docmap.symbols: a function value is left to docmap.functions")
-  eq(by_sym.inner, nil, "docmap.symbols: a local inside a function body is not module scope")
-
-  -- The export table is the module, not state it holds. Filtering it matters
-  -- at scale: over lib.nvim it was 188 of 600 entries before this.
-  eq(by_sym.M, nil, "docmap.symbols: the returned export table is not listed as a symbol")
-
-  local meta_fixture = H.tmpfile(".lua")
-  local mfw = assert(io.open(meta_fixture, "w"))
-  mfw:write(table.concat({
-    "local M = {}",
-    "local state = {}",
-    "return setmetatable(M, { __call = function() return 1 end })",
-  }, "\n"))
-  mfw:close()
-  local _, _, _, meta_syms = functions.scan_file(meta_fixture)
-  local meta_names = {}
-  for _, s in ipairs(meta_syms) do
-    meta_names[s.name] = true
-  end
-  eq(
-    meta_names.M,
-    nil,
-    "docmap.symbols: `return setmetatable(M, …)` also identifies the export table"
-  )
-  ok(meta_names.state, "docmap.symbols: other module-scope tables survive that filter")
-
-  -- ------------------------------------------------ deps.path / deps.impact
-  -- A four-module chain plus a shortcut, so "shortest" is a real claim:
-  --   one -> two -> three -> four,  and  one -> four directly (lazy)
-  local gr = H.tmpfile("_graph")
-  local function gwrite(rel, lines)
-    local abs = gr .. "/" .. rel
-    vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
-    local fd = assert(io.open(abs, "w"), "docmap spec: graph fixture must be writable")
-    fd:write(table.concat(lines, "\n"))
-    fd:close()
-  end
-  local function mod(name, requires, lazy)
-    local lines = { ("---@module 'g.%s'"):format(name), "--- M.", "local M = {}" }
-    for _, r in ipairs(requires) do
-      if lazy then
-        lines[#lines + 1] = "---Lazy."
-        lines[#lines + 1] = ("function M.get_%s()"):format(r)
-        lines[#lines + 1] = ('  return require("g.%s")'):format(r)
-        lines[#lines + 1] = "end"
-      else
-        table.insert(lines, 3, ('local _%s = require("g.%s")'):format(r, r))
+    local default_findings = check.run(dead_ir, opts)
+    ok(
+      has_dead_function(default_findings, "bare_dead"),
+      "docmap.check: dead-function fires for an uncalled local function"
+    )
+    ok(
+      not has_dead_function(default_findings, "bare_called"),
+      "docmap.check: dead-function does not fire for a called local function"
+    )
+    ok(
+      has_dead_function(default_findings, "M.internal_dead"),
+      "docmap.check: dead-function fires for an uncalled @internal function"
+    )
+    ok(
+      not has_dead_function(default_findings, "M.internal_called"),
+      "docmap.check: dead-function does not fire for a called @internal function"
+    )
+    ok(
+      not has_dead_function(default_findings, "M.public_uncalled"),
+      "docmap.check: dead-function does NOT fire for an uncalled exported function by default"
+    )
+    ok(
+      not has_dead_function(default_findings, "M.public_called"),
+      "docmap.check: dead-function never fires for a called exported function"
+    )
+    for _, f in ipairs(default_findings) do
+      if f.check == "dead-function" then
+        eq(f.severity, "info", "docmap.check: dead-function is always info-severity")
       end
     end
-    -- Every fixture module declares one function, so the diff below has
-    -- something to lose when a module is deleted.
-    lines[#lines + 1] = "---Runs."
-    lines[#lines + 1] = "function M.run()"
-    lines[#lines + 1] = "  return 1"
-    lines[#lines + 1] = "end"
-    lines[#lines + 1] = "return M"
-    gwrite(("lua/g/%s/init.lua"):format(name), lines)
-  end
-  mod("two", { "three" })
-  mod("three", { "four" })
-  mod("four", {})
-  -- `one` reaches `four` in three load-time hops or one lazy hop.
-  gwrite("lua/g/one/init.lua", {
-    "---@module 'g.one'",
-    "--- One.",
-    'local _two = require("g.two")',
-    "local M = {}",
-    "---Lazy.",
-    "function M.late()",
-    '  return require("g.four")',
-    "end",
-    "return M",
-  })
 
-  local gir = scan.scan({ root = gr, source = "lua/g", lua_root = "lua" })
-  local chain = deps.path(gir, "lua/g/one", "lua/g/four")
-  ok(chain, "deps.path: finds a path")
-  eq(#chain, 1, "deps.path: takes the one-hop lazy shortcut over the three-hop chain")
-  eq(chain[1].deferred, true, "deps.path: and reports that the hop is lazy")
+    local dead_code_findings =
+      check.run(dead_ir, vim.tbl_extend("force", opts, { dead_code = true }))
+    ok(
+      has_dead_function(dead_code_findings, "M.public_uncalled"),
+      "docmap.check: opts.dead_code = true also fires for an uncalled exported function"
+    )
+    ok(
+      not has_dead_function(dead_code_findings, "M.public_called"),
+      "docmap.check: opts.dead_code = true still skips a called exported function"
+    )
 
-  -- Without the shortcut the long way is the answer, and the chain must be
-  -- contiguous — a reconstruction bug shows up here and nowhere else.
-  local long = deps.path(gir, "lua/g/two", "lua/g/four")
-  eq(#long, 2, "deps.path: the multi-hop route when there is no shortcut")
-  eq(long[1].from, "lua/g/two", "deps.path: the chain starts at the source")
-  eq(long[1].to, long[2].from, "deps.path: and is contiguous")
-  eq(long[2].to, "lua/g/four", "deps.path: and ends at the target")
+    -- ------------------------------------------------------------ docmap.luals
+    -- `merge` is the half of luals.lua that needs no lua-language-server: IR +
+    -- parsed doc.json in, mutated IR out. The fixture below reproduces the real
+    -- --doc shapes exactly as verified against lua-language-server 3.18.2 —
+    -- notably that a class's parents live on `defines[1].extends` (an array,
+    -- one element per parent) and NOT on the entry, and that each element is
+    -- `{ type = "doc.extends.name", view = "<ParentName>" }`. An alias never
+    -- carries `extends`, even when it aliases a class; that was checked too,
+    -- because the opposite would manufacture inheritance that does not exist.
+    local luals = require("docmap.core.luals")
 
-  eq(#deps.path(gir, "lua/g/one", "lua/g/one"), 0, "deps.path: a node reaches itself in zero hops")
-  eq(deps.path(gir, "lua/g/four", "lua/g/one"), nil, "deps.path: nil when unreachable")
-  eq(deps.path(gir, "lua/g/one", "nope"), nil, "deps.path: nil for an unknown node")
+    local function ext(view)
+      return { type = "doc.extends.name", view = view }
+    end
+    local function class_entry(name, extends_list)
+      return {
+        name = name,
+        desc = "",
+        fields = {},
+        defines = { { type = "doc.class", file = "@types/init.lua", extends = extends_list } },
+      }
+    end
 
-  local hull, direct = deps.impact(gir, "lua/g/four")
-  eq(#hull, 3, "deps.impact: the transitive closure of required_by")
-  eq(direct, 2, "deps.impact: and the direct count alongside it")
-  eq(hull[1] < hull[2], true, "deps.impact: sorted")
-  eq(#(deps.impact(gir, "lua/g/one")), 0, "deps.impact: nothing depends on the top of the chain")
-  eq(#(deps.impact(gir, "nope")), 0, "deps.impact: an unknown node has no dependents")
+    local luals_ir = {
+      order = { "n" },
+      nodes = {
+        n = {
+          id = "n",
+          parent = nil,
+          types = { "lua/@types/init.lua" },
+          stats = { types = 0 },
+        },
+      },
+      edges = {},
+    }
 
-  -- ---------------------------------------------------------- render.dot
-  local dot = require("docmap.core.render.dot")
-  local whole = dot.render(gir, { kind = "require" })
-  ok(whole:match("^// require graph"), "render.dot: leads with a comment naming the graph")
-  ok(whole:find("digraph docmap {", 1, true), "render.dot: emits a digraph")
-  ok(whole:find('"lua/g/one" -> "lua/g/two"', 1, true), "render.dot: quotes node ids and edges")
-  ok(whole:find('label="lazy"', 1, true), "render.dot: marks deferred requires")
-  eq(whole, dot.render(gir, { kind = "require" }), "render.dot: byte-stable for the same IR")
+    luals.merge(luals_ir, {
+      class_entry("D.Root", nil), -- no parent: no `extends` key at all
+      class_entry("D.Child", { ext("D.Root") }),
+      class_entry("D.Multi", { ext("D.Root"), ext("D.Other") }),
+      class_entry("D.Other", nil),
+      class_entry("D.Orphan", { ext("D.Missing") }), -- parent not declared anywhere
+      class_entry("D.Self", { ext("D.Self") }), -- degenerate, must not self-loop
+      {
+        name = "D.Alias",
+        desc = "",
+        fields = {},
+        defines = { { type = "doc.alias", file = "@types/init.lua" } },
+      },
+    }, "lua")
 
-  -- Scope is bounded. Unbounded reachability sounds right and is not: in a
-  -- connected dependency graph almost everything reaches almost everything,
-  -- and a scope that excludes nothing is not a scope.
-  local near = dot.render(gir, { kind = "require", scope = "lua/g/four", hops = 1 })
-  local far = dot.render(gir, { kind = "require", scope = "lua/g/four", hops = 3 })
-  local function node_count(s)
-    return select(2, s:gsub("%[label=", ""))
-  end
-  ok(node_count(near) < node_count(far), "render.dot: a smaller hop budget yields a smaller graph")
-  ok(node_count(near) > 0, "render.dot: and still contains the neighbourhood")
+    local by_class = {}
+    for _, t in ipairs(luals_ir.nodes.n.types_detail or {}) do
+      by_class[t.name] = t
+    end
 
-  local calls_dot = dot.render(gir, { kind = "call" })
-  ok(
-    calls_dot:match("^// call graph"),
-    "render.dot: the call graph is a different graph, not a relabelled one"
-  )
+    eq(
+      #(by_class["D.Root"].extends or {}),
+      0,
+      "docmap.luals: a class with no parent gets an empty extends"
+    )
+    eq(
+      by_class["D.Child"].extends[1],
+      "D.Root",
+      "docmap.luals: single parent parsed from defines[1].extends"
+    )
+    eq(#by_class["D.Multi"].extends, 2, "docmap.luals: multiple inheritance keeps both parents")
+    eq(by_class["D.Multi"].extends[2], "D.Other", "docmap.luals: parents stay in source order")
+    eq(#(by_class["D.Alias"].extends or {}), 0, "docmap.luals: an alias never carries extends")
+    eq(
+      by_class["D.Orphan"].extends[1],
+      "D.Missing",
+      "docmap.luals: an unresolvable parent is still recorded on the class"
+    )
 
-  -- --------------------------------------------------------------- diff
-  -- The same tree with one module gone, one function gone and one dependency
-  -- made load-time instead of lazy — every section exercised at once.
-  local diff = require("docmap.core.diff")
-  local nothing = diff.compare(gir, gir)
-  eq(diff.is_empty(nothing), true, "diff: a map against itself is empty")
+    local ext_pairs = {}
+    for _, e in ipairs(luals_ir.edges) do
+      if e.kind == "extends" then
+        ext_pairs[e.from_class .. " -> " .. e.to_class] = true
+        eq(e.from, "n", "docmap.luals: extends edge carries the owning node id")
+        eq(e.via, nil, "docmap.luals: extends edges have no `via` — nothing mediates inheritance")
+      end
+    end
+    ok(ext_pairs["D.Child -> D.Root"], "docmap.luals: a resolvable parent produces an extends edge")
+    ok(
+      ext_pairs["D.Multi -> D.Root"],
+      "docmap.luals: multiple inheritance emits an edge per parent (1/2)"
+    )
+    ok(
+      ext_pairs["D.Multi -> D.Other"],
+      "docmap.luals: multiple inheritance emits an edge per parent (2/2)"
+    )
+    ok(
+      not ext_pairs["D.Orphan -> D.Missing"],
+      "docmap.luals: a parent outside the map produces no edge (kept readable on the class instead)"
+    )
+    ok(
+      not ext_pairs["D.Self -> D.Self"],
+      "docmap.luals: a class listing itself never becomes a self-loop"
+    )
 
-  gwrite("lua/g/five/init.lua", {
-    "---@module 'g.five'",
-    "--- Five.",
-    'local _four = require("g.four")',
-    "local M = {}",
-    "---New.",
-    "function M.fresh()",
-    "  return 1",
-    "end",
-    "return M",
-  })
-  vim.fn.delete(gr .. "/lua/g/two", "rf")
-  local after = scan.scan({ root = gr, source = "lua/g", lua_root = "lua" })
-  local d = diff.compare(gir, after)
+    -- Deterministic order: --check compares the artifact byte for byte, so two
+    -- runs over unchanged input must emit these in the same sequence.
+    local ext_seq = {}
+    for _, e in ipairs(luals_ir.edges) do
+      if e.kind == "extends" then
+        ext_seq[#ext_seq + 1] = e.from_class .. ">" .. e.to_class
+      end
+    end
+    eq(
+      table.concat(ext_seq, ","),
+      "D.Child>D.Root,D.Multi>D.Other,D.Multi>D.Root",
+      "docmap.luals: extends edges are emitted sorted by class name pair"
+    )
 
-  eq(diff.is_empty(d), false, "diff: a changed tree is not empty")
-  eq(d.nodes_added[1], "lua/g/five", "diff: the new module is reported")
-  eq(d.nodes_removed[1], "lua/g/two", "diff: and the deleted one")
-  eq(d.functions_added[1], "lua/g/five#M.fresh", "diff: functions are keyed like everywhere else")
-  eq(d.functions_removed[1], "lua/g/two#M.run", "diff: the deleted module's functions are gone too")
-  eq(d.deps_comparable, true, "diff: two current maps are comparable")
+    -- ------------------------------------------------------------- docmap.deps
+    local deps = require("docmap.core.deps")
 
-  local added_edges, removed_edges = {}, {}
-  for _, e in ipairs(d.deps_added) do
-    added_edges[e.edge] = true
-  end
-  for _, e in ipairs(d.deps_removed) do
-    removed_edges[e.edge] = true
-  end
-  ok(added_edges["lua/g/five -> lua/g/four"], "diff: the new dependency is reported")
-  ok(removed_edges["lua/g/one -> lua/g/two"], "diff: and the one that vanished with the module")
+    local extracted = deps.extract_source(table.concat({
+      'local fs = require("demo.fs")',
+      'local read = require("demo.io").read',
+      'require("demo.side_effect")',
+      '---   local x = require("demo.docs_only")', -- a usage example, not a require
+      '-- require("demo.commented_out")',
+      "function M.lazy()",
+      '  return require("demo.deferred")',
+      "end",
+    }, "\n"))
 
-  -- `three` lost its only dependent when `two` was deleted, so its blast
-  -- radius drops. `four` deliberately is *not* asserted on: it gained `five`
-  -- and lost `two` in the same change, and the two cancel out exactly — a
-  -- reminder that "I changed something near it" is not the same as "its
-  -- radius moved".
-  local moved = {}
-  for _, c in ipairs(d.impact_changed) do
-    moved[c.id] = { c.before, c.after }
-  end
-  ok(moved["lua/g/three"], "diff: a module whose blast radius changed is reported")
-  ok(
-    moved["lua/g/three"][1] > moved["lua/g/three"][2],
-    "diff: with both figures, and this one shrank"
-  )
+    eq(#extracted, 4, "docmap.deps: comment lines are not requires")
 
-  -- An older artifact is missing this data rather than merely shaped
-  -- differently; saying "every dependency in the tree was added" would be
-  -- true and useless.
-  local ancient = vim.deepcopy(gir)
-  ancient.meta.schema = 1
-  ancient.edges = {}
-  local old_diff = diff.compare(ancient, after)
-  eq(old_diff.deps_comparable, false, "diff: a schema-1 map is not comparable on dependencies")
-  eq(#old_diff.deps_added, 0, "diff: so no dependency is claimed to be new")
-  local rendered = table.concat(diff.render(old_diff, ancient, after, "old"), "\n")
-  ok(rendered:find("predates the dependency graph", 1, true), "diff: and the reason is stated")
+    -- A dynamic require puts a string literal exactly where the pattern looks,
+    -- and yields a dangling prefix that is not a module path at all.
+    local dynamic = deps.extract_source(table.concat({
+      'local mod = require("demo.lua." .. key)',
+      'return require("demo." .. name)',
+      'require("..weird")',
+      'local ok = require("demo.real")',
+    }, "\n"))
+    eq(#dynamic, 1, "docmap.deps: dynamic require concatenations are not module paths")
+    eq(dynamic[1].module, "demo.real", "docmap.deps: the one real require on those lines survives")
 
-  vim.fn.delete(gr, "rf")
+    eq(extracted[1].alias, "fs", "docmap.deps: local binding is captured as an alias")
+    eq(extracted[1].module, "demo.fs", "docmap.deps: alias form resolves the module path")
+    eq(extracted[2].member, "read", "docmap.deps: trailing field access is captured")
+    eq(extracted[3].alias, nil, "docmap.deps: a bare require has no alias")
+    eq(extracted[3].module, "demo.side_effect", "docmap.deps: bare require module path")
+    eq(extracted[4].module, "demo.deferred", "docmap.deps: requires inside functions are found")
 
-  -- ------------------------------------------------------ dead-function check
-  -- The trap this check is built around, made concrete: a library consists of
-  -- functions with no internal caller by design, so it fires in two tiers —
-  -- always-on where the statement genuinely holds (file-local, @internal),
-  -- opt-in everywhere else.
-  -- Scoped: the dead-function locals would push the file over the 200-local ceiling.
-  do
-    local dr = H.tmpfile("_dead")
-    local function dwrite(rel, lines)
-      local abs = dr .. "/" .. rel
+    local no_comment_modules = true
+    for _, req in ipairs(extracted) do
+      if req.module:match("docs_only") or req.module:match("commented_out") then
+        no_comment_modules = false
+      end
+    end
+    ok(no_comment_modules, "docmap.deps: no require is taken from a comment line")
+
+    -- The optional-dependency idiom. `pcall(require, "m")` puts a comma where
+    -- the paren-or-nothing pattern used to stop, so every optional edge in the
+    -- tree was missing -- and missing in the direction that produces a false
+    -- "unreferenced module" finding rather than a visible error.
+    --
+    -- Scoped in a `do` block, not because the block is separable but because
+    -- this function sits against Lua's 200-active-locals limit; two more at
+    -- file scope is a compile error two hundred lines further down.
+    do
+      local optional = deps.extract_source(table.concat({
+        'local ok, m = pcall(require, "demo.optional")',
+        'local plain = require("demo.plain")',
+        'require "demo.bare_string"',
+        "for _, mod in ipairs(DEPS) do",
+        "  if not pcall(require, mod) then return end", -- a variable: nothing to resolve
+        "end",
+      }, "\n"))
+      eq(
+        #optional,
+        3,
+        "docmap.deps: pcall(require, ...) is found without swallowing the other forms"
+      )
+      eq(
+        optional[1].module,
+        "demo.optional",
+        "docmap.deps: the comma form resolves the module path"
+      )
+      eq(optional[1].alias, nil, "docmap.deps: `local ok, m =` is not an alias binding")
+      eq(optional[2].module, "demo.plain", "docmap.deps: the paren form still matches")
+      eq(optional[2].alias, "plain", "docmap.deps: and is still recognised as an alias first")
+      eq(optional[3].module, "demo.bare_string", "docmap.deps: the parenless form still matches")
+
+      local variable_only = deps.extract_source("if not pcall(require, mod) then return end")
+      eq(#variable_only, 0, "docmap.deps: a require of a variable resolves to no edge")
+    end
+
+    -- ----------------------------------------------- deps + calls over a tree
+    -- A real scan, not a hand-built IR: resolution is the whole point of these
+    -- two stages, and it only exists once a module index and require aliases
+    -- are in play. Two modules, one requiring and calling into the other.
+    local scan = require("docmap.core.scan")
+    local root = H.tmpfile("_tree")
+    local function write(rel, lines)
+      local abs = root .. "/" .. rel
       vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
-      local fd = assert(io.open(abs, "w"), "docmap spec: dead-function fixture must be writable")
+      local fd = assert(io.open(abs, "w"), "docmap spec: fixture tree must be writable")
       fd:write(table.concat(lines, "\n"))
       fd:close()
     end
 
-    dwrite("lua/d/a/init.lua", {
-      "---@module 'd.a'",
-      "--- A.",
+    write("lua/demo/util/init.lua", {
+      "---@module 'demo.util'",
+      "--- Utilities.",
       "local M = {}",
-      "---Truly dead: nothing in this file mentions it again.",
-      "local function truly_dead()",
-      "  return 1",
+      "---Trim it.",
+      "function M.trim(s)",
+      "  return s",
       "end",
-      "---Passed as a value, never called at a call site.",
-      "local function as_value()",
-      "  return 2",
+      "return M",
+    })
+    write("lua/demo/app/init.lua", {
+      "---@module 'demo.app'",
+      "--- The app.",
+      'local util = require("demo.util")',
+      'local outside = require("plenary.async")',
+      "local M = {}",
+      "---Run it.",
+      "function M.run(s)",
+      "  return util.trim(helper(s))",
       "end",
-      "---Public, uncalled anywhere, but tagged.",
-      "---@internal",
-      "function M.internal_unused()",
-      "  return 3",
-      "end",
-      "---Public and uncalled — the always-on tiers must NOT flag this.",
-      "function M.public_unused()",
-      "  return 4",
-      "end",
-      -- Declared with `:`, exactly the shape lua/lib/lua/memo/lru.lua uses for
-      -- its real public API (Lru:get/Lru:put), which calls.lua cannot resolve
-      -- call sites for at all (method-call syntax is invisible to it).
-      "---Colon-declared method.",
-      "function M:method_dead()",
-      "  return 5",
-      "end",
-      "---Referenced only by another function's @see tag.",
-      "function M.only_seen()",
-      "  return 6",
-      "end",
-      "---Documents a relationship to only_seen; itself has no caller.",
-      "---@see M.only_seen",
-      "function M.seen_by_see()",
-      "  return 7",
-      "end",
-      "---Entry point.",
-      "function M.go()",
-      "  vim.system({}, as_value)",
-      "  return 1",
+      "---Helper.",
+      "function helper(s)",
+      '  return require("demo.util").trim(s)',
       "end",
       "return M",
     })
 
-    local dir_ = require("docmap.core.scan").scan({ root = dr, source = "lua/d", lua_root = "lua" })
-    local function dead_messages(dead_code)
-      local dopts = { root = dr, source = "lua/d", lua_root = "lua", dead_code = dead_code }
-      local out = {}
-      for _, f in ipairs(check.run(dir_, dopts)) do
+    local tree = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
+
+    local app, util = "lua/demo/app", "lua/demo/util"
+    eq(#tree.nodes[app].requires, 1, "docmap.deps: app requires exactly one in-tree module")
+    eq(tree.nodes[app].requires[1], util, "docmap.deps: the require resolves to the util node")
+    eq(tree.nodes[util].required_by[1], app, "docmap.deps: required_by is the reverse index")
+
+    local req_edge, lazy_edge, call_cross, call_local
+    for _, e in ipairs(tree.edges) do
+      if e.kind == "require" and e.from == app then
+        req_edge = e
+      end
+      if e.kind == "call" and e.from_fn == "M.run" and e.to == util then
+        call_cross = e
+      end
+      if e.kind == "call" and e.from_fn == "M.run" and e.to_fn == "helper" then
+        call_local = e
+      end
+      if e.kind == "call" and e.from_fn == "helper" then
+        lazy_edge = e
+      end
+    end
+
+    -- Stats aggregate over the subtree, not just the node's own directory.
+    local root_stats = tree.nodes[tree.root].stats
+    eq(root_stats.modules, 2, "docmap.stats: both modules are counted at the root")
+    eq(root_stats.files_lua, 2, "docmap.stats: lua files roll up")
+    ok(root_stats.lines > 0, "docmap.stats: lines of Lua are counted")
+    eq(
+      root_stats.functions,
+      tree.nodes[app].stats.functions + tree.nodes[util].stats.functions,
+      "docmap.stats: the root's function count is the sum of its children's"
+    )
+    eq(tree.nodes[util].stats.modules, 1, "docmap.stats: a leaf module counts itself")
+
+    ok(req_edge, "docmap.deps: a require edge exists between the two modules")
+    -- Unresolvable requires are kept as plain module strings rather than
+    -- dropped or turned into invented nodes, so the Deps view can draw them.
+    eq(
+      #tree.nodes[app].requires_external,
+      1,
+      "docmap.deps: a require outside the tree is recorded, not discarded"
+    )
+    eq(
+      tree.nodes[app].requires_external[1],
+      "plenary.async",
+      "docmap.deps: it is kept as the module path as written"
+    )
+    eq(
+      #tree.nodes[util].requires_external,
+      0,
+      "docmap.deps: a module with only in-tree requires has none"
+    )
+    local invented = false
+    for _, e in ipairs(tree.edges) do
+      if e.kind == "require" and e.to_module == "plenary.async" then
+        invented = true
+      end
+    end
+    ok(
+      not invented,
+      "docmap.deps: an external require produces no edge to a node that does not exist"
+    )
+    eq(req_edge.deferred, nil, "docmap.deps: a top-level require is not marked deferred")
+    ok(call_cross, "docmap.calls: a call through a require alias resolves across modules")
+    eq(call_cross.to_fn, "M.trim", "docmap.calls: resolves to the declared name in the target")
+    eq(call_cross.confidence, "exact", "docmap.calls: alias-resolved calls are exact")
+    ok(call_local, "docmap.calls: a bare call to a same-file function resolves locally")
+    ok(lazy_edge, "docmap.calls: calls inside a lazily-requiring function still resolve")
+
+    -- Deduped to one edge per (from, to), and the load-time occurrence wins the
+    -- `deferred` flag over the lazy one inside `helper`.
+    local req_count = 0
+    for _, e in ipairs(tree.edges) do
+      if e.kind == "require" and e.from == app and e.to == util then
+        req_count = req_count + 1
+      end
+    end
+    eq(req_count, 1, "docmap.deps: repeated requires of one module collapse to a single edge")
+
+    -- A cycle among *deferred* requires must not be reported: that is the
+    -- deliberate lazy-load pattern, and reporting it drowns the real ones.
+    write("lua/demo/util/init.lua", {
+      "---@module 'demo.util'",
+      "--- Utilities.",
+      "local M = {}",
+      "---Trim it.",
+      "function M.trim(s)",
+      '  return require("demo.app") and s',
+      "end",
+      "return M",
+    })
+    local cyc = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
+    local cyc_findings = check.run(cyc, { root = root, source = "lua/demo", lua_root = "lua" })
+    local reported_cycle = false
+    for _, f in ipairs(cyc_findings) do
+      if f.check == "require-cycle" then
+        reported_cycle = true
+      end
+    end
+    ok(not reported_cycle, "docmap.check: a cycle closed by a deferred require is not reported")
+
+    -- ------------------------------------------------- require-not-declared
+    --
+    -- A require that resolves to nothing lands in `requires_external`, which is
+    -- also where a genuine third-party dependency lands. That is right for
+    -- `plenary.async` and silently wrong for a typo inside the tree's own
+    -- namespace: both break at runtime, neither looks different in the map. The
+    -- check separates them on the first path segment, so this fixture needs one
+    -- of each in the same file — asserting only the positive would pass on a
+    -- check that flagged every external require there is.
+    write("lua/demo/broken/init.lua", {
+      "---@module 'demo.broken'",
+      "--- Requires one module that does not exist and one that is not ours.",
+      'local gone = require("demo.nowhere")',
+      'local async = require("plenary.async")',
+      "local M = {}",
+      "---Do it.",
+      "function M.go()",
+      "  return gone, async",
+      "end",
+      "return M",
+    })
+    local broken_opts = { root = root, source = "lua/demo", lua_root = "lua" }
+    local broken = scan.scan(broken_opts)
+    local rnd = {}
+    for _, f in ipairs(check.run(broken, broken_opts)) do
+      if f.check == "require-not-declared" then
+        rnd[#rnd + 1] = f
+      end
+    end
+    eq(#rnd, 1, "docmap.check: require-not-declared fires once, for the in-namespace miss")
+    ok(fmsg(rnd[1]):match("demo%.nowhere"), "docmap.check: ... naming the module that is missing")
+    ok(fmsg(rnd[1]):match("line 3"), "docmap.check: ... and the line, since a file can miss twice")
+    eq(rnd[1].severity, "warn", "docmap.check: require-not-declared is a warning")
+
+    -- The escape hatch that already existed: `tag_files` declares that a prefix
+    -- lives in another project's map, so a namespace split across repositories
+    -- is not a finding here.
+    local tagged_opts = vim.tbl_extend("force", broken_opts, {
+      tag_files = { ["demo.nowhere"] = "../other/docs/map" },
+    })
+    local still = false
+    for _, f in ipairs(check.run(broken, tagged_opts)) do
+      if f.check == "require-not-declared" then
+        still = true
+      end
+    end
+    ok(not still, "docmap.check: a prefix covered by tag_files is somebody else's to declare")
+
+    -- ---------------------------------------------------- command.find_node
+    -- `:DocMap graph <name>` has to resolve the names people actually type.
+    -- A namespace declares no @module at all, so matching on that alone missed
+    -- exactly the directories a dependency graph is most interesting at.
+    local command = require("docmap.editor.command")
+
+    eq(
+      command.find_node(cyc, "demo.app", "lua"),
+      "lua/demo/app",
+      "docmap.command: resolves a declared @module path"
+    )
+    eq(
+      command.find_node(cyc, "lua/demo/util", "lua"),
+      "lua/demo/util",
+      "docmap.command: resolves a raw node id"
+    )
+    eq(
+      command.find_node(cyc, "demo", "lua"),
+      "lua/demo",
+      "docmap.command: resolves a namespace by its path-implied module name"
+    )
+    eq(
+      command.find_node(cyc, "nope.nope", "lua"),
+      nil,
+      "docmap.command: an unknown name resolves to nil rather than a wrong node"
+    )
+
+    -- ------------------------------------------------------ tagfiles.resolve
+    -- `demo.app` (built above) requires `plenary.async`, which resolves to
+    -- nothing *in this tree* — exactly the requires_external case tag_files
+    -- exists to resolve against another project's own committed artifact,
+    -- instead of leaving the Deps view an inert dead end.
+    local tagfiles = require("docmap.core.tagfiles")
+    local docmap = require("docmap")
+
+    local ext_root = H.tmpfile("_plenary")
+    local function ext_write(rel, lines)
+      local abs = ext_root .. "/" .. rel
+      vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
+      local fd = assert(io.open(abs, "w"), "docmap spec: tag-file fixture must be writable")
+      fd:write(table.concat(lines, "\n"))
+      fd:close()
+    end
+    ext_write("lua/plenary/async/init.lua", {
+      "---@module 'plenary.async'",
+      "--- Fixture standing in for a real external project.",
+      "local M = {}",
+      "return M",
+    })
+    local ext_ir = scan.scan({ root = ext_root, source = "lua/plenary", lua_root = "lua" })
+    vim.fn.mkdir(ext_root .. "/docs/map", "p")
+    local ext_fd =
+      assert(io.open(ext_root .. "/docs/map/module_map.json", "w"), "docmap spec: writable")
+    ext_fd:write(docmap.to_json(ext_ir))
+    ext_fd:close()
+
+    tagfiles.resolve(tree, {
+      root = root,
+      lua_root = "lua",
+      tag_files = { plenary = ext_root .. "/docs/map" },
+    })
+    ok(tree.tag_links["plenary.async"], "docmap.tagfiles: resolves against the external artifact")
+    eq(
+      tree.tag_links["plenary.async"].title,
+      "plenary.async",
+      "docmap.tagfiles: title is the external node's declared @module"
+    )
+    eq(
+      tree.tag_links["plenary.async"].html,
+      (ext_root:gsub("\\", "/")) .. "/docs/map/index.html#lua/plenary/async",
+      "docmap.tagfiles: html is that project's own page, fragment = its node id"
+    )
+
+    local tree_none = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
+    tagfiles.resolve(tree_none, { root = root, lua_root = "lua" })
+    eq(
+      next(tree_none.tag_links),
+      nil,
+      "docmap.tagfiles: an empty table, not nil, when opts.tag_files is unset"
+    )
+
+    local tree_miss = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
+    tagfiles.resolve(tree_miss, {
+      root = root,
+      lua_root = "lua",
+      tag_files = { ["some.other.project"] = ext_root .. "/docs/map" },
+    })
+    eq(
+      next(tree_miss.tag_links),
+      nil,
+      "docmap.tagfiles: a prefix that matches nothing resolves nothing, not an error"
+    )
+
+    -- ------------------------------------------------------------ duplicates
+    --
+    -- Two halves: the grouping is pure and gets a synthetic IR, and the
+    -- fingerprint itself needs a real parse, so it gets real files.
+    local duplicates = require("docmap.core.duplicates")
+
+    local function dup_ir(by_node)
+      local synth = { root = "lua/d", order = {}, nodes = {} }
+      for node_id, list in pairs(by_node) do
+        synth.order[#synth.order + 1] = node_id
+        synth.nodes[node_id] = { id = node_id, module = node_id:gsub("/", "."), functions = list }
+      end
+      table.sort(synth.order)
+      return synth
+    end
+
+    local dres = duplicates.resolve(
+      dup_ir({
+        ["lua/d/a"] = {
+          { name = "M.x", signature = "x()", line = 1, shape = "aa-bb", shape_size = 90 },
+        },
+        ["lua/d/b"] = {
+          { name = "M.y", signature = "y()", line = 2, shape = "aa-bb", shape_size = 90 },
+        },
+        ["lua/d/c"] = {
+          { name = "M.z", signature = "z()", line = 3, shape = "cc-dd", shape_size = 90 },
+        },
+      }),
+      40
+    )
+    eq(#dres.groups, 1, "duplicates: only shapes shared by two or more are a group")
+    eq(#dres.groups[1].members, 2, "duplicates: with both members in it")
+    eq(dres.groups[1].members[1].node, "lua/d/a", "duplicates: members sorted by node id")
+    eq(dres.functions, 2, "duplicates: the covered-function count")
+    eq(dres.considered, 3, "duplicates: everything above the floor was compared")
+
+    -- The floor is the whole reason this is readable: every tree has a dozen
+    -- one-line accessors that match each other and mean nothing.
+    local small = duplicates.resolve(
+      dup_ir({
+        ["lua/d/a"] = {
+          { name = "M.x", signature = "x()", line = 1, shape = "ee-ff", shape_size = 9 },
+        },
+        ["lua/d/b"] = {
+          { name = "M.y", signature = "y()", line = 2, shape = "ee-ff", shape_size = 9 },
+        },
+      }),
+      40
+    )
+    eq(#small.groups, 0, "duplicates: shapes below the size floor are not compared")
+    eq(small.considered, 0, "duplicates: and the count says so, so 'none found' stays honest")
+
+    -- An artifact written before `shape` existed has none. Skipped, not an
+    -- error: this tool is the wrong place to discover a map is a few versions
+    -- old, the same tolerance `diff.lua` extends to older schemas.
+    local old = duplicates.resolve(
+      dup_ir({ ["lua/d/a"] = { { name = "M.x", signature = "x()", line = 1 } } }),
+      40
+    )
+    eq(#old.groups, 0, "duplicates: a function with no shape is skipped, not fatal")
+
+    -- The claim the fingerprint actually rests on: a copy-paste gets RENAMED on
+    -- the way in. Byte-identical bodies are the one case nobody ships, so if
+    -- different identifier and literal names broke the match the tool would
+    -- find nothing that matters. Real files, because only a real parse produces
+    -- a shape at all.
+    write("lua/demo/clone_a/init.lua", {
+      "---@module 'demo.clone_a'",
+      "--- One.",
+      "local M = {}",
+      "---Sum the odd ones.",
+      "---@param items integer[]",
+      "---@return integer",
+      "function M.total(items)",
+      "  local acc = 0",
+      "  for _, item in ipairs(items) do",
+      "    if item % 2 == 1 then",
+      "      acc = acc + item",
+      "    end",
+      "  end",
+      "  return acc",
+      "end",
+      "return M",
+    })
+    write("lua/demo/clone_b/init.lua", {
+      "---@module 'demo.clone_b'",
+      "--- Two.",
+      "local M = {}",
+      "---Sum the odd ones, with every name changed.",
+      "---@param values integer[]",
+      "---@return integer",
+      "function M.tally(values)",
+      "  local running = 999",
+      "  for _, value in ipairs(values) do",
+      "    if value % 7 == 3 then",
+      "      running = running + value",
+      "    end",
+      "  end",
+      "  return running",
+      "end",
+      "return M",
+    })
+    local clone_ir = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
+    local shape_a, shape_b, size_a
+    for _, id in ipairs(clone_ir.order) do
+      for _, fn in ipairs(clone_ir.nodes[id].functions or {}) do
+        if fn.name == "M.total" then
+          shape_a, size_a = fn.shape, fn.shape_size
+        elseif fn.name == "M.tally" then
+          shape_b = fn.shape
+        end
+      end
+    end
+    ok(shape_a ~= nil, "duplicates: the scan produces a shape for every function")
+    eq(shape_b, shape_a, "duplicates: renaming every identifier and literal keeps the shape")
+    ok(size_a > 40, "duplicates: and a body this size clears the floor")
+
+    -- The other direction, which is what keeps the assertion above from passing
+    -- on a fingerprint that returns a constant: a different structure must not
+    -- collide.
+    local other_shape
+    for _, id in ipairs(clone_ir.order) do
+      for _, fn in ipairs(clone_ir.nodes[id].functions or {}) do
+        if fn.name == "M.go" then
+          other_shape = fn.shape
+        end
+      end
+    end
+    ok(
+      other_shape ~= nil and other_shape ~= shape_a,
+      "duplicates: a differently-shaped function gets a different fingerprint"
+    )
+
+    -- ----------------------------------------------------------------- churn
+    --
+    -- The scoring only, which is all of it that is pure: counting commits is
+    -- git's job and lives in `command.lua`, the same split `history.lua`
+    -- follows. The fixture is built so the ranking has to get the *argument*
+    -- right, not just sort a column — each of the three losing modules loses
+    -- for a different reason.
+    local churn = require("docmap.core.churn")
+
+    local churn_ir = {
+      root = "lua/c",
+      order = { "lua/c/hot", "lua/c/stable", "lua/c/simple", "lua/c/notes" },
+      nodes = {
+        -- Changed often AND complex: the intersection, and the whole point.
+        ["lua/c/hot"] = {
+          id = "lua/c/hot",
+          module = "c.hot",
+          source = "lua/c/hot/init.lua",
+          functions = { { name = "M.a", signature = "a()", complexity = 10 } },
+        },
+        -- Complex but finished. Not a problem — it is done.
+        ["lua/c/stable"] = {
+          id = "lua/c/stable",
+          module = "c.stable",
+          source = "lua/c/stable/init.lua",
+          functions = { { name = "M.b", signature = "b()", complexity = 20 } },
+        },
+        -- Churned constantly but trivial. Not a problem either — that is what a
+        -- config file looks like. Scored to TIE with `c.stable`, so the pair
+        -- also pins the tie-break rather than only the ordering.
+        ["lua/c/simple"] = {
+          id = "lua/c/simple",
+          module = "c.simple",
+          source = "lua/c/simple/init.lua",
+          functions = { { name = "M.c", signature = "c()", complexity = 2 } },
+        },
+        -- No documented functions, so no complexity to multiply.
+        ["lua/c/notes"] = {
+          id = "lua/c/notes",
+          module = "c.notes",
+          source = "lua/c/notes/init.lua",
+          functions = {},
+        },
+      },
+    }
+
+    local cres = churn.rank({
+      ["lua/c/hot/init.lua"] = 8,
+      ["lua/c/stable/init.lua"] = 2,
+      ["lua/c/simple/init.lua"] = 20,
+      ["lua/c/notes/init.lua"] = 12,
+      ["README.md"] = 4,
+      [".github/workflows/ci.yml"] = 2,
+    }, churn_ir, 40)
+
+    -- 8x10 = 80 beats 20x2 = 40 and 2x20 = 40. `c.hot` is highest on NEITHER
+    -- axis on its own — fewer commits than `c.simple`, less complexity than
+    -- `c.stable` — which is exactly the claim: the intersection is the signal,
+    -- and sorting by either column alone would put the wrong module first.
+    eq(cres.entries[1].module, "c.hot", "churn: the intersection outranks either factor alone")
+    eq(cres.entries[1].score, 80, "churn: score is commits x complexity")
+    eq(cres.entries[2].score, 40, "churn: the two single-factor modules tie below it")
+    eq(cres.entries[3].score, 40, "churn: ...both of them")
+    eq(cres.entries[2].module, "c.simple", "churn: a tie breaks toward the more-churned module")
+    eq(#cres.entries, 3, "churn: a module with no documented functions is dropped, not scored 0")
+    eq(cres.entries[1].hottest, "a()", "churn: every row names where to start reading")
+
+    -- Paths that changed but back no scanned module — READMEs, CI config,
+    -- anything deleted since. Counted rather than silently dropped: a number
+    -- with no idea how much it ignored is worse than no number.
+    eq(cres.unmatched, 2, "churn: unmatched paths are reported, not swallowed")
+    eq(cres.commits, 40, "churn: and the range's commit count travels with the result")
+
+    local churn_qf = churn.quickfix_items(cres, "/repo")
+    eq(#churn_qf, 3, "churn: one quickfix row per ranked module")
+    ok(churn_qf[1].filename:find("hot", 1, true) ~= nil, "churn: pointing at the module's source")
+    eq(churn_qf[1].lnum, 1, "churn: at line 1 — the finding is about the file, not a line in it")
+
+    -- ------------------------------------------------------ coverage.resolve
+    -- Real spec-file text, not a hand-built name list: the whole point is
+    -- that a bare name mentioned in a test file — the way a spec actually
+    -- calls a function — is what lights `tested` up.
+    local coverage = require("docmap.core.coverage")
+    write("TESTS/demo_spec.lua", {
+      "local util = require('demo.util')",
+      "assert(util.trim('x') ~= nil)",
+    })
+
+    local cov_tree = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
+    coverage.resolve(cov_tree, { root = root, lua_root = "lua" })
+
+    local trim_fn, run_fn
+    for _, fn in ipairs(cov_tree.nodes[util].functions) do
+      if fn.name == "M.trim" then
+        trim_fn = fn
+      end
+    end
+    for _, fn in ipairs(cov_tree.nodes[app].functions) do
+      if fn.name == "M.run" then
+        run_fn = fn
+      end
+    end
+    ok(trim_fn.tested, "docmap.coverage: a function named in a spec file is tested = true")
+    ok(
+      not run_fn.tested,
+      "docmap.coverage: a function never mentioned in any spec stays tested = false"
+    )
+
+    local tested_n, total_n = coverage.summary(cov_tree)
+    eq(tested_n, 1, "docmap.coverage: summary counts exactly the one tested function")
+    ok(total_n >= 2, "docmap.coverage: summary's total covers every function in the tree")
+
+    local cov_none = scan.scan({ root = root, source = "lua/demo", lua_root = "lua" })
+    coverage.resolve(cov_none, { root = root, lua_root = "lua", tests_dir = "no/such/dir" })
+    local none_tested = coverage.summary(cov_none)
+    eq(
+      none_tested,
+      0,
+      "docmap.coverage: a missing tests_dir leaves every function untested, not an error"
+    )
+
+    -- --------------------------------------------------- doccoverage (R4)
+    local doccoverage = require("docmap.core.doccoverage")
+    local doc_ir = make_ir({
+      ["a"] = {
+        { -- fully documented: summary + matching params
+          name = "M.documented",
+          signature = "documented(x)",
+          summary = "Does the thing.",
+          line = 1,
+          params = { param("x") },
+          returns = {},
+          generic = {},
+          async = false,
+          nodiscard = false,
+          see = {},
+          overload = {},
+        },
+        { -- no summary at all
+          name = "M.no_summary",
+          signature = "no_summary()",
+          summary = "",
+          line = 5,
+          params = {},
+          returns = {},
+          generic = {},
+          async = false,
+          nodiscard = false,
+          see = {},
+          overload = {},
+        },
+        { -- summary present, but a parameter has no matching @param line
+          name = "M.bad_params",
+          signature = "bad_params(x, y)",
+          summary = "Half documented.",
+          line = 9,
+          params = { param("x") },
+          returns = {},
+          generic = {},
+          async = false,
+          nodiscard = false,
+          see = {},
+          overload = {},
+        },
+        { -- @internal: excluded from the total entirely, documented or not
+          name = "M.internal_thing",
+          signature = "internal_thing()",
+          summary = "",
+          line = 13,
+          params = {},
+          returns = {},
+          generic = {},
+          async = false,
+          nodiscard = false,
+          see = {},
+          overload = {},
+          internal = true,
+        },
+      },
+    })
+
+    local doc_documented, doc_total = doccoverage.summary(doc_ir)
+    eq(doc_total, 3, "docmap.doccoverage: @internal functions are excluded from the total")
+    eq(
+      doc_documented,
+      1,
+      "docmap.doccoverage: only the summary+matching-params function counts as documented"
+    )
+
+    local svg = doccoverage.badge_svg(doc_ir)
+    ok(svg:match("^<svg"), "docmap.doccoverage: badge_svg produces an <svg> document")
+    ok(svg:match("33%%"), "docmap.doccoverage: badge_svg's percentage matches the summary (1/3)")
+    ok(svg:match("doc coverage"), "docmap.doccoverage: badge_svg labels itself")
+
+    local empty_documented, empty_total = doccoverage.summary(make_ir({ ["a"] = {} }))
+    eq(empty_documented, 0, "docmap.doccoverage: a tree with no functions documents zero")
+    eq(empty_total, 0, "docmap.doccoverage: a tree with no functions has zero total")
+
+    -- `M.resolve` stamps `fn.documented` in place — what the Analysis tab's
+    -- Documentation panel reads instead of reimplementing is_documented in
+    -- JS. Must agree exactly with M.summary's own count over the same IR, or
+    -- the panel and the CLI/badge number would quietly disagree.
+    doccoverage.resolve(doc_ir)
+    local stamped_documented, stamped_total = 0, 0
+    for _, id in ipairs(doc_ir.order) do
+      for _, fn in ipairs(doc_ir.nodes[id].functions) do
+        if not fn.internal then
+          stamped_total = stamped_total + 1
+        end
+        if fn.documented then
+          stamped_documented = stamped_documented + 1
+        end
+      end
+    end
+    eq(
+      stamped_documented,
+      doc_documented,
+      "docmap.doccoverage: resolve's stamped fn.documented count matches summary's"
+    )
+    eq(
+      stamped_total,
+      doc_total,
+      "docmap.doccoverage: resolve never stamps documented=true on an @internal function"
+    )
+    ok(
+      (function()
+        for _, fn in ipairs(doc_ir.nodes["a"].functions) do
+          if fn.name == "M.internal_thing" then
+            return fn.documented == false
+          end
+        end
+        return false
+      end)(),
+      "docmap.doccoverage: an @internal function is always documented = false, never true"
+    )
+
+    -- ------------------------------------------------------- history (R11 P1)
+    local history = require("docmap.core.history")
+
+    ---@param name string
+    ---@param line integer
+    ---@param line_end integer?
+    local function hfn(name, line, line_end)
+      return {
+        name = name,
+        signature = name .. "()",
+        summary = "s",
+        line = line,
+        line_end = line_end,
+        params = {},
+        returns = {},
+        generic = {},
+        async = false,
+        nodiscard = false,
+        see = {},
+        overload = {},
+      }
+    end
+
+    -- parse_diff: the four hunk shapes git actually emits at --unified=0.
+    local parsed = history.parse_diff(table.concat({
+      "diff --git a/a/init.lua b/a/init.lua",
+      "index 1111111..2222222 100644",
+      "--- a/a/init.lua",
+      "+++ b/a/init.lua",
+      "@@ -12,3 +12,4 @@ function M.alpha()",
+      "@@ -20 +21 @@ function M.alpha()",
+      "@@ -30,0 +32,2 @@ function M.beta()",
+      "diff --git a/b/init.lua b/b/init.lua",
+      "new file mode 100644",
+      "--- /dev/null",
+      "+++ b/b/init.lua",
+      "@@ -0,0 +1,5 @@",
+    }, "\n"))
+
+    eq(#parsed, 2, "docmap.history: parse_diff finds both files")
+    eq(parsed[1].new_path, "a/init.lua", "docmap.history: strips git's b/ prefix")
+    eq(#parsed[1].old, 2, "docmap.history: a -N,0 hunk contributes no old range")
+    eq(parsed[1].old[1].first, 12, "docmap.history: old range start")
+    eq(parsed[1].old[1].last, 14, "docmap.history: old range end (start + count - 1)")
+    eq(parsed[1].old[2].first, 20, "docmap.history: a missing count means exactly one line")
+    eq(parsed[1].old[2].last, 20, "docmap.history: …so first == last")
+    eq(parsed[1].new[3].first, 32, "docmap.history: pure insertion keeps its new range")
+    eq(parsed[1].new[3].last, 33, "docmap.history: …spanning `count` lines")
+    eq(parsed[2].old_path, nil, "docmap.history: /dev/null on the old side means added file")
+    eq(parsed[2].new_path, "b/init.lua", "docmap.history: added file still has a new path")
+
+    -- analyze, exact spans: alpha 10-20, beta 30-40, with a real gap between.
+    local hist_ir = make_ir({
+      ["a"] = { hfn("M.alpha", 10, 20), hfn("M.beta", 30, 40) },
+      ["b"] = { hfn("M.caller", 5, 8) },
+    }, {
+      { kind = "call", from = "b", from_fn = "M.caller", to = "a", to_fn = "M.alpha", line = 6 },
+    })
+
+    ---@param hunk string
+    ---@param path string?
+    local function diff_for(hunk, path)
+      path = path or "a/init.lua"
+      return table.concat({
+        "diff --git a/" .. path .. " b/" .. path,
+        "--- a/" .. path,
+        "+++ b/" .. path,
+        hunk,
+      }, "\n")
+    end
+
+    local mid = history.analyze(diff_for("@@ -15,2 +15,2 @@"), hist_ir, hist_ir)
+    eq(#mid.touched, 1, "docmap.history: a change inside one function touches exactly it")
+    eq(mid.touched[1].fn, "M.alpha", "docmap.history: …and names that function")
+    eq(mid.approximate, false, "docmap.history: exact line_end needs no approximation")
+
+    -- Both boundaries are inclusive: the `function` line and the `end` line are
+    -- part of the function, and an off-by-one either way would silently drop
+    -- exactly the single-line signature changes most worth catching.
+    eq(
+      #history.analyze(diff_for("@@ -10 +10 @@"), hist_ir, hist_ir).touched,
+      1,
+      "docmap.history: a change on the declaration line counts"
+    )
+    eq(
+      #history.analyze(diff_for("@@ -20 +20 @@"), hist_ir, hist_ir).touched,
+      1,
+      "docmap.history: a change on the closing `end` line counts"
+    )
+
+    local gap = history.analyze(diff_for("@@ -25 +25 @@"), hist_ir, hist_ir)
+    eq(#gap.touched, 0, "docmap.history: a change between two functions touches neither")
+    eq(gap.unattributed[1], "a/init.lua", "docmap.history: …and is reported as unattributed")
+
+    -- Callers, and the two answers they feed.
+    local cs = mid.callers["a#M.alpha"]
+    eq(#cs, 1, "docmap.history: the call edge into a touched function is found")
+    eq(cs[1].fn, "M.caller", "docmap.history: caller is named by its declared function")
+    eq(cs[1].node, "b", "docmap.history: …and by the node it lives in")
+    eq(mid.calling_modules[1], "b", "docmap.history: calling_modules is the precise answer")
+
+    -- Degradation: an artifact without line_end (every revision older than the
+    -- field itself). Spans fall back to the next function's start, which
+    -- over-attributes the gap — and must say so.
+    local old_ir = make_ir({ ["a"] = { hfn("M.alpha", 10), hfn("M.beta", 30) } })
+    local approx = history.analyze(diff_for("@@ -25 +25 @@"), old_ir, old_ir)
+    eq(approx.approximate, true, "docmap.history: a missing line_end is flagged as approximate")
+    eq(#approx.touched, 1, "docmap.history: the fallback still attributes the change")
+    eq(
+      approx.touched[1].fn,
+      "M.alpha",
+      "docmap.history: …to the preceding function, erring toward over-attribution"
+    )
+
+    -- A path the map does not know is reported, not silently dropped.
+    local unknown = history.analyze(diff_for("@@ -1 +1 @@", "README.md"), hist_ir, hist_ir)
+    eq(#unknown.touched, 0, "docmap.history: an unscanned path touches no function")
+    eq(unknown.unattributed[1], "README.md", "docmap.history: …and is listed as unattributed")
+    eq(unknown.files[1], "README.md", "docmap.history: every changed path is reported in files")
+
+    -- Missing IRs (a first commit has no parent) degrade to files-only rather
+    -- than erroring.
+    local no_ir = history.analyze(diff_for("@@ -15 +15 @@"), nil, nil)
+    eq(#no_ir.touched, 0, "docmap.history: no IR means no attribution, not a crash")
+    eq(#no_ir.files, 1, "docmap.history: …but the changed file is still reported")
+
+    -- quickfix_items (R11 P2): the shape `:DocMap impact` puts in the list.
+    -- Here rather than in command.lua so it is testable without a repository —
+    -- the same split diff.lua uses for `render`.
+    local qf = history.quickfix_items(mid, hist_ir, "/repo")
+    eq(#qf, 2, "docmap.history: one entry for the touched function, one per call site")
+    eq(
+      qf[1].filename,
+      "/repo/a/init.lua",
+      "docmap.history: the touched entry points at the node's own source"
+    )
+    eq(qf[1].lnum, 10, "docmap.history: …at the function's declaration line")
+    ok(
+      qf[1].text:match("^changed: M%.alpha") and qf[1].text:match("1 caller%)"),
+      "docmap.history: the touched entry names the function and its caller count"
+    )
+    eq(qf[2].filename, "/repo/b/init.lua", "docmap.history: the caller entry points at the caller")
+    eq(qf[2].lnum, 6, "docmap.history: …at the call site line, not the callee's")
+    ok(qf[2].text:match("M%.caller calls it"), "docmap.history: the caller entry says who calls it")
+
+    -- Singular/plural is a detail, but "1 callers" in every review list is the
+    -- kind of wrong that erodes trust in the rest of the output.
+    local zero_qf = history.quickfix_items(
+      history.analyze(diff_for("@@ -35 +35 @@"), hist_ir, hist_ir),
+      hist_ir,
+      "/repo"
+    )
+    ok(
+      zero_qf[1].text:match("%(0 callers%)"),
+      "docmap.history: a function with no caller reads '0 callers', not '0 caller'"
+    )
+
+    -- Unattributed files come last: they explain the count but are not
+    -- findings, so they must never push the actionable entries down.
+    local mixed = history.analyze(
+      diff_for("@@ -15 +15 @@") .. "\n" .. diff_for("@@ -1 +1 @@", "README.md"),
+      hist_ir,
+      hist_ir
+    )
+    local mixed_qf = history.quickfix_items(mixed, hist_ir, "/repo")
+    eq(#mixed_qf, 3, "docmap.history: touched + caller + unattributed all appear")
+    ok(
+      mixed_qf[#mixed_qf].text:match("nothing to trace"),
+      "docmap.history: the unattributed file sorts last"
+    )
+    eq(
+      mixed_qf[#mixed_qf].filename,
+      "/repo/README.md",
+      "docmap.history: an unattributed path is still an openable location"
+    )
+
+    -- ---------------------------------------------------------- serve (R11 P3)
+    -- The route table and socket handling are verified by running the thing and
+    -- talking to it, which a spec cannot do without an event loop. What *is*
+    -- tested here is the part that must never be wrong: the whitelist standing
+    -- between a URL path and a git subprocess, and the lifecycle, since a
+    -- listening socket left behind is the cost of having a runtime at all.
+    local serve = require("docmap.editor.serve")
+
+    for _, good in ipairs({
+      "1ce752e",
+      "08b4494",
+      "7bdfb3ab5762e42806c228625ee095d72c18d0b2",
+      "abcdef0123456789",
+    }) do
+      eq(
+        serve.safe_sha(good),
+        good,
+        "docmap.serve: accepts a real hash (" .. good:sub(1, 10) .. ")"
+      )
+    end
+
+    -- Every one of these is a value someone could put in a URL path. None may
+    -- reach git: the first is argument injection, the rest are either shell
+    -- metacharacters or simply not hashes.
+    for _, bad in ipairs({
+      "--upload-pack=evil",
+      "--output=/tmp/x",
+      "HEAD",
+      "HEAD~1",
+      "abc;id",
+      "$(id)",
+      "../../etc/passwd",
+      "zzzzzzz",
+      "1234", -- too short: 7 hex digits minimum
+      "0123456789012345678901234567890123456789a", -- 41, one over
+      "",
+    }) do
+      eq(serve.safe_sha(bad), nil, ("docmap.serve: refuses %q"):format(bad))
+    end
+    -- Both calls hand it the wrong type on purpose: refusing those is the
+    -- behaviour under test, so the mismatch is the point rather than a defect.
+    ---@diagnostic disable-next-line: param-type-mismatch
+    eq(serve.safe_sha(nil), nil, "docmap.serve: refuses a nil path segment")
+    ---@diagnostic disable-next-line: param-type-mismatch
+    eq(serve.safe_sha(42), nil, "docmap.serve: refuses a non-string")
+
+    -- The other half of the server's security surface: the static route may
+    -- only ever hand out a bare filename inside `out_dir`. Same reasoning as
+    -- `safe_sha` — the property is the whole point of the route, so it is
+    -- exported and tested rather than asserted in a comment.
+    eq(
+      serve.safe_static_name(""),
+      "index.html",
+      "docmap.serve: an empty path is the index, not a traversal"
+    )
+    eq(
+      serve.safe_static_name("module_map.json"),
+      "module_map.json",
+      "docmap.serve: a bare filename is served"
+    )
+    for _, bad in ipairs({
+      "../.git/config",
+      "..",
+      "../../etc/passwd",
+      "sub/dir.html",
+      "sub\\dir.html", -- backslash: a separator on the platform this runs on
+      "..%2f..%2fetc", -- already-decoded escape, so the `..` check is what catches it
+      "a/../b",
+    }) do
+      eq(serve.safe_static_name(bad), nil, ("docmap.serve: refuses static path %q"):format(bad))
+    end
+    ---@diagnostic disable-next-line: param-type-mismatch
+    eq(serve.safe_static_name(nil), nil, "docmap.serve: refuses a nil static path")
+    ---@diagnostic disable-next-line: param-type-mismatch
+    eq(serve.safe_static_name(42), nil, "docmap.serve: refuses a non-string static path")
+
+    -- `route_static` builds its path as `cfg.root/cfg.out_dir/safe`, and
+    -- `cfg.out_dir` is the same repository-controlled value `write_artifacts`
+    -- guards against (SEC-42) -- `config/file.lua`'s `REPO_KEYS.out_dir` lets a
+    -- cloned tree's own `.docmap.json` set it. `safe_static_name` above only
+    -- constrains the request-path half of that join; this is the other half,
+    -- shared via `core/safe_out_dir` rather than re-derived in `serve.lua`.
+    -- Scoped in its own `do...end` block (this function is already at Lua's
+    -- 200-local ceiling): the locals below must not outlive this check.
+    do
+      local safe_out_dir = require("docmap.core.safe_out_dir")
+      eq(
+        safe_out_dir("generated/map"),
+        "generated/map",
+        "docmap.safe_out_dir: an ordinary relative out_dir passes through"
+      )
+      eq(safe_out_dir(nil), "docs/map", "docmap.safe_out_dir: nil falls back to the default")
+      for _, bad in ipairs({
+        "../../../../somewhere_outside",
+        "..\\..\\somewhere_outside",
+        "/etc/somewhere_outside",
+        "C:/somewhere_outside",
+      }) do
+        eq(safe_out_dir(bad), nil, ("docmap.safe_out_dir: refuses %q"):format(bad))
+      end
+    end
+
+    -- `M.start` now runs `out_dir` through the same whitelist once, up front,
+    -- rather than leaving `route_static` to fail every request against a
+    -- server that "started" fine. A malicious `out_dir` must refuse to start
+    -- at all, and must not leave anything listening behind.
+    do
+      local bad_url, bad_err = serve.start({ root = root, out_dir = "../../../../evil" })
+      eq(bad_url, nil, "docmap.serve: start refuses an out_dir that escapes the repository")
+      ok(bad_err and bad_err:match("out_dir"), "docmap.serve: ...and says why, naming out_dir")
+      eq(serve.is_running(), false, "docmap.serve: ...and nothing was left listening")
+    end
+
+    -- Lifecycle. Bound to loopback on an OS-assigned port, idempotent both
+    -- ways: a second start must not orphan the first socket, and stopping what
+    -- never ran is a no-op rather than an error (same tolerance `uninstall`
+    -- has).
+    eq(serve.is_running(), false, "docmap.serve: nothing is running before start")
+    eq(serve.stop(), false, "docmap.serve: stopping when idle is a no-op, not an error")
+
+    local serve_url = serve.start({ root = root, out_dir = "docs/map" })
+    ok(serve_url ~= nil, "docmap.serve: start returns a URL")
+    ok(
+      serve_url and serve_url:match("^http://127%.0%.0%.1:%d+/$") ~= nil,
+      "docmap.serve: binds loopback only, on an OS-assigned port"
+    )
+    eq(serve.is_running(), true, "docmap.serve: reports itself running")
+
+    local first_port = serve.info().port
+    eq(serve.start({ root = root }), serve_url, "docmap.serve: a second start returns the same URL")
+    eq(serve.info().port, first_port, "docmap.serve: …on the same port, not a second socket")
+
+    eq(serve.stop(), true, "docmap.serve: stop reports that it stopped something")
+    eq(serve.is_running(), false, "docmap.serve: …and is no longer running")
+    eq(serve.info(), nil, "docmap.serve: info is nil once stopped")
+    eq(serve.stop(), false, "docmap.serve: stopping twice is a no-op")
+
+    -- ---------------------------------------------- symbols and subtree stats
+    local sym_fixture = H.tmpfile(".lua")
+    local sfw = assert(io.open(sym_fixture, "w"), "docmap spec: symbol fixture must be writable")
+    sfw:write(table.concat({
+      "local M = {}",
+      "---Cache of resolved roots.",
+      "local CACHE = { a = 1, b = 2, c = 3 }",
+      "local MAX = 42",
+      'local fs = require("demo.fs")', -- a dependency, not a symbol
+      "local uv = vim.uv or vim.loop",
+      "M.defaults = { x = 1 }",
+      "M.handler = function() return 1 end", -- a function, not a symbol
+      "function M.go()",
+      "  local inner = {}", -- nested: not module scope
+      "  return inner",
+      "end",
+      "return M",
+    }, "\n"))
+    sfw:close()
+
+    -- `select(4, ...)` rather than three leading `_`s: this file sits at Lua's
+    -- 200-local-per-function ceiling, and `select` costs no local slots for the
+    -- values being skipped. Four names now, not three: `scan_file` returns
+    -- symbols, plugins, endpoints, lines from this position on, since the
+    -- endpoints recognizer widened the shared seven-value contract.
+    local syms, _, _, loc = select(4, functions.scan_file(sym_fixture))
+    local by_sym = {}
+    for _, s in ipairs(syms) do
+      by_sym[s.name] = s
+    end
+
+    eq(loc, 13, "docmap.functions: reports the file's line count")
+    ok(by_sym.CACHE, "docmap.symbols: a module-scope table is reported")
+    eq(by_sym.CACHE.kind, "table", "docmap.symbols: a table constructor is a table")
+    eq(by_sym.CACHE.detail, "3 fields", "docmap.symbols: a table's detail is its field count")
+    eq(
+      by_sym.CACHE.summary,
+      "Cache of resolved roots.",
+      "docmap.symbols: the doc comment above it becomes the summary"
+    )
+    eq(by_sym.MAX.kind, "constant", "docmap.symbols: a literal is a constant")
+    eq(by_sym.MAX.detail, "42", "docmap.symbols: a constant's detail is the literal")
+    eq(by_sym.uv.kind, "binding", "docmap.symbols: anything else is a binding")
+    eq(by_sym["M.defaults"].kind, "table", "docmap.symbols: M.x = {} is reported too")
+
+    -- The two exclusions are the point: another stage owns each of them, and
+    -- reporting them twice would be two places to keep in sync.
+    eq(by_sym.fs, nil, "docmap.symbols: a require binding is left to docmap.deps")
+    eq(by_sym["M.handler"], nil, "docmap.symbols: a function value is left to docmap.functions")
+    eq(by_sym.inner, nil, "docmap.symbols: a local inside a function body is not module scope")
+
+    -- The export table is the module, not state it holds. Filtering it matters
+    -- at scale: over lib.nvim it was 188 of 600 entries before this.
+    eq(by_sym.M, nil, "docmap.symbols: the returned export table is not listed as a symbol")
+
+    local meta_fixture = H.tmpfile(".lua")
+    local mfw = assert(io.open(meta_fixture, "w"))
+    mfw:write(table.concat({
+      "local M = {}",
+      "local state = {}",
+      "return setmetatable(M, { __call = function() return 1 end })",
+    }, "\n"))
+    mfw:close()
+    local _, _, _, meta_syms = functions.scan_file(meta_fixture)
+    local meta_names = {}
+    for _, s in ipairs(meta_syms) do
+      meta_names[s.name] = true
+    end
+    eq(
+      meta_names.M,
+      nil,
+      "docmap.symbols: `return setmetatable(M, …)` also identifies the export table"
+    )
+    ok(meta_names.state, "docmap.symbols: other module-scope tables survive that filter")
+
+    -- ------------------------------------------------ deps.path / deps.impact
+    -- A four-module chain plus a shortcut, so "shortest" is a real claim:
+    --   one -> two -> three -> four,  and  one -> four directly (lazy)
+    local gr = H.tmpfile("_graph")
+    local function gwrite(rel, lines)
+      local abs = gr .. "/" .. rel
+      vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
+      local fd = assert(io.open(abs, "w"), "docmap spec: graph fixture must be writable")
+      fd:write(table.concat(lines, "\n"))
+      fd:close()
+    end
+    local function mod(name, requires, lazy)
+      local lines = { ("---@module 'g.%s'"):format(name), "--- M.", "local M = {}" }
+      for _, r in ipairs(requires) do
+        if lazy then
+          lines[#lines + 1] = "---Lazy."
+          lines[#lines + 1] = ("function M.get_%s()"):format(r)
+          lines[#lines + 1] = ('  return require("g.%s")'):format(r)
+          lines[#lines + 1] = "end"
+        else
+          table.insert(lines, 3, ('local _%s = require("g.%s")'):format(r, r))
+        end
+      end
+      -- Every fixture module declares one function, so the diff below has
+      -- something to lose when a module is deleted.
+      lines[#lines + 1] = "---Runs."
+      lines[#lines + 1] = "function M.run()"
+      lines[#lines + 1] = "  return 1"
+      lines[#lines + 1] = "end"
+      lines[#lines + 1] = "return M"
+      gwrite(("lua/g/%s/init.lua"):format(name), lines)
+    end
+    mod("two", { "three" })
+    mod("three", { "four" })
+    mod("four", {})
+    -- `one` reaches `four` in three load-time hops or one lazy hop.
+    gwrite("lua/g/one/init.lua", {
+      "---@module 'g.one'",
+      "--- One.",
+      'local _two = require("g.two")',
+      "local M = {}",
+      "---Lazy.",
+      "function M.late()",
+      '  return require("g.four")',
+      "end",
+      "return M",
+    })
+
+    local gir = scan.scan({ root = gr, source = "lua/g", lua_root = "lua" })
+    local chain = deps.path(gir, "lua/g/one", "lua/g/four")
+    ok(chain, "deps.path: finds a path")
+    eq(#chain, 1, "deps.path: takes the one-hop lazy shortcut over the three-hop chain")
+    eq(chain[1].deferred, true, "deps.path: and reports that the hop is lazy")
+
+    -- Without the shortcut the long way is the answer, and the chain must be
+    -- contiguous — a reconstruction bug shows up here and nowhere else.
+    local long = deps.path(gir, "lua/g/two", "lua/g/four")
+    eq(#long, 2, "deps.path: the multi-hop route when there is no shortcut")
+    eq(long[1].from, "lua/g/two", "deps.path: the chain starts at the source")
+    eq(long[1].to, long[2].from, "deps.path: and is contiguous")
+    eq(long[2].to, "lua/g/four", "deps.path: and ends at the target")
+
+    eq(
+      #deps.path(gir, "lua/g/one", "lua/g/one"),
+      0,
+      "deps.path: a node reaches itself in zero hops"
+    )
+    eq(deps.path(gir, "lua/g/four", "lua/g/one"), nil, "deps.path: nil when unreachable")
+    eq(deps.path(gir, "lua/g/one", "nope"), nil, "deps.path: nil for an unknown node")
+
+    local hull, direct = deps.impact(gir, "lua/g/four")
+    eq(#hull, 3, "deps.impact: the transitive closure of required_by")
+    eq(direct, 2, "deps.impact: and the direct count alongside it")
+    eq(hull[1] < hull[2], true, "deps.impact: sorted")
+    eq(#(deps.impact(gir, "lua/g/one")), 0, "deps.impact: nothing depends on the top of the chain")
+    eq(#(deps.impact(gir, "nope")), 0, "deps.impact: an unknown node has no dependents")
+
+    -- ---------------------------------------------------------- render.dot
+    local dot = require("docmap.core.render.dot")
+    local whole = dot.render(gir, { kind = "require" })
+    ok(whole:match("^// require graph"), "render.dot: leads with a comment naming the graph")
+    ok(whole:find("digraph docmap {", 1, true), "render.dot: emits a digraph")
+    ok(whole:find('"lua/g/one" -> "lua/g/two"', 1, true), "render.dot: quotes node ids and edges")
+    ok(whole:find('label="lazy"', 1, true), "render.dot: marks deferred requires")
+    eq(whole, dot.render(gir, { kind = "require" }), "render.dot: byte-stable for the same IR")
+
+    -- Scope is bounded. Unbounded reachability sounds right and is not: in a
+    -- connected dependency graph almost everything reaches almost everything,
+    -- and a scope that excludes nothing is not a scope.
+    local near = dot.render(gir, { kind = "require", scope = "lua/g/four", hops = 1 })
+    local far = dot.render(gir, { kind = "require", scope = "lua/g/four", hops = 3 })
+    local function node_count(s)
+      return select(2, s:gsub("%[label=", ""))
+    end
+    ok(
+      node_count(near) < node_count(far),
+      "render.dot: a smaller hop budget yields a smaller graph"
+    )
+    ok(node_count(near) > 0, "render.dot: and still contains the neighbourhood")
+
+    local calls_dot = dot.render(gir, { kind = "call" })
+    ok(
+      calls_dot:match("^// call graph"),
+      "render.dot: the call graph is a different graph, not a relabelled one"
+    )
+
+    -- --------------------------------------------------------------- diff
+    -- The same tree with one module gone, one function gone and one dependency
+    -- made load-time instead of lazy — every section exercised at once.
+    local diff = require("docmap.core.diff")
+    local nothing = diff.compare(gir, gir)
+    eq(diff.is_empty(nothing), true, "diff: a map against itself is empty")
+
+    gwrite("lua/g/five/init.lua", {
+      "---@module 'g.five'",
+      "--- Five.",
+      'local _four = require("g.four")',
+      "local M = {}",
+      "---New.",
+      "function M.fresh()",
+      "  return 1",
+      "end",
+      "return M",
+    })
+    vim.fn.delete(gr .. "/lua/g/two", "rf")
+    local after = scan.scan({ root = gr, source = "lua/g", lua_root = "lua" })
+    local d = diff.compare(gir, after)
+
+    eq(diff.is_empty(d), false, "diff: a changed tree is not empty")
+    eq(d.nodes_added[1], "lua/g/five", "diff: the new module is reported")
+    eq(d.nodes_removed[1], "lua/g/two", "diff: and the deleted one")
+    eq(d.functions_added[1], "lua/g/five#M.fresh", "diff: functions are keyed like everywhere else")
+    eq(
+      d.functions_removed[1],
+      "lua/g/two#M.run",
+      "diff: the deleted module's functions are gone too"
+    )
+    eq(d.deps_comparable, true, "diff: two current maps are comparable")
+
+    local added_edges, removed_edges = {}, {}
+    for _, e in ipairs(d.deps_added) do
+      added_edges[e.edge] = true
+    end
+    for _, e in ipairs(d.deps_removed) do
+      removed_edges[e.edge] = true
+    end
+    ok(added_edges["lua/g/five -> lua/g/four"], "diff: the new dependency is reported")
+    ok(removed_edges["lua/g/one -> lua/g/two"], "diff: and the one that vanished with the module")
+
+    -- `three` lost its only dependent when `two` was deleted, so its blast
+    -- radius drops. `four` deliberately is *not* asserted on: it gained `five`
+    -- and lost `two` in the same change, and the two cancel out exactly — a
+    -- reminder that "I changed something near it" is not the same as "its
+    -- radius moved".
+    local moved = {}
+    for _, c in ipairs(d.impact_changed) do
+      moved[c.id] = { c.before, c.after }
+    end
+    ok(moved["lua/g/three"], "diff: a module whose blast radius changed is reported")
+    ok(
+      moved["lua/g/three"][1] > moved["lua/g/three"][2],
+      "diff: with both figures, and this one shrank"
+    )
+
+    -- An older artifact is missing this data rather than merely shaped
+    -- differently; saying "every dependency in the tree was added" would be
+    -- true and useless.
+    local ancient = vim.deepcopy(gir)
+    ancient.meta.schema = 1
+    ancient.edges = {}
+    local old_diff = diff.compare(ancient, after)
+    eq(old_diff.deps_comparable, false, "diff: a schema-1 map is not comparable on dependencies")
+    eq(#old_diff.deps_added, 0, "diff: so no dependency is claimed to be new")
+    local rendered = table.concat(diff.render(old_diff, ancient, after, "old"), "\n")
+    ok(rendered:find("predates the dependency graph", 1, true), "diff: and the reason is stated")
+
+    vim.fn.delete(gr, "rf")
+
+    -- ------------------------------------------------------ dead-function check
+    -- The trap this check is built around, made concrete: a library consists of
+    -- functions with no internal caller by design, so it fires in two tiers —
+    -- always-on where the statement genuinely holds (file-local, @internal),
+    -- opt-in everywhere else.
+    -- Scoped: the dead-function locals would push the file over the 200-local ceiling.
+    do
+      local dr = H.tmpfile("_dead")
+      local function dwrite(rel, lines)
+        local abs = dr .. "/" .. rel
+        vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
+        local fd = assert(io.open(abs, "w"), "docmap spec: dead-function fixture must be writable")
+        fd:write(table.concat(lines, "\n"))
+        fd:close()
+      end
+
+      dwrite("lua/d/a/init.lua", {
+        "---@module 'd.a'",
+        "--- A.",
+        "local M = {}",
+        "---Truly dead: nothing in this file mentions it again.",
+        "local function truly_dead()",
+        "  return 1",
+        "end",
+        "---Passed as a value, never called at a call site.",
+        "local function as_value()",
+        "  return 2",
+        "end",
+        "---Public, uncalled anywhere, but tagged.",
+        "---@internal",
+        "function M.internal_unused()",
+        "  return 3",
+        "end",
+        "---Public and uncalled — the always-on tiers must NOT flag this.",
+        "function M.public_unused()",
+        "  return 4",
+        "end",
+        -- Declared with `:`, exactly the shape lua/lib/lua/memo/lru.lua uses for
+        -- its real public API (Lru:get/Lru:put), which calls.lua cannot resolve
+        -- call sites for at all (method-call syntax is invisible to it).
+        "---Colon-declared method.",
+        "function M:method_dead()",
+        "  return 5",
+        "end",
+        "---Referenced only by another function's @see tag.",
+        "function M.only_seen()",
+        "  return 6",
+        "end",
+        "---Documents a relationship to only_seen; itself has no caller.",
+        "---@see M.only_seen",
+        "function M.seen_by_see()",
+        "  return 7",
+        "end",
+        "---Entry point.",
+        "function M.go()",
+        "  vim.system({}, as_value)",
+        "  return 1",
+        "end",
+        "return M",
+      })
+
+      local dir_ =
+        require("docmap.core.scan").scan({ root = dr, source = "lua/d", lua_root = "lua" })
+      local function dead_messages(dead_code)
+        local dopts = { root = dr, source = "lua/d", lua_root = "lua", dead_code = dead_code }
+        local out = {}
+        for _, f in ipairs(check.run(dir_, dopts)) do
+          if f.check == "dead-function" then
+            out[fmsg(f):match("^(%S+)")] = fmsg(f)
+          end
+        end
+        return out
+      end
+
+      local default_dead = dead_messages(false)
+      ok(
+        default_dead.truly_dead,
+        "check.dead-function: a genuinely unreferenced local is flagged by default"
+      )
+      ok(
+        default_dead["M.internal_unused"],
+        "check.dead-function: an @internal function with no caller is flagged by default"
+      )
+      eq(
+        default_dead.as_value,
+        nil,
+        "check.dead-function: a function passed by value to another call is not dead"
+      )
+      eq(
+        default_dead["M.public_unused"],
+        nil,
+        "check.dead-function: an ordinary public function is NOT flagged without opts.dead_code — a library is exactly this"
+      )
+      eq(
+        default_dead["M:method_dead"],
+        nil,
+        "check.dead-function: a colon-declared method is not mistaken for a private local"
+      )
+      eq(
+        default_dead.only_seen or default_dead["M.only_seen"],
+        nil,
+        "check.dead-function: a documented @see TARGET counts as used"
+      )
+
+      local opted_in = dead_messages(true)
+      ok(
+        opted_in["M.public_unused"],
+        "check.dead-function: opts.dead_code reaches an ordinary uncalled public function"
+      )
+      ok(
+        opted_in["M:method_dead"],
+        "check.dead-function: opts.dead_code reaches an uncalled colon method too"
+      )
+      eq(
+        opted_in.as_value,
+        nil,
+        "check.dead-function: opts.dead_code still respects local_refs — a callback stays not-dead"
+      )
+      ok(
+        opted_in["M.seen_by_see"],
+        "check.dead-function: the function CARRYING the @see tag is not itself excused by it"
+      )
+
+      for _, f in ipairs(check.run(dir_, { root = dr, source = "lua/d", lua_root = "lua" })) do
         if f.check == "dead-function" then
-          out[fmsg(f):match("^(%S+)")] = fmsg(f)
+          eq(f.severity, "info", "check.dead-function: never above info severity")
+        end
+      end
+
+      vim.fn.delete(dr, "rf")
+    end
+
+    -- --------------------------------------- layers, heuristic, handle queries
+    -- Three features that shipped with no coverage at all. The heuristic one in
+    -- particular is only worth having if it stays *silent* on an ambiguous name,
+    -- which is precisely the case a happy-path test would miss.
+    local heur_root = H.tmpfile("_heur")
+    local function hwrite(rel, lines)
+      local abs = heur_root .. "/" .. rel
+      vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
+      local fd = assert(io.open(abs, "w"), "docmap spec: heuristic fixture must be writable")
+      fd:write(table.concat(lines, "\n"))
+      fd:close()
+    end
+
+    -- `only_here` is declared once in the tree; `ambiguous` is declared twice.
+    hwrite("lua/demo/a/init.lua", {
+      "---@module 'demo.a'",
+      "--- A.",
+      "local M = {}",
+      "---U.",
+      "function M.only_here()",
+      "  return 1",
+      "end",
+      "---S.",
+      "function M.ambiguous()",
+      "  return 1",
+      "end",
+      "return M",
+    })
+    hwrite("lua/demo/b/init.lua", {
+      "---@module 'demo.b'",
+      "--- B.",
+      "local M = {}",
+      "---S.",
+      "function M.ambiguous()",
+      "  return 2",
+      "end",
+      "return M",
+    })
+    -- Calls both by bare name, with no require anywhere to resolve them.
+    hwrite("lua/demo/c/init.lua", {
+      "---@module 'demo.c'",
+      "--- C.",
+      "local M = {}",
+      "---Go.",
+      "function M.go()",
+      "  return only_here() + ambiguous()",
+      "end",
+      "return M",
+    })
+
+    local base = { root = heur_root, source = "lua/demo", lua_root = "lua" }
+    local function guessed_edges(o)
+      local out = {}
+      for _, e in ipairs(scan.scan(o).edges) do
+        if e.kind == "call" and e.from == "lua/demo/c" then
+          out[#out + 1] = e
         end
       end
       return out
     end
 
-    local default_dead = dead_messages(false)
-    ok(
-      default_dead.truly_dead,
-      "check.dead-function: a genuinely unreferenced local is flagged by default"
-    )
-    ok(
-      default_dead["M.internal_unused"],
-      "check.dead-function: an @internal function with no caller is flagged by default"
-    )
-    eq(
-      default_dead.as_value,
-      nil,
-      "check.dead-function: a function passed by value to another call is not dead"
-    )
-    eq(
-      default_dead["M.public_unused"],
-      nil,
-      "check.dead-function: an ordinary public function is NOT flagged without opts.dead_code — a library is exactly this"
-    )
-    eq(
-      default_dead["M:method_dead"],
-      nil,
-      "check.dead-function: a colon-declared method is not mistaken for a private local"
-    )
-    eq(
-      default_dead.only_seen or default_dead["M.only_seen"],
-      nil,
-      "check.dead-function: a documented @see TARGET counts as used"
-    )
+    eq(#guessed_edges(base), 0, "docmap.calls: unresolvable bare calls are dropped by default")
 
-    local opted_in = dead_messages(true)
-    ok(
-      opted_in["M.public_unused"],
-      "check.dead-function: opts.dead_code reaches an ordinary uncalled public function"
-    )
-    ok(
-      opted_in["M:method_dead"],
-      "check.dead-function: opts.dead_code reaches an uncalled colon method too"
-    )
-    eq(
-      opted_in.as_value,
-      nil,
-      "check.dead-function: opts.dead_code still respects local_refs — a callback stays not-dead"
-    )
-    ok(
-      opted_in["M.seen_by_see"],
-      "check.dead-function: the function CARRYING the @see tag is not itself excused by it"
-    )
+    local guessed = guessed_edges(vim.tbl_extend("force", base, { calls_heuristic = true }))
+    eq(#guessed, 1, "docmap.calls: the heuristic guesses only the tree-unique name")
+    eq(guessed[1].to_fn, "M.only_here", "docmap.calls: it guesses the right one")
+    eq(guessed[1].confidence, "heuristic", "docmap.calls: guessed edges are marked as such")
 
-    for _, f in ipairs(check.run(dir_, { root = dr, source = "lua/d", lua_root = "lua" })) do
-      if f.check == "dead-function" then
-        eq(f.severity, "info", "check.dead-function: never above info severity")
+    -- The important half: a name owned by two modules must produce no edge at
+    -- all rather than an arbitrary winner.
+    local guessed_ambiguous = false
+    for _, e in ipairs(guessed) do
+      if e.to_fn == "M.ambiguous" then
+        guessed_ambiguous = true
       end
     end
+    ok(not guessed_ambiguous, "docmap.calls: an ambiguous name is left unresolved, not picked")
 
-    vim.fn.delete(dr, "rf")
-  end
-
-  -- --------------------------------------- layers, heuristic, handle queries
-  -- Three features that shipped with no coverage at all. The heuristic one in
-  -- particular is only worth having if it stays *silent* on an ambiguous name,
-  -- which is precisely the case a happy-path test would miss.
-  local heur_root = H.tmpfile("_heur")
-  local function hwrite(rel, lines)
-    local abs = heur_root .. "/" .. rel
-    vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
-    local fd = assert(io.open(abs, "w"), "docmap spec: heuristic fixture must be writable")
-    fd:write(table.concat(lines, "\n"))
-    fd:close()
-  end
-
-  -- `only_here` is declared once in the tree; `ambiguous` is declared twice.
-  hwrite("lua/demo/a/init.lua", {
-    "---@module 'demo.a'",
-    "--- A.",
-    "local M = {}",
-    "---U.",
-    "function M.only_here()",
-    "  return 1",
-    "end",
-    "---S.",
-    "function M.ambiguous()",
-    "  return 1",
-    "end",
-    "return M",
-  })
-  hwrite("lua/demo/b/init.lua", {
-    "---@module 'demo.b'",
-    "--- B.",
-    "local M = {}",
-    "---S.",
-    "function M.ambiguous()",
-    "  return 2",
-    "end",
-    "return M",
-  })
-  -- Calls both by bare name, with no require anywhere to resolve them.
-  hwrite("lua/demo/c/init.lua", {
-    "---@module 'demo.c'",
-    "--- C.",
-    "local M = {}",
-    "---Go.",
-    "function M.go()",
-    "  return only_here() + ambiguous()",
-    "end",
-    "return M",
-  })
-
-  local base = { root = heur_root, source = "lua/demo", lua_root = "lua" }
-  local function guessed_edges(o)
-    local out = {}
-    for _, e in ipairs(scan.scan(o).edges) do
-      if e.kind == "call" and e.from == "lua/demo/c" then
-        out[#out + 1] = e
+    -- layer-violation: the rule direction has to matter, and the prefix has to
+    -- respect module-path segments rather than being a raw string prefix.
+    local layered = vim.tbl_extend("force", base, {
+      layers = { { from = "demo.a", to = "demo.b" } },
+    })
+    local function layer_hits(o)
+      local n = 0
+      for _, f in ipairs(check.run(scan.scan(o), o)) do
+        if f.check == "layer-violation" then
+          n = n + 1
+        end
       end
+      return n
     end
-    return out
-  end
+    eq(
+      layer_hits(layered),
+      0,
+      "docmap.check: layer-violation is silent when no edge breaks the rule"
+    )
 
-  eq(#guessed_edges(base), 0, "docmap.calls: unresolvable bare calls are dropped by default")
+    hwrite("lua/demo/a/init.lua", {
+      "---@module 'demo.a'",
+      "--- A.",
+      'local b = require("demo.b")',
+      "local M = {}",
+      "---U.",
+      "function M.only_here()",
+      "  return b",
+      "end",
+      "return M",
+    })
+    eq(layer_hits(layered), 1, "docmap.check: layer-violation fires on a rule-breaking require")
+    eq(
+      layer_hits(vim.tbl_extend("force", base, { layers = { { from = "demo.b", to = "demo.a" } } })),
+      0,
+      "docmap.check: the rule is directional — the reverse does not fire"
+    )
+    eq(
+      layer_hits(vim.tbl_extend("force", base, { layers = { { from = "demo.", to = "demo.b" } } })),
+      0,
+      "docmap.check: prefixes match whole path segments, so 'demo.' matches nothing"
+    )
 
-  local guessed = guessed_edges(vim.tbl_extend("force", base, { calls_heuristic = true }))
-  eq(#guessed, 1, "docmap.calls: the heuristic guesses only the tree-unique name")
-  eq(guessed[1].to_fn, "M.only_here", "docmap.calls: it guesses the right one")
-  eq(guessed[1].confidence, "heuristic", "docmap.calls: guessed edges are marked as such")
+    -- The sibling form: `demo.a` requiring `demo.b` crosses from one direct
+    -- child of `demo` into another, which is exactly what `siblings` forbids,
+    -- and `allow` names the shared child every sibling may reach.
+    eq(
+      layer_hits(vim.tbl_extend("force", base, { layers = { { siblings = "demo" } } })),
+      1,
+      "docmap.check: the sibling form fires when one child requires another"
+    )
+    eq(
+      layer_hits(
+        vim.tbl_extend("force", base, { layers = { { siblings = "demo", allow = { "demo.b" } } } })
+      ),
+      0,
+      "docmap.check: the sibling form leaves an allowed shared child alone"
+    )
+    eq(
+      layer_hits(vim.tbl_extend("force", base, { layers = { { siblings = "demo.a" } } })),
+      0,
+      "docmap.check: the sibling form only judges edges between two children of its prefix"
+    )
+    eq(
+      layer_hits(vim.tbl_extend("force", base, { layers = { { siblings = "dem" } } })),
+      0,
+      "docmap.check: the sibling prefix matches whole path segments too"
+    )
+    eq(
+      layer_hits(
+        vim.tbl_extend(
+          "force",
+          base,
+          { layers = { { from = "demo.a", to = "demo.b", allow = { "demo.b" } } } }
+        )
+      ),
+      0,
+      "docmap.check: allow exempts a shared target in the pair form as well"
+    )
 
-  -- The important half: a name owned by two modules must produce no edge at
-  -- all rather than an arbitrary winner.
-  local guessed_ambiguous = false
-  for _, e in ipairs(guessed) do
-    if e.to_fn == "M.ambiguous" then
-      guessed_ambiguous = true
+    -- Handle graph queries, against a live install().
+    local handle = require("docmap").install(base)
+    eq(#handle.requires("lua/demo/a"), 1, "docmap.handle: requires() returns the outgoing edge")
+    eq(#handle.required_by("lua/demo/b"), 1, "docmap.handle: required_by() is the reverse")
+    eq(
+      #handle.callers("lua/demo/a#M.only_here"),
+      0,
+      "docmap.handle: callers() of an uncalled function is empty, not nil"
+    )
+    -- `ensure_watch` upgrades an installed handle in place. The case it exists
+    -- for: `command.setup()` installs with the plain config, which sets no
+    -- `watch`, so a `:DocMap` earlier in the session left a non-watching handle
+    -- that `:DocBrowse live` then reused — a "live" view that never re-scanned.
+    -- Upgrading rather than re-installing is what keeps the subscribers, since
+    -- `install()` treats a collision as replace and drops them.
+    local registry = require("docmap.editor.registry")
+    -- The group name is keyed on the *normalized* root, the same way the
+    -- registry keys its entries — so it has to be built with the registry's own
+    -- key function, `config.normalise_root`. Not `core.artifact.norm_root`,
+    -- which only unifies separators and trims a trailing one: a raw tempname
+    -- carries backslashes on Windows *and* an 8.3 short directory name, and
+    -- only the `uv.fs_realpath` inside `normalise_root` resolves the latter.
+    local watch_group = "LibDocmapWatch:" .. require("docmap.config").normalise_root(heur_root)
+    local function watching()
+      local got, aus = pcall(vim.api.nvim_get_autocmds, { group = watch_group })
+      return got and #aus > 0
     end
-  end
-  ok(not guessed_ambiguous, "docmap.calls: an ambiguous name is left unresolved, not picked")
 
-  -- layer-violation: the rule direction has to matter, and the prefix has to
-  -- respect module-path segments rather than being a raw string prefix.
-  local layered = vim.tbl_extend("force", base, {
-    layers = { { from = "demo.a", to = "demo.b" } },
-  })
-  local function layer_hits(o)
-    local n = 0
-    for _, f in ipairs(check.run(scan.scan(o), o)) do
-      if f.check == "layer-violation" then
-        n = n + 1
-      end
+    local notified = 0
+    handle.on_change(function()
+      notified = notified + 1
+    end)
+
+    eq(watching(), false, "docmap.registry: install() without watch does not watch")
+    eq(registry.ensure_watch(heur_root), true, "docmap.registry: ensure_watch upgrades it")
+    eq(watching(), true, "docmap.registry: the watch is live afterwards")
+    handle.rescan()
+    ok(notified > 0, "docmap.registry: the on_change subscriber survives the upgrade")
+    eq(registry.ensure_watch(heur_root), true, "docmap.registry: ensure_watch is idempotent")
+    eq(
+      registry.ensure_watch(heur_root .. "/nowhere"),
+      false,
+      "docmap.registry: ensure_watch on an uninstalled root is a no-op, not an error"
+    )
+
+    handle.uninstall()
+    eq(watching(), false, "docmap.registry: uninstall tears the watch down again")
+
+    -- --------------------------------------------------- the watch, end to end
+    -- Assumed untestable headlessly at first, which was wrong: `vim.wait` pumps
+    -- the event loop, so a real `:write` reaches BufWritePost and the debounced
+    -- rescan completes inside the test.
+    local live_root = H.tmpfile("_live")
+    local function lwrite(rel, lines)
+      local abs = live_root .. "/" .. rel
+      vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
+      local fd = assert(io.open(abs, "w"), "docmap spec: live fixture must be writable")
+      fd:write(table.concat(lines, "\n"))
+      fd:close()
+      return abs
     end
-    return n
-  end
-  eq(layer_hits(layered), 0, "docmap.check: layer-violation is silent when no edge breaks the rule")
 
-  hwrite("lua/demo/a/init.lua", {
-    "---@module 'demo.a'",
-    "--- A.",
-    'local b = require("demo.b")',
-    "local M = {}",
-    "---U.",
-    "function M.only_here()",
-    "  return b",
-    "end",
-    "return M",
-  })
-  eq(layer_hits(layered), 1, "docmap.check: layer-violation fires on a rule-breaking require")
-  eq(
-    layer_hits(vim.tbl_extend("force", base, { layers = { { from = "demo.b", to = "demo.a" } } })),
-    0,
-    "docmap.check: the rule is directional — the reverse does not fire"
-  )
-  eq(
-    layer_hits(vim.tbl_extend("force", base, { layers = { { from = "demo.", to = "demo.b" } } })),
-    0,
-    "docmap.check: prefixes match whole path segments, so 'demo.' matches nothing"
-  )
+    local watched_file = lwrite("lua/demo/a/init.lua", {
+      "---@module 'demo.a'",
+      "--- A.",
+      "local M = {}",
+      "---One.",
+      "function M.one()",
+      "  return 1",
+      "end",
+      "return M",
+    })
+    -- Deliberately outside `source`: writing here must not trigger anything.
+    local outsider = lwrite("notes/scratch.lua", { "-- not part of the scanned tree" })
 
-  -- The sibling form: `demo.a` requiring `demo.b` crosses from one direct
-  -- child of `demo` into another, which is exactly what `siblings` forbids,
-  -- and `allow` names the shared child every sibling may reach.
-  eq(
-    layer_hits(vim.tbl_extend("force", base, { layers = { { siblings = "demo" } } })),
-    1,
-    "docmap.check: the sibling form fires when one child requires another"
-  )
-  eq(
-    layer_hits(
-      vim.tbl_extend("force", base, { layers = { { siblings = "demo", allow = { "demo.b" } } } })
-    ),
-    0,
-    "docmap.check: the sibling form leaves an allowed shared child alone"
-  )
-  eq(
-    layer_hits(vim.tbl_extend("force", base, { layers = { { siblings = "demo.a" } } })),
-    0,
-    "docmap.check: the sibling form only judges edges between two children of its prefix"
-  )
-  eq(
-    layer_hits(vim.tbl_extend("force", base, { layers = { { siblings = "dem" } } })),
-    0,
-    "docmap.check: the sibling prefix matches whole path segments too"
-  )
-  eq(
-    layer_hits(
-      vim.tbl_extend(
-        "force",
-        base,
-        { layers = { { from = "demo.a", to = "demo.b", allow = { "demo.b" } } } }
-      )
-    ),
-    0,
-    "docmap.check: allow exempts a shared target in the pair form as well"
-  )
+    local live = require("docmap").install({
+      root = live_root,
+      source = "lua/demo",
+      lua_root = "lua",
+      watch = true,
+      watch_ms = 40,
+    })
+    local rescans = 0
+    live.on_change(function()
+      rescans = rescans + 1
+    end)
 
-  -- Handle graph queries, against a live install().
-  local handle = require("docmap").install(base)
-  eq(#handle.requires("lua/demo/a"), 1, "docmap.handle: requires() returns the outgoing edge")
-  eq(#handle.required_by("lua/demo/b"), 1, "docmap.handle: required_by() is the reverse")
-  eq(
-    #handle.callers("lua/demo/a#M.only_here"),
-    0,
-    "docmap.handle: callers() of an uncalled function is empty, not nil"
-  )
-  -- `ensure_watch` upgrades an installed handle in place. The case it exists
-  -- for: `command.setup()` installs with the plain config, which sets no
-  -- `watch`, so a `:DocMap` earlier in the session left a non-watching handle
-  -- that `:DocBrowse live` then reused — a "live" view that never re-scanned.
-  -- Upgrading rather than re-installing is what keeps the subscribers, since
-  -- `install()` treats a collision as replace and drops them.
-  local registry = require("docmap.editor.registry")
-  -- The group name is keyed on the *normalized* root, the same way the
-  -- registry keys its entries — so it has to be built with the registry's own
-  -- key function, `config.normalise_root`. Not `core.artifact.norm_root`,
-  -- which only unifies separators and trims a trailing one: a raw tempname
-  -- carries backslashes on Windows *and* an 8.3 short directory name, and
-  -- only the `uv.fs_realpath` inside `normalise_root` resolves the latter.
-  local watch_group = "LibDocmapWatch:" .. require("docmap.config").normalise_root(heur_root)
-  local function watching()
-    local got, aus = pcall(vim.api.nvim_get_autocmds, { group = watch_group })
-    return got and #aus > 0
-  end
+    eq(#live.ir().nodes["lua/demo/a"].functions, 1, "docmap.watch: one function before the edit")
 
-  local notified = 0
-  handle.on_change(function()
-    notified = notified + 1
+    vim.cmd.edit(vim.fn.fnameescape(watched_file))
+    vim.api.nvim_buf_set_lines(0, 7, 7, false, {
+      "---Two.",
+      "function M.two()",
+      "  return 2",
+      "end",
+    })
+    vim.cmd("silent write")
+    local settled = vim.wait(5000, function()
+      return rescans > 0
+    end, 25)
+
+    ok(settled, "docmap.watch: writing a file under source triggers a rescan")
+    eq(
+      #live.ir().nodes["lua/demo/a"].functions,
+      2,
+      "docmap.watch: and the handle's IR reflects the edit afterwards"
+    )
+
+    -- The scope check is the fragile half: an autocmd *glob* over the source
+    -- directory silently never fires on Windows, because Vim matches the raw
+    -- OS-native buffer path against a forward-slash pattern. This asserts the
+    -- other direction — that the explicit subpath check does not over-match.
+    local before_outside = rescans
+    vim.cmd.edit(vim.fn.fnameescape(outsider))
+    vim.api.nvim_buf_set_lines(0, -1, -1, false, { "-- touched" })
+    vim.cmd("silent write")
+    vim.wait(300, function()
+      return false
+    end, 25)
+    eq(rescans, before_outside, "docmap.watch: a write outside source does not rescan")
+
+    live.uninstall()
+    H.wipe_new(snap)
+    vim.fn.delete(live_root, "rf")
+
+    vim.fn.delete(heur_root, "rf")
+    vim.fn.delete(root, "rf")
   end)
-
-  eq(watching(), false, "docmap.registry: install() without watch does not watch")
-  eq(registry.ensure_watch(heur_root), true, "docmap.registry: ensure_watch upgrades it")
-  eq(watching(), true, "docmap.registry: the watch is live afterwards")
-  handle.rescan()
-  ok(notified > 0, "docmap.registry: the on_change subscriber survives the upgrade")
-  eq(registry.ensure_watch(heur_root), true, "docmap.registry: ensure_watch is idempotent")
-  eq(
-    registry.ensure_watch(heur_root .. "/nowhere"),
-    false,
-    "docmap.registry: ensure_watch on an uninstalled root is a no-op, not an error"
-  )
-
-  handle.uninstall()
-  eq(watching(), false, "docmap.registry: uninstall tears the watch down again")
-
-  -- --------------------------------------------------- the watch, end to end
-  -- Assumed untestable headlessly at first, which was wrong: `vim.wait` pumps
-  -- the event loop, so a real `:write` reaches BufWritePost and the debounced
-  -- rescan completes inside the test.
-  local live_root = H.tmpfile("_live")
-  local function lwrite(rel, lines)
-    local abs = live_root .. "/" .. rel
-    vim.fn.mkdir(vim.fn.fnamemodify(abs, ":h"), "p")
-    local fd = assert(io.open(abs, "w"), "docmap spec: live fixture must be writable")
-    fd:write(table.concat(lines, "\n"))
-    fd:close()
-    return abs
-  end
-
-  local watched_file = lwrite("lua/demo/a/init.lua", {
-    "---@module 'demo.a'",
-    "--- A.",
-    "local M = {}",
-    "---One.",
-    "function M.one()",
-    "  return 1",
-    "end",
-    "return M",
-  })
-  -- Deliberately outside `source`: writing here must not trigger anything.
-  local outsider = lwrite("notes/scratch.lua", { "-- not part of the scanned tree" })
-
-  local live = require("docmap").install({
-    root = live_root,
-    source = "lua/demo",
-    lua_root = "lua",
-    watch = true,
-    watch_ms = 40,
-  })
-  local rescans = 0
-  live.on_change(function()
-    rescans = rescans + 1
-  end)
-
-  eq(#live.ir().nodes["lua/demo/a"].functions, 1, "docmap.watch: one function before the edit")
-
-  vim.cmd.edit(vim.fn.fnameescape(watched_file))
-  vim.api.nvim_buf_set_lines(0, 7, 7, false, {
-    "---Two.",
-    "function M.two()",
-    "  return 2",
-    "end",
-  })
-  vim.cmd("silent write")
-  local settled = vim.wait(5000, function()
-    return rescans > 0
-  end, 25)
-
-  ok(settled, "docmap.watch: writing a file under source triggers a rescan")
-  eq(
-    #live.ir().nodes["lua/demo/a"].functions,
-    2,
-    "docmap.watch: and the handle's IR reflects the edit afterwards"
-  )
-
-  -- The scope check is the fragile half: an autocmd *glob* over the source
-  -- directory silently never fires on Windows, because Vim matches the raw
-  -- OS-native buffer path against a forward-slash pattern. This asserts the
-  -- other direction — that the explicit subpath check does not over-match.
-  local before_outside = rescans
-  vim.cmd.edit(vim.fn.fnameescape(outsider))
-  vim.api.nvim_buf_set_lines(0, -1, -1, false, { "-- touched" })
-  vim.cmd("silent write")
-  vim.wait(300, function()
-    return false
-  end, 25)
-  eq(rescans, before_outside, "docmap.watch: a write outside source does not rescan")
-
-  live.uninstall()
-  H.wipe_new(snap)
-  vim.fn.delete(live_root, "rf")
-
-  vim.fn.delete(heur_root, "rf")
-  vim.fn.delete(root, "rf")
 end
