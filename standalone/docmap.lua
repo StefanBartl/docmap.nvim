@@ -182,8 +182,13 @@ if capabilities_only then
   -- listed (they answer `available = false` without it), so the route list alone cannot tell a host whether this
   -- build can run rules. An older engine has neither, and that is the same answer: no `rules`.
   local caps = { "api", "languages", "schema" }
-  if require("docmap.core.rules_api").engine() then
+  local rules_api = require("docmap.core.rules_api")
+  if rules_api.engine() then
     caps[#caps + 1] = "rules"
+    -- `rules-agent`: `rules/plan` and `rules/validate` can answer (`rules.nvim`'s agent functions are here too)
+    if rules_api.agent_engine() then
+      caps[#caps + 1] = "rules-agent"
+    end
   end
   print(require("docmap.core.json").encode({
     capabilities = caps,
@@ -236,6 +241,7 @@ local argv = {}
 -- is not.
 local source, repo_url, branch, out_dir, api_route, api_snapshot
 local exclude, languages, trust = {}, {}, {}
+local answer_file
 for i = 2, #arg do
   local a = arg[i]
   local src = a:match("^%-%-source=(.+)$")
@@ -261,8 +267,13 @@ for i = 2, #arg do
   -- their `lua_predicate` checks (`core/rules_api.lua`); the host decides what it trusts, this only passes it on.
   local snap = a:match("^%-%-snapshot=(.+)$") or a:match("^%-%-select=(.+)$")
   local trusted = a:match("^%-%-trust=(.+)$")
+  -- `--answer=<file>`: the model's answer `rules/validate` checks. A file, not stdin: a host that forgets to close
+  -- a pipe would leave this process waiting for ever, a missing file is an answer with a reason.
+  local answer = a:match("^%-%-answer=(.+)$")
   if trusted then
     trust[#trust + 1] = trusted
+  elseif answer then
+    answer_file = answer
   elseif src then
     -- Comma-separated, matching `scripts/action_run.lua`'s own reading of the
     -- same option and for the reason stated there: a repository can hold two
@@ -436,6 +447,7 @@ if api_route then
 
   opts.git = popen_git
   opts.rules_trust = trust
+  opts.rules_answer_file = answer_file
 
   local api = require("docmap.core.api")
   local result, api_err = api.answer(api_route, opts, api_snapshot)

@@ -536,6 +536,8 @@ function GATES.standalone()
   local api_project = fixture_dir .. "/project"
   local api_ruleset = fixture_dir .. "/ruleset"
   local api_fixtures = root .. "/TESTS/fixtures/rules_api"
+  local agent_project_api = api_fixtures .. "/agent/project"
+  local agent_answers = api_fixtures .. "/agent/answers"
   ---@param cmd string[]
   ---@return table|nil
   local function api_answer(cmd)
@@ -661,6 +663,84 @@ function GATES.standalone()
       args = { "rules/run", "--select=FIX" },
       check = function(r)
         return r.available == false and tostring(r.reason):find("no-such-ruleset", 1, true) ~= nil
+      end,
+    },
+    -- The agent half: `rules/plan` (prompts, files, the deny list, what is not sent and why) and `rules/validate`
+    -- with canned answers, over a project whose `.rules.json` sets scopes, a deny entry and a small context limit.
+    {
+      label = "plan",
+      project = agent_project_api,
+      args = { "rules/plan", "--select=AGT,SCP" },
+      check = function(r)
+        local not_sent = {}
+        for _, s in ipairs(r.skipped or {}) do
+          not_sent[s.id] = s.status .. ": " .. s.reason
+        end
+        local b1 = (r.batches or {})[1] or {}
+        local ids = {}
+        for _, rule in ipairs(b1.rules or {}) do
+          ids[#ids + 1] = rule.id .. ":" .. rule.source
+        end
+        return r.available == true
+          and #r.batches == 2
+          and vim.deep_equal(b1.files, { "lua/a.lua", "lua/b.lua" })
+          and vim.deep_equal(ids, { "AGT-01:rule", "SCP-01:family" })
+          and type(b1.system) == "string"
+          and tostring(b1.prompt):find('4:   local mod = require("x")', 1, true) ~= nil
+          and b1.tokens == math.ceil(b1.chars / 4)
+          and vim.deep_equal(r.batches[2].rules[1].truncated, { total = 3, kept = 1 })
+          and vim.deep_equal(r.denied, { ".env", "keys/server.pem" })
+          and vim.deep_equal(not_sent, {
+            ["AGT-02"] = "manual: scope matches no file that may be sent (2 denied)",
+            ["AGT-03"] = "manual: no scope to look in",
+            ["AGT-04"] = "unclear: context exceeds limit (931 bytes, limit 600)",
+            ["AGT-05"] = "unclear: none of the files of the batch could be read",
+          })
+          and vim.deep_equal(r.with_check, {
+            { id = "AGT-06", check = "grep" },
+            { id = "AGT-07", check = "lua_predicate" },
+          })
+          and r.totals.requests == 2
+      end,
+    },
+    {
+      label = "validate, a violation with invented findings",
+      project = agent_project_api,
+      args = {
+        "rules/validate",
+        "--select=AGT-01",
+        "--answer=" .. agent_answers .. "/violation.json",
+      },
+      check = function(r)
+        local p = r.proposal or {}
+        return r.available == true
+          and p.status == "violation"
+          and p.proposed == true
+          and p.verified == false
+          and #p.findings == 1
+          and p.findings[1].quote == 'local mod = require("x")'
+          and #p.dropped == 3
+          and vim.deep_equal(r.sent, { "lua/a.lua", "lua/b.lua" })
+      end,
+    },
+    {
+      label = "validate, a file claimed as checked that was not sent",
+      project = agent_project_api,
+      args = { "rules/validate", "--select=AGT-01", "--answer=" .. agent_answers .. "/unsent.json" },
+      check = function(r)
+        return r.available == true
+          and r.proposal.status == "unclear"
+          and tostring(r.proposal.reason):find("not sent: .env", 1, true) ~= nil
+      end,
+    },
+    {
+      label = "validate, an answer that is not JSON",
+      project = agent_project_api,
+      args = { "rules/validate", "--select=AGT-01", "--answer=" .. agent_answers .. "/prose.txt" },
+      check = function(r)
+        return r.available == true
+          and r.proposal.status == "unclear"
+          and r.proposal.raw == "Looks fine to me, nothing to report.\n"
       end,
     },
   }

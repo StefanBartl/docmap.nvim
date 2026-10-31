@@ -60,7 +60,7 @@ binary with anything.
 
 | Field | What it says |
 |---|---|
-| `capabilities` | Coarse feature names this build has — `api`, `languages`, `schema`, and `rules` when `rules.nvim`'s engine is part of it (the `rules/*` routes are listed in `routes` either way and answer with a reason without it). A host that wants one thing can test for it without parsing the rest. |
+| `capabilities` | Coarse feature names this build has — `api`, `languages`, `schema`, `rules` when `rules.nvim`'s engine is part of it, and `rules-agent` when its agent functions are too (`rules/plan`, `rules/validate`). The `rules/*` routes are listed in `routes` either way and answer with a reason without the engine; an older engine lacks the route names, so a missing route is read off this answer, never from an error. A host that wants one thing can test for it without parsing the rest. |
 | `schema` | The artifact schema this build writes. The release is rolling (`standalone-latest`), so there is no version number to report that would not be fiction; the schema is what actually decides whether two artifacts are comparable, and it is bumped deliberately. |
 | `build` | Commit, commit date, and whether the tree it was built from was clean. **Present only in a bundled binary** — `scripts/package.lua` writes it at bundle time and never into the source tree, so a run from a checkout answers `null` rather than claiming a provenance it does not have. |
 | `routes` | Every `/api/*` route name this build answers, read from `core/api.routes`. A route added there is advertised here without this being told. |
@@ -115,6 +115,8 @@ instead of generating anything. Today's routes:
 | `commit/<sha>` | One commit's diff. Not in `routes` because its name carries the sha. |
 | `rules/catalog` | Every rule of the project's rulesets (`.rules.json`, else the vault): id, severity, family, title, section, text, source file and line, the check type if any, the agent hint. See below. |
 | `rules/run` | The mechanical run of a selection: one result per rule, `pass`, `fail`, `error`, `manual` or `waived`, with findings. See below. |
+| `rules/plan` | What an agent run over a selection would send: the requests (`system`, `prompt`, files, rules), what is not sent and why, sizes and a token estimate. Sends nothing. See below. |
+| `rules/validate` | One model answer about one rule, checked against the tree: a proposal with the findings whose quotes hold up. See below. |
 
 **One route per invocation, deliberately.** A request is one question, and a
 process that answered several would need a protocol to say which answer is
@@ -154,6 +156,38 @@ come from `rules.settings`, the same resolution `:Rules check` uses: the project
   `/api/rules/run?select=...` (`select=` as on the command line). That server passes **no trust**: there is no
   `--trust=` to name, and the trust of `rules.nvim`'s own settings (`setup({ trust })`, `$RULES_TRUST`) is not
   taken over, so every `lua_predicate` there reports `predicate not trusted`. Run predicates with `:Rules check`.
+
+### `rules/plan` and `rules/validate`
+
+```bash
+docmap /path/to/project --api=rules/plan --select=ARCH,DEP-07
+docmap /path/to/project --api=rules/validate --select=DEP-07 --answer=/tmp/answer.json
+```
+
+The agent half of the Rules tab: `rules.nvim`'s own pure functions (`rules.engine.agent.plan`, `.request`,
+`.validate`), the same ones `:Rules agent` runs in the editor, so the prompt, the deny list and the evidence check
+exist once. Neither route sends anything or opens a connection; sending a request is the host's job.
+
+- `rules/plan` plans the selected rules **without** a check (rules with one come back in `with_check`: `rules/run`
+  answers them, and nothing of them runs here, so no predicate runs and no trust is asked for). Each entry of
+  `batches` is one request: `system`, `prompt`, `files` (what the prompt carries), `unreadable`, `bytes`, `chars`,
+  `tokens` (about 4 characters a token) and its `rules` (`source` says whether the scope is the rule's own or its
+  family's, `truncated` what `max_files` cut). `skipped` lists every rule that is not sent, with `status` (`manual`:
+  stays on the worklist; `unclear`: sending it would have been wrong) and the `reason` (`no scope to look in`,
+  `scope matches no file that may be sent (n denied)`, `context exceeds limit (...)`, a batch none of whose files can
+  be read). `denied` lists the files the deny list kept out (built in: `.env*`, keys, credential stores; plus
+  `agent.deny`; links are never sent). `totals`, `limits` (`batch_size`, `max_context_bytes`) and `agent`
+  (`backends`, `models`: the project's allow-list, which the host enforces) come from the project's `.rules.json`.
+- `rules/validate` takes one rule id and the model's answer as a **file** (`--answer=<file>`; not stdin, so a host
+  cannot leave the engine waiting on a pipe). The files the answer may claim to have read are planned again here,
+  never taken from the caller. The `proposal` has `status` (`violation`, `compliant`, `unclear`), `findings` (only the
+  ones whose quote occurs literally within 3 lines of the named line, in a file that was sent), `dropped` (the rest,
+  with the reason), `checked`, `unchecked`, `reason`, and always `proposed: true`, `verified: false`. An answer that
+  is not the schema is `unclear` with the text in `raw`; a rule that is not sent is `unclear` whatever the answer says.
+- Bounds: a selection over 64 KiB or 4096 items, an answer over 1 MiB and a plan whose requests add up to more than
+  16 MiB are refused with a reason (`available: false`), never read in full or printed.
+- `:DocMap serve` answers `/api/rules/plan?select=...`; `/api/rules/validate` there has no way to receive an answer
+  (a GET query is no place for one) and says so.
 
 **The join logic stays in Lua.** `docmap-desktop` runs a small HTTP server
 that forwards `/api/*` here; its Rust side is transport only. `core/api.lua`

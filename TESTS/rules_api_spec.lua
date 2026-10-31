@@ -86,6 +86,142 @@ return function(H)
     ok(tostring(run.reason):find("rules.env", 1, true) ~= nil, "engine raises: run names the error")
   end
 
+  -- -------------------------------------------------- plan and validate, before the engine is asked
+  ok(type(api.routes["rules/plan"]) == "function", "routes: rules/plan is a route")
+  ok(type(api.routes["rules/validate"]) == "function", "routes: rules/validate is a route")
+  do
+    local saved_engine, saved_agent = rules_api.engine, rules_api.agent_engine
+    local function stub(engine, agent)
+      ---@diagnostic disable-next-line: duplicate-set-field
+      rules_api.engine = function()
+        return engine
+      end
+      ---@diagnostic disable-next-line: duplicate-set-field
+      rules_api.agent_engine = function()
+        return agent
+      end
+    end
+    -- a `load` that is reached raises, so a refusal that comes later than it should is visible
+    local reached = {
+      settings = {
+        resolve = function()
+          error("load reached", 0)
+        end,
+      },
+      loader = {},
+      runner = {},
+      waivers = {},
+    }
+    local results = {}
+    local ok_all, err = pcall(function()
+      stub(nil, nil)
+      results.plan_no_engine = rules_api.plan({ root = repo }, "AGT")
+      results.validate_no_engine =
+        rules_api.validate({ root = repo, rules_answer = "{}" }, "AGT-01")
+      stub(reached, nil)
+      results.plan_no_agent = rules_api.plan({ root = repo }, "AGT")
+      results.validate_no_agent = rules_api.validate({ root = repo, rules_answer = "{}" }, "AGT-01")
+      stub(reached, {})
+      results.plan_long =
+        rules_api.plan({ root = repo }, ("A"):rep(rules_api.MAX_SELECTION_BYTES + 1))
+      results.run_long =
+        rules_api.run({ root = repo }, ("A"):rep(rules_api.MAX_SELECTION_BYTES + 1))
+      local many = {}
+      for i = 1, rules_api.MAX_SELECTION_ITEMS + 1 do
+        many[i] = "F" .. i
+      end
+      results.plan_many = rules_api.plan({ root = repo }, table.concat(many, ","))
+      results.plan_none = rules_api.plan({ root = repo }, nil)
+      results.validate_two =
+        rules_api.validate({ root = repo, rules_answer = "{}" }, "AGT-01,AGT-02")
+      results.validate_no_id = rules_api.validate({ root = repo, rules_answer = "{}" }, nil)
+      results.validate_no_answer = rules_api.validate({ root = repo }, "AGT-01")
+      results.validate_big = rules_api.validate(
+        { root = repo, rules_answer = ("x"):rep(rules_api.MAX_ANSWER_BYTES + 1) },
+        "AGT-01"
+      )
+      local big_file = vim.fn.tempname()
+      local fh = assert(io.open(big_file, "wb"))
+      fh:write(("x"):rep(rules_api.MAX_ANSWER_BYTES + 1))
+      fh:close()
+      results.validate_big_file =
+        rules_api.validate({ root = repo, rules_answer_file = big_file }, "AGT-01")
+      os.remove(big_file)
+      results.validate_missing_file = rules_api.validate(
+        { root = repo, rules_answer_file = repo .. "/no/such/answer.json" },
+        "AGT-01"
+      )
+      results.validate_reaches_load =
+        rules_api.validate({ root = repo, rules_answer = "{}" }, "AGT-01")
+    end)
+    rules_api.engine, rules_api.agent_engine = saved_engine, saved_agent
+    ok(ok_all, "plan/validate refusals: nothing raises (" .. tostring(err) .. ")")
+    eq(
+      results.plan_no_engine,
+      { available = false, reason = rules_api.NO_ENGINE },
+      "no engine: plan says why"
+    )
+    eq(
+      results.validate_no_engine,
+      { available = false, reason = rules_api.NO_ENGINE },
+      "no engine: validate says why"
+    )
+    eq(
+      results.plan_no_agent,
+      { available = false, reason = rules_api.NO_AGENT },
+      "no agent functions: plan says why"
+    )
+    eq(
+      results.validate_no_agent,
+      { available = false, reason = rules_api.NO_AGENT },
+      "no agent functions: validate says why"
+    )
+    ok(
+      tostring(results.plan_long.reason):match("^the selection is too long") ~= nil,
+      "plan: a selection over the byte limit is refused before anything is loaded"
+    )
+    ok(
+      tostring(results.run_long.reason):match("^the selection is too long") ~= nil,
+      "run: the same bound"
+    )
+    ok(
+      tostring(results.plan_many.reason):match("^the selection names %d+ items") ~= nil,
+      "plan: a selection over the item limit is refused"
+    )
+    ok(
+      tostring(results.plan_none.reason):match("^nothing selected") ~= nil,
+      "plan: nothing selected is not a whole-catalog plan"
+    )
+    ok(
+      tostring(results.validate_two.reason):match("^name exactly one rule id") ~= nil,
+      "validate: two ids are refused"
+    )
+    ok(
+      tostring(results.validate_no_id.reason):match("^name exactly one rule id") ~= nil,
+      "validate: no id is refused"
+    )
+    ok(
+      tostring(results.validate_no_answer.reason):match("^no answer given") ~= nil,
+      "validate: no answer is a reason"
+    )
+    ok(
+      tostring(results.validate_big.reason):match("^the answer is too large") ~= nil,
+      "validate: an answer over the limit is refused"
+    )
+    ok(
+      tostring(results.validate_big_file.reason):match("^the answer is too large") ~= nil,
+      "validate: an answer file over the limit is refused"
+    )
+    ok(
+      tostring(results.validate_missing_file.reason):match("^the answer file cannot be read") ~= nil,
+      "validate: a missing answer file is a reason"
+    )
+    ok(
+      tostring(results.validate_reaches_load.reason):find("load reached", 1, true) ~= nil,
+      "validate: a well-formed request does reach the engine (the stubs above are not vacuous)"
+    )
+  end
+
   -- -------------------------------------------------------- the real engine
   ---Where the real-engine half finds `rules.nvim`, as `scripts/ci.lua` finds it: `RULES_NVIM_DIR`,
   ---`<repo>/.deps/rules.nvim`, then a sibling checkout. Without one it skips on a developer machine,
@@ -272,6 +408,100 @@ return function(H)
     local nothing = api.answer("rules/run", { root = project }, "gate:typo")
     eq(nothing.available, false, "run: a gate whose families have no rule matches nothing")
     eq(nothing.unknown, { "gate:typo/NOPE" }, "run: and names what matched nothing")
+
+    -- plan: the agent fixture's `.rules.json` sets a family scope, a deny entry and a 600-byte limit
+    ok(rules_api.agent_engine() ~= nil, "agent: rules.nvim's agent functions load")
+    local agent_project = fixtures .. "/rules_api/agent/project"
+    local answers = fixtures .. "/rules_api/agent/answers"
+    local plan = api.answer("rules/plan", { root = agent_project }, "AGT,SCP,NOPE")
+    eq(plan.available, true, "plan: available")
+    eq(#plan.batches, 2, "plan: two requests")
+    local b1 = plan.batches[1]
+    eq(b1.files, { "lua/a.lua", "lua/b.lua" }, "plan: the files of the first request")
+    eq(b1.rules[1].id, "AGT-01", "plan: a rule with its own scope")
+    eq(b1.rules[1].source, "rule", "plan: whose scope is its own")
+    eq(b1.rules[2].id, "SCP-01", "plan: shares the request with a rule of the same files")
+    eq(b1.rules[2].source, "family", "plan: whose scope is its family's")
+    eq(b1.bytes, 139, "plan: byte size of the request's files")
+    eq(b1.tokens, math.ceil(b1.chars / 4), "plan: the token estimate")
+    ok(b1.system:find("data to judge", 1, true) ~= nil, "plan: the system text of rules.nvim")
+    ok(
+      b1.prompt:find('4:   local mod = require("x")', 1, true) ~= nil,
+      "plan: the files numbered in the prompt"
+    )
+    eq(
+      plan.batches[2].rules[1].truncated,
+      { total = 3, kept = 1 },
+      "plan: max_files says what it cut"
+    )
+    eq(plan.denied, { ".env", "keys/server.pem" }, "plan: the deny list holds")
+    for _, b in ipairs(plan.batches) do
+      for _, f in ipairs(b.files) do
+        ok(f ~= ".env" and not f:match("%.pem$"), "plan: no denied file is in a request: " .. f)
+      end
+    end
+    local not_sent = {}
+    for _, s in ipairs(plan.skipped) do
+      not_sent[s.id] = s.status .. ": " .. s.reason
+    end
+    eq(not_sent, {
+      ["AGT-02"] = "manual: scope matches no file that may be sent (2 denied)",
+      ["AGT-03"] = "manual: no scope to look in",
+      ["AGT-04"] = "unclear: context exceeds limit (931 bytes, limit 600)",
+      ["AGT-05"] = "unclear: none of the files of the batch could be read",
+    }, "plan: what is not sent, and why")
+    eq(plan.with_check, {
+      { id = "AGT-06", check = "grep" },
+      { id = "AGT-07", check = "lua_predicate" },
+    }, "plan: rules with a check are left to rules/run (the predicate does not run)")
+    eq(plan.unknown, { "NOPE" }, "plan: a selected family without rules is named")
+    eq(plan.totals.requests, 2, "plan: totals")
+    eq(plan.limits, { batch_size = 8, max_context_bytes = 600 }, "plan: the limits in force")
+    eq(
+      plan.agent,
+      { backends = { "ollama" }, models = { "qwen-test" } },
+      "plan: the project's allow-list"
+    )
+    local only_checks = api.answer("rules/plan", { root = agent_project }, "AGT-06")
+    eq(#only_checks.batches, 0, "plan: a selection of checked rules sends nothing")
+
+    -- validate
+    local function validate(id, file)
+      return api.answer(
+        "rules/validate",
+        { root = agent_project, rules_answer_file = answers .. "/" .. file },
+        id
+      )
+    end
+    local v = validate("AGT-01", "violation.json")
+    eq(v.available, true, "validate: available")
+    eq(v.sent, { "lua/a.lua", "lua/b.lua" }, "validate: the files its request carries")
+    eq(v.proposal.status, "violation", "validate: a violation that holds up")
+    eq(v.proposal.proposed, true, "validate: a proposal")
+    eq(v.proposal.verified, false, "validate: never a verdict")
+    eq(#v.proposal.findings, 1, "validate: only the literal quote survives")
+    eq(v.proposal.findings[1].line, 4, "validate: at its line")
+    eq(#v.proposal.dropped, 3, "validate: the invented quote, the unsent file, the null line")
+    eq(v.proposal.dropped[3].line, nil, "validate: a JSON null in a dropped finding is left out")
+    local scp = validate("SCP-01", "violation.json")
+    eq(scp.proposal.status, "compliant", "validate: the other rule of the same answer")
+    eq(scp.proposal.unchecked, { "lua/b.lua" }, "validate: the sent file it did not name")
+    local unsent = validate("AGT-01", "unsent.json")
+    eq(unsent.proposal.status, "unclear", "validate: checked names a file that was not sent")
+    local prose = validate("AGT-01", "prose.txt")
+    eq(prose.proposal.status, "unclear", "validate: prose is unclear")
+    eq(
+      prose.proposal.raw,
+      "Looks fine to me, nothing to report.\n",
+      "validate: with the raw text attached"
+    )
+    local denied = validate("AGT-02", "violation.json")
+    eq(denied.proposal.status, "unclear", "validate: a rule that is not sent")
+    eq(denied.sent, {}, "validate: has no files to claim")
+    local checked_rule = validate("AGT-06", "violation.json")
+    eq(checked_rule.available, false, "validate: a rule with a check is refused")
+    local unknown = validate("NOPE-01", "violation.json")
+    eq(unknown.unknown, { "NOPE-01" }, "validate: an unknown id is named")
   end)
   restore()
   if not ok_all then

@@ -195,6 +195,17 @@ probe(rules_fixture .. "/project", {
   "--select=FIX,PRD,HOS",
   "--trust=" .. rules_fixture .. "/ruleset",
 })
+-- The agent half (`rules/plan`, `rules/validate`) reaches modules neither of the
+-- two above does: `rules.engine.agent.{plan,request,validate,read}`, `glob`,
+-- `fswalk` and `lib.nvim.fs.read_bounded`. Its own fixture, whose manual rules
+-- have scopes, so the planner, the request writer and the quote check all run.
+local agent_fixture = repo .. "/TESTS/fixtures/rules_api/agent"
+probe(agent_fixture .. "/project", { "--api=rules/plan", "--select=AGT,SCP" })
+probe(agent_fixture .. "/project", {
+  "--api=rules/validate",
+  "--select=AGT-01",
+  "--answer=" .. agent_fixture .. "/answers/violation.json",
+})
 
 -- **`rules.env`, which no probe reaches.** `rules.settings.resolve` requires
 -- it lazily, only when `$RULES_TRUST` is set (`trust_paths`), and these probes

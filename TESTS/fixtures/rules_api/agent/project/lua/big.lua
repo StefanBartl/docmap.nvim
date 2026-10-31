@@ -1,0 +1,23 @@
+-- a file larger than the fixture's max_context_bytes (600)
+return {
+  v00 = "padding padding padding padding",
+  v01 = "padding padding padding padding",
+  v02 = "padding padding padding padding",
+  v03 = "padding padding padding padding",
+  v04 = "padding padding padding padding",
+  v05 = "padding padding padding padding",
+  v06 = "padding padding padding padding",
+  v07 = "padding padding padding padding",
+  v08 = "padding padding padding padding",
+  v09 = "padding padding padding padding",
+  v10 = "padding padding padding padding",
+  v11 = "padding padding padding padding",
+  v12 = "padding padding padding padding",
+  v13 = "padding padding padding padding",
+  v14 = "padding padding padding padding",
+  v15 = "padding padding padding padding",
+  v16 = "padding padding padding padding",
+  v17 = "padding padding padding padding",
+  v18 = "padding padding padding padding",
+  v19 = "padding padding padding padding",
+}

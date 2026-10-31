@@ -19,6 +19,10 @@
 --- a ruleset says (grep, file_exists, json_key_absent) runs regardless: those read files, they do not execute them.
 --- An untrusted predicate reports `error` with `NOT_TRUSTED`, visibly, never silently absent (D5).
 ---
+--- **The agent half** (`rules/plan`, `rules/validate`) wires `rules.nvim`'s pure agent functions
+--- (`rules.engine.agent.plan`, `.request`, `.validate`), the ones `:Rules agent` uses, so the prompt, the deny list and
+--- the evidence check live in one place for both hosts. Neither sends anything; the input of both is bounded.
+---
 --- **Absence is an answer** (the rule `core/api.lua` states): `rules.nvim` not part of this engine, a `.rules.json`
 --- that cannot be used, no ruleset configured, a selection that names nothing -- each is
 --- `{ available = false, reason = ... }`.
@@ -34,6 +38,19 @@ M.NO_ENGINE = "rules.nvim is not part of this engine"
 ---The statuses `rules.engine.runner` reports, in the order counts are listed.
 M.STATUSES = { "pass", "fail", "error", "manual", "waived" }
 
+---A selection longer than this is refused (a host can list a whole catalog by family or gate instead of by id).
+M.MAX_SELECTION_BYTES = 64 * 1024
+---A selection naming more items than this is refused.
+M.MAX_SELECTION_ITEMS = 4096
+---An answer bigger than this is not read: `rules/validate` refuses it with a reason.
+M.MAX_ANSWER_BYTES = 1024 * 1024
+---`rules/plan` refuses a plan whose requests (system and prompt) add up to more characters than this, rather than
+---printing it: select fewer rules. The planner's own `max_context_bytes` bounds a single rule; this bounds the sum.
+M.MAX_PLAN_CHARS = 16 * 1024 * 1024
+
+---What `rules/plan` and `rules/validate` answer when `rules.nvim` is there but has no agent functions.
+M.NO_AGENT = "the rules.nvim of this engine has no agent functions (rules.engine.agent.*)"
+
 ---`rules.nvim`'s modules, or nil when it is not reachable from this host.
 ---@return table|nil engine `{ settings, loader, runner, waivers }`
 function M.engine()
@@ -46,6 +63,20 @@ function M.engine()
     return nil
   end
   return { settings = settings, loader = loader, runner = runner, waivers = waivers }
+end
+
+---`rules.nvim`'s agent functions (the planner, the request writer, the check of an answer), or nil when this host
+---has none: an older `rules.nvim`, or a bundle that did not stage them.
+---@return table|nil agent `{ plan, request, validate }`
+function M.agent_engine()
+  local probe = require("docmap.core.soft_require").probe
+  local plan = probe("rules.engine.agent.plan")
+  local request = probe("rules.engine.agent.request")
+  local validate = probe("rules.engine.agent.validate")
+  if not (plan and request and validate) then
+    return nil
+  end
+  return { plan = plan, request = request, validate = validate }
 end
 
 ---`/`-separated, no trailing slash, `.` and `..` segments folded: a ruleset a `.rules.json` names as `../ruleset`
@@ -281,38 +312,41 @@ function M.parse_selection(param)
   return out
 end
 
----`/api/rules/run`, `param` the selection (`M.parse_selection`) -- the mechanical run of the selected rules over the
----project: one result per rule, `pass | fail | error | manual | waived`, with its findings.
----
----Never "every rule": a selection that names nothing is an answer with a reason, as `rules.engine.runner` refuses a
----whole-catalog sweep by design. A caller that wants everything names every family, which it can read off the
----catalog.
----@param opts table A resolved `Docmap.Opts`; `opts.rules_trust` the folders whose predicates may run,
----`opts.rules_today` the date waivers are judged against (`YYYY-MM-DD`, default today: for tests).
+---A selection that is too large to be one question: a host may pass a whole catalog's ids, but not without bound.
 ---@param param string|nil
----@return table
-local function run(opts, param)
-  local engine = M.engine()
-  if not engine then
-    return { available = false, reason = M.NO_ENGINE }
+---@return { ids: string[], families: string[], gates: string[] }|nil selection
+---@return string|nil reason
+local function bounded_selection(param)
+  if type(param) == "string" and #param > M.MAX_SELECTION_BYTES then
+    return nil,
+      ("the selection is too long (%d bytes, limit %d): select families or gates instead of single ids"):format(
+        #param,
+        M.MAX_SELECTION_BYTES
+      )
   end
   local selection = M.parse_selection(param)
-  if #selection.ids + #selection.families + #selection.gates == 0 then
-    return {
-      available = false,
-      reason = "nothing selected: name rule ids, families or gate:<name>, comma-separated",
-    }
+  local items = #selection.ids + #selection.families + #selection.gates
+  if items == 0 then
+    return nil, "nothing selected: name rule ids, families or gate:<name>, comma-separated"
   end
-  local loaded, reason = load(engine, opts)
-  if not loaded then
-    return { available = false, reason = reason }
+  if items > M.MAX_SELECTION_ITEMS then
+    return nil,
+      ("the selection names %d items (limit %d): select families or gates instead of single ids"):format(
+        items,
+        M.MAX_SELECTION_ITEMS
+      )
   end
-  local waiver_entries, waiver_err = engine.waivers.load_entries(loaded.root)
-  if waiver_err then
-    return { available = false, reason = waiver_err }
-  end
+  return selection, nil
+end
 
-  -- which rules are selected, and which items of the selection matched nothing
+---The rules a selection names, in the loader's order, their families (sorted), and the items that matched nothing.
+---@param engine table
+---@param loaded table `load`'s result
+---@param selection { ids: string[], families: string[], gates: string[] }
+---@return table[] selected
+---@return string[] families
+---@return string[] unknown
+local function resolve_selection(engine, loaded, selection)
   local present_family, present_id = {}, {}
   for _, rule in ipairs(loaded.rules) do
     present_family[engine.runner.family_of(rule.id)] = true
@@ -359,6 +393,39 @@ local function run(opts, param)
       end
     end
   end
+  table.sort(families)
+  return selected, families, unknown
+end
+
+---`/api/rules/run`, `param` the selection (`M.parse_selection`) -- the mechanical run of the selected rules over the
+---project: one result per rule, `pass | fail | error | manual | waived`, with its findings.
+---
+---Never "every rule": a selection that names nothing is an answer with a reason, as `rules.engine.runner` refuses a
+---whole-catalog sweep by design. A caller that wants everything names every family, which it can read off the
+---catalog.
+---@param opts table A resolved `Docmap.Opts`; `opts.rules_trust` the folders whose predicates may run,
+---`opts.rules_today` the date waivers are judged against (`YYYY-MM-DD`, default today: for tests).
+---@param param string|nil
+---@return table
+local function run(opts, param)
+  local engine = M.engine()
+  if not engine then
+    return { available = false, reason = M.NO_ENGINE }
+  end
+  local selection, refused = bounded_selection(param)
+  if not selection then
+    return { available = false, reason = refused }
+  end
+  local loaded, reason = load(engine, opts)
+  if not loaded then
+    return { available = false, reason = reason }
+  end
+  local waiver_entries, waiver_err = engine.waivers.load_entries(loaded.root)
+  if waiver_err then
+    return { available = false, reason = waiver_err }
+  end
+
+  local selected, families, unknown = resolve_selection(engine, loaded, selection)
   if #selected == 0 then
     return {
       available = false,
@@ -366,7 +433,6 @@ local function run(opts, param)
       reason = "the selection matches no rule of the configured rulesets",
     }
   end
-  table.sort(families)
 
   local trusted = host_trust(engine, opts.rules_trust)
   local run_opts = {
@@ -436,6 +502,278 @@ local function run(opts, param)
   }
 end
 
+---`rules.nvim`'s agent config of the project, as the planner reads it (`batch_size`, `max_context_bytes`, `deny`,
+---`scopes`, defaults filled in by `rules.settings`).
+---@param loaded table
+---@return table
+local function agent_config(loaded)
+  return loaded.res.agent or {}
+end
+
+---`/api/rules/plan`, `param` the selection (`M.parse_selection`) -- what an agent run over the selected rules would
+---send, and what it would not, without sending anything.
+---
+---The planner and the request writer are `rules.nvim`'s own (`rules.engine.agent.plan`, `.request`), the same pure
+---functions `:Rules agent` uses in the editor: scope (`agent.include` of the rule, else of its family), the deny list
+---(built in plus `agent.deny`, links never sent), the size limit and the batching are decided there, so they hold in
+---both hosts. Rules with a check are not planned (a check answers them, `rules/run`) and come back in `with_check`;
+---nothing of them runs here, so no predicate runs and there is nothing to trust -- the trust of `rules/run` is the
+---only one there is (a lead derived from a predicate would have to pass it the same way).
+---@param opts table A resolved `Docmap.Opts`.
+---@param param string|nil
+---@return table
+local function plan(opts, param)
+  local engine = M.engine()
+  if not engine then
+    return { available = false, reason = M.NO_ENGINE }
+  end
+  local agent = M.agent_engine()
+  if not agent then
+    return { available = false, reason = M.NO_AGENT }
+  end
+  local selection, refused = bounded_selection(param)
+  if not selection then
+    return { available = false, reason = refused }
+  end
+  local loaded, reason = load(engine, opts)
+  if not loaded then
+    return { available = false, reason = reason }
+  end
+  local selected, _, unknown = resolve_selection(engine, loaded, selection)
+  if #selected == 0 then
+    return {
+      available = false,
+      unknown = unknown,
+      reason = "the selection matches no rule of the configured rulesets",
+    }
+  end
+
+  local manual, with_check = {}, {}
+  for _, rule in ipairs(selected) do
+    if rule.check == nil then
+      manual[#manual + 1] = rule
+    else
+      with_check[#with_check + 1] = {
+        id = rule.id,
+        check = type(rule.check) == "table" and rule.check.type or nil,
+      }
+    end
+  end
+  table.sort(with_check, function(a, b)
+    return a.id < b.id
+  end)
+
+  local cfg = agent_config(loaded)
+  local planned = agent.plan.plan(manual, loaded.root, { agent = cfg })
+
+  local skipped = {}
+  for _, entry in ipairs(planned.skipped) do
+    skipped[#skipped + 1] = { id = entry.rule.id, status = entry.status, reason = entry.reason }
+  end
+  local batches = {}
+  local totals = { requests = 0, files = 0, bytes = 0, chars = 0, tokens = 0 }
+  for _, batch in ipairs(planned.batches) do
+    local req, build_err = agent.request.build(batch, loaded.root)
+    if not req then
+      -- not sent, and not lost: each of its rules says why
+      for _, entry in ipairs(batch.rules) do
+        skipped[#skipped + 1] = { id = entry.rule.id, status = "unclear", reason = build_err }
+      end
+    else
+      local rules = {}
+      for _, entry in ipairs(batch.rules) do
+        rules[#rules + 1] = {
+          id = entry.rule.id,
+          severity = entry.rule.severity,
+          title = entry.rule.title,
+          source = entry.source,
+          truncated = entry.truncated,
+        }
+      end
+      batches[#batches + 1] = {
+        id = batch.id,
+        system = req.system,
+        prompt = req.prompt,
+        files = req.sent,
+        unreadable = req.unreadable,
+        bytes = batch.bytes,
+        chars = req.chars,
+        tokens = req.tokens,
+        rules = rules,
+      }
+      totals.requests = totals.requests + 1
+      totals.files = totals.files + #req.sent
+      totals.bytes = totals.bytes + batch.bytes
+      totals.chars = totals.chars + req.chars
+      totals.tokens = totals.tokens + req.tokens
+      if totals.chars > M.MAX_PLAN_CHARS then
+        return {
+          available = false,
+          reason = ("the plan is too large (more than %d characters of requests): select fewer rules"):format(
+            M.MAX_PLAN_CHARS
+          ),
+        }
+      end
+    end
+  end
+  table.sort(skipped, function(a, b)
+    return a.id < b.id
+  end)
+
+  return {
+    available = true,
+    batches = batches,
+    skipped = skipped,
+    denied = planned.denied,
+    with_check = with_check,
+    unknown = unknown,
+    totals = totals,
+    limits = {
+      batch_size = cfg.batch_size or agent.plan.DEFAULT_BATCH_SIZE,
+      max_context_bytes = cfg.max_context_bytes or agent.plan.DEFAULT_MAX_CONTEXT_BYTES,
+    },
+    -- where a request may go is the host's to enforce; it reads the project's allow-list from here
+    agent = { backends = cfg.backends or {}, models = cfg.models or {} },
+    errors = loaded.errors,
+    warnings = warnings_of(engine, loaded.res),
+  }
+end
+
+---The answer a host hands `rules/validate`: `opts.rules_answer` (the text, an in-process host) or
+---`opts.rules_answer_file` (a path, `--answer=<file>` on the command line), bounded by `M.MAX_ANSWER_BYTES`.
+---@param opts table
+---@return string|nil text
+---@return string|nil reason
+local function answer_of(opts)
+  local text = opts.rules_answer
+  if text == nil and opts.rules_answer_file then
+    local path = tostring(opts.rules_answer_file)
+    local fh = io.open(path, "rb")
+    if not fh then
+      return nil, "the answer file cannot be read: " .. path
+    end
+    -- one byte past the limit is enough to know it is too big; nothing more is read
+    text = fh:read(M.MAX_ANSWER_BYTES + 1) or ""
+    fh:close()
+  end
+  if type(text) ~= "string" then
+    return nil, "no answer given: pass the model's answer as a file (--answer=<file>)"
+  end
+  if #text > M.MAX_ANSWER_BYTES then
+    return nil, ("the answer is too large (more than %d bytes)"):format(M.MAX_ANSWER_BYTES)
+  end
+  return text, nil
+end
+
+---A dropped finding as plain fields: the model wrote it, so it is whatever JSON came back (a `null` is a userdata
+---in the editor and a table under the shim); only the parts a host shows are kept, and only with their own type.
+---@param dropped { finding: any, reason: string }[]
+---@return table[]
+local function plain_dropped(dropped)
+  local out = {}
+  for _, d in ipairs(dropped or {}) do
+    local f = type(d.finding) == "table" and d.finding or {}
+    out[#out + 1] = {
+      reason = d.reason,
+      file = type(f.file) == "string" and f.file or nil,
+      line = type(f.line) == "number" and f.line or nil,
+      quote = type(f.quote) == "string" and f.quote or nil,
+    }
+  end
+  return out
+end
+
+---`/api/rules/validate`, `param` one rule id -- the model's answer about that rule (`opts.rules_answer[_file]`)
+---checked against the tree as it is now, by `rules.engine.agent.validate`.
+---
+---The files the answer may claim to have looked at are the ones the request of this rule carries: planned and
+---written again here (the planner is deterministic, and a rule's files do not depend on the rules it shares a batch
+---with), never taken from the caller. A rule that is not sent has no request, so any answer is `unclear`.
+---The result is a proposal, never a verdict: `proposed = true`, `verified = false`.
+---@param opts table A resolved `Docmap.Opts`.
+---@param param string|nil
+---@return table
+local function validate(opts, param)
+  local engine = M.engine()
+  if not engine then
+    return { available = false, reason = M.NO_ENGINE }
+  end
+  local agent = M.agent_engine()
+  if not agent then
+    return { available = false, reason = M.NO_AGENT }
+  end
+  local id = tostring(param or ""):match("^%s*(.-)%s*$")
+  if id == "" or id:find("[,%s]") then
+    return { available = false, reason = "name exactly one rule id (--select=<ID>)" }
+  end
+  local text, refused = answer_of(opts)
+  if not text then
+    return { available = false, reason = refused }
+  end
+  local loaded, reason = load(engine, opts)
+  if not loaded then
+    return { available = false, reason = reason }
+  end
+  local rule
+  for _, candidate in ipairs(loaded.rules) do
+    if candidate.id == id then
+      rule = candidate
+    end
+  end
+  if not rule then
+    return {
+      available = false,
+      unknown = { id },
+      reason = "no rule of the configured rulesets has this id",
+    }
+  end
+  if rule.check ~= nil then
+    return {
+      available = false,
+      reason = ("%s has a check: rules/run answers it, an agent answers only the rules without one"):format(
+        id
+      ),
+    }
+  end
+
+  local planned = agent.plan.plan({ rule }, loaded.root, { agent = agent_config(loaded) })
+  local result, sent
+  if planned.skipped[1] then
+    sent = {}
+    result =
+      agent.validate.unclear(id, "this rule is not sent (" .. planned.skipped[1].reason .. ")")
+  else
+    local req, build_err = agent.request.build(planned.batches[1], loaded.root)
+    if not req then
+      sent = {}
+      result = agent.validate.unclear(id, build_err)
+    else
+      sent = req.sent
+      result = agent.validate.validate(rule, text, loaded.root, { sent = sent })
+    end
+  end
+
+  return {
+    available = true,
+    rule = { id = rule.id, severity = rule.severity, title = rule.title },
+    sent = sent,
+    proposal = {
+      rule_id = result.rule_id,
+      status = result.status,
+      proposed = true,
+      verified = false,
+      findings = result.findings,
+      checked = result.checked,
+      unchecked = result.unchecked or {},
+      dropped = plain_dropped(result.dropped),
+      reason = result.reason,
+      raw = result.raw,
+    },
+    errors = loaded.errors,
+    warnings = warnings_of(engine, loaded.res),
+  }
+end
+
 -- Exported guarded: whatever `rules.nvim` raises comes back as `{ available = false, reason }`.
 
 ---`/api/rules/catalog` (see `catalog` above).
@@ -445,5 +783,13 @@ M.catalog = guarded(catalog)
 ---`/api/rules/run` (see `run` above).
 ---@type fun(opts: table, param: string|nil): table
 M.run = guarded(run)
+
+---`/api/rules/plan` (see `plan` above).
+---@type fun(opts: table, param: string|nil): table
+M.plan = guarded(plan)
+
+---`/api/rules/validate` (see `validate` above).
+---@type fun(opts: table, param: string|nil): table
+M.validate = guarded(validate)
 
 return M

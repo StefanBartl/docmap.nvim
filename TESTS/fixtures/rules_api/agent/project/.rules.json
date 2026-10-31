@@ -1,0 +1,10 @@
+{
+  "rulesets": ["../ruleset"],
+  "agent": {
+    "max_context_bytes": 600,
+    "deny": ["keys"],
+    "scopes": { "SCP": { "include": ["lua/a.lua", "lua/b.lua"] } },
+    "backends": ["ollama"],
+    "models": ["qwen-test"]
+  }
+}

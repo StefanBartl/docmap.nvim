@@ -1,0 +1,1 @@
+{ "results": [ { "rule": "AGT-01", "verdict": "compliant", "checked": ["lua/a.lua", ".env"] } ] }

@@ -462,6 +462,14 @@ M.routes = {
   ["rules/run"] = function(opts, param)
     return require("docmap.core.rules_api").run(opts, param)
   end,
+  -- the agent half (`rules.engine.agent.*`): what a run would send (`param` the selection), and the check of one
+  -- model answer about one rule (`param` the rule id, the answer in `opts.rules_answer[_file]`). Neither sends.
+  ["rules/plan"] = function(opts, param)
+    return require("docmap.core.rules_api").plan(opts, param)
+  end,
+  ["rules/validate"] = function(opts, param)
+    return require("docmap.core.rules_api").validate(opts, param)
+  end,
 }
 
 ---Answer one route by name.

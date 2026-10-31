@@ -1,8 +1,8 @@
 ---@module 'standalone.rules_api'
 --- Answer one `rules/*` route of `core/api.lua` for a project and print its JSON -- on **either** host.
 ---
----   nvim --headless -u NONE -l standalone/rules_api.lua <project> <route> [--select=...] [--trust=<folder>]...
----   lua standalone/rules_api.lua <project> <route> [--select=...] [--trust=<folder>]...
+---   nvim --headless -u NONE -l standalone/rules_api.lua <project> <route> [--select=...] [--trust=<folder>]... [--answer=<file>]
+---   lua standalone/rules_api.lua <project> <route> [--select=...] [--trust=<folder>]... [--answer=<file>]
 ---
 --- Under Neovim it uses the real `vim.*`; under plain Lua it installs `standalone.vim_shim` first. The JSON is
 --- encoded by `docmap.core.json` (sorted keys), so the same input prints the same bytes on both hosts: that is what
@@ -48,13 +48,16 @@ local function find_dependency(name, probe)
   os.exit(2)
 end
 
-local project, route, selection
+local project, route, selection, answer_file
 local trust = {}
 for _, a in ipairs(arg) do
   local sel = a:match("^%-%-select=(.+)$")
   local tr = a:match("^%-%-trust=(.+)$")
+  local ans = a:match("^%-%-answer=(.+)$")
   if sel then
     selection = sel
+  elseif ans then
+    answer_file = ans
   elseif tr then
     trust[#trust + 1] = tr
   elseif not project then
@@ -64,7 +67,9 @@ for _, a in ipairs(arg) do
   end
 end
 if not project or not route then
-  io.stderr:write("usage: rules_api.lua <project> <route> [--select=...] [--trust=<folder>]...\n")
+  io.stderr:write(
+    "usage: rules_api.lua <project> <route> [--select=...] [--trust=<folder>]... [--answer=<file>]\n"
+  )
   os.exit(2)
 end
 
@@ -85,6 +90,7 @@ end
 local result, err = require("docmap.core.api").answer(route, {
   root = project,
   rules_trust = trust,
+  rules_answer_file = answer_file,
   rules_today = "2026-01-01",
 }, selection)
 if not result then

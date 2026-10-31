@@ -1,0 +1,11 @@
+{ "results": [
+  { "rule": "AGT-01", "verdict": "violation",
+    "checked": ["lua/a.lua", "lua/b.lua"],
+    "findings": [
+      { "file": "lua/a.lua", "line": 4, "quote": "local mod = require(\"x\")", "why": "not guarded" },
+      { "file": "lua/a.lua", "line": 4, "quote": "require(\"made-up\")", "why": "invented" },
+      { "file": "lua/big.lua", "line": 1, "quote": "a file larger", "why": "not sent" },
+      { "file": "lua/b.lua", "line": null, "quote": "require(\"a\")" }
+    ] },
+  { "rule": "SCP-01", "verdict": "compliant", "checked": ["lua/a.lua"] }
+] }
