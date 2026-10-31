@@ -153,6 +153,10 @@ ensure("docmap.core.cli", "docmap.nvim")
 -- `runtime-analysis.loaded` (loaded/snapshots routes) live in the same
 -- checkout, so putting it on package.path once resolves both.
 ensure_soft("runtime-analysis.telemetry", "runtime-analysis.nvim")
+-- `rules.nvim`'s engine, for the `rules/*` routes (`core/rules_api.lua`). Soft for the same reason: a binary built
+-- without it answers those routes with a reason and says so in `--capabilities` (`rules` is absent there), rather
+-- than refusing to start for a dependency only one tab of the app needs.
+ensure_soft("rules.settings", "rules.nvim")
 
 -- What a host asks before trusting this binary with anything else.
 --
@@ -174,8 +178,15 @@ if capabilities_only then
     names[#names + 1] = name
   end
   table.sort(names)
+  -- `rules` is claimed only when `rules.nvim`'s engine is really loadable here: the `rules/*` routes are always
+  -- listed (they answer `available = false` without it), so the route list alone cannot tell a host whether this
+  -- build can run rules. An older engine has neither, and that is the same answer: no `rules`.
+  local caps = { "api", "languages", "schema" }
+  if require("docmap.core.rules_api").engine() then
+    caps[#caps + 1] = "rules"
+  end
   print(require("docmap.core.json").encode({
-    capabilities = { "api", "languages", "schema" },
+    capabilities = caps,
     -- Which artifact schema this build writes. The release is rolling
     -- (`standalone-latest`), so there is no version number to report that
     -- would not be fiction; the schema is what actually decides whether
@@ -224,7 +235,7 @@ local argv = {}
 -- every host, and reading them twice is idempotent where reading them late
 -- is not.
 local source, repo_url, branch, out_dir, api_route, api_snapshot
-local exclude, languages = {}, {}
+local exclude, languages, trust = {}, {}, {}
 for i = 2, #arg do
   local a = arg[i]
   local src = a:match("^%-%-source=(.+)$")
@@ -245,8 +256,14 @@ for i = 2, #arg do
   local br = a:match("^%-%-branch=(.+)$")
   local out = a:match("^%-%-out%-dir=(.+)$")
   local api = a:match("^%-%-api=(.+)$")
-  local snap = a:match("^%-%-snapshot=(.+)$")
-  if src then
+  -- `--select=` is `--snapshot=` under the name `rules/run` reads it by (the selection of rules to run); one value
+  -- either way, `core.api.answer`'s single `param`. `--trust=<folder>` (repeatable): a folder whose rulesets may run
+  -- their `lua_predicate` checks (`core/rules_api.lua`); the host decides what it trusts, this only passes it on.
+  local snap = a:match("^%-%-snapshot=(.+)$") or a:match("^%-%-select=(.+)$")
+  local trusted = a:match("^%-%-trust=(.+)$")
+  if trusted then
+    trust[#trust + 1] = trusted
+  elseif src then
     -- Comma-separated, matching `scripts/action_run.lua`'s own reading of the
     -- same option and for the reason stated there: a repository can hold two
     -- languages in two places, one starting directory means the walk never
@@ -418,6 +435,7 @@ if api_route then
   end
 
   opts.git = popen_git
+  opts.rules_trust = trust
 
   local api = require("docmap.core.api")
   local result, api_err = api.answer(api_route, opts, api_snapshot)

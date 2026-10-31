@@ -34,6 +34,14 @@
 --- and vim.fn.strchars (a text's length in characters, an invalid byte counting one), which `rules.nvim`'s waiver
 --- and verdict validation ask for the limits they tell in characters.
 ---
+--- and, added for the `rules/*` routes (`core/rules_api.lua`), which resolve a project's `.rules.json` through
+--- `rules.settings` -- measured by running that under this shim until it answered as the editor does:
+---
+---   vim.empty_dict (and `vim.json.decode` marking an empty object with it, `vim.islist` saying no to it: the
+---   settings schema tells `{}` from `[]`), vim.fn.tolower (ASCII, Latin-1, Greek, Cyrillic), the stat fields
+---   `size` and `mtime` on vim.uv.{fs_stat, fs_lstat}, and vim.uv.{fs_realpath, fs_open (read-only), fs_fstat,
+---   fs_read, fs_close, constants} (`lib.nvim.fs.read_bounded`, `lib.nvim.fs.normkey`).
+---
 --- `TESTS/shim_contract_spec.lua` holds this list to the file: a `vim.fn`,
 --- `vim.fs` or `vim.uv` function defined below and missing here fails it.
 ---
@@ -330,19 +338,28 @@ function vim.list_extend(dst, src, start, finish)
   return dst
 end
 
+---The marker of an empty dictionary: what `vim.empty_dict()` returns and what
+---`vim.json.decode` gives an empty JSON object (and only an empty one, as in the
+---editor: a non-empty object needs no marker to be told from a list).
+---`__jsontype` is what dkjson reads, so `vim.json.encode` writes `{}` for it.
+local EMPTY_DICT_MT = { __jsontype = "object" }
+
+---@return table
+function vim.empty_dict()
+  return setmetatable({}, EMPTY_DICT_MT)
+end
+
 ---Neovim's own definition, key for key: `{}` is a list, and so is any table
 ---whose keys are exactly `1..n`. A hole or a string key is not.
 ---
----**Differs from the editor in one place, on purpose and narrowly:** Neovim
----answers `false` for the table `vim.empty_dict()` and for what
----`vim.json.decode("{}")` returns, because both carry a marker metatable. The
----shim has neither marker, so those read as lists. The one caller that meets a
----decoded document (`rules.nvim`'s waivers loader) already asks
----`next(t) ~= nil` first for exactly this reason, and says so.
+---`vim.empty_dict()` and an empty object out of `vim.json.decode` are not
+---lists: both carry the marker metatable `EMPTY_DICT_MT`, as both carry one in
+---the editor. Added when `rules.nvim`'s settings schema had to tell `{}` from
+---`[]` in a `.rules.json` (a `gates` that is `[]` is a mistake it reports).
 ---@param t any
 ---@return boolean
 function vim.islist(t)
-  if type(t) ~= "table" then
+  if type(t) ~= "table" or getmetatable(t) == EMPTY_DICT_MT then
     return false
   end
   local j = 1
@@ -600,7 +617,9 @@ local function normalize_decoded(value, drop)
   if type(value) ~= "table" then
     return value
   end
-  setmetatable(value, nil)
+  local meta = getmetatable(value)
+  local empty_object = meta ~= nil and meta.__jsontype == "object" and next(value) == nil
+  setmetatable(value, empty_object and EMPTY_DICT_MT or nil)
   for k, v in pairs(value) do
     -- Setting a field to `nil` during a `pairs` traversal is explicitly
     -- allowed; adding one is not, and nothing here adds.
@@ -802,6 +821,53 @@ function vim.fn.strchars(text, skipcc)
     i = i + size
   end
   return count
+end
+
+---Lower case for the letters a path on a case-folding file system is likely to hold: ASCII, Latin-1 (`Ä` to `Þ`
+---but not `×`), Greek (`Α` to `Ω`), Cyrillic (`Ѐ` to `Я`) and `ẞ`. The editor folds every script Unicode knows;
+---this does not, and a letter outside these stays as it is. Its one caller here (`lib.nvim.fs.normkey`'s keys,
+---through `rules.settings`) builds both sides of a comparison with it, so a letter left alone still compares equal
+---with itself; only two spellings of a name that differ in such a letter compare unequal, which errs toward "not the
+---same folder".
+---@param text string
+---@return string
+function vim.fn.tolower(text)
+  local ascii = text:lower()
+  if not ascii:find("[\195-\211\225]") then
+    return ascii
+  end
+  local out = ascii:gsub("\195([\128-\158])", function(c)
+    local b = c:byte()
+    if b == 0x97 then
+      return nil
+    end
+    return "\195" .. string.char(b + 0x20)
+  end)
+  -- Greek capitals U+0391..U+03A9 (not U+03A2): CE 91..A9 -> CE B1..BF, CF 80..89
+  out = out:gsub("\206([\145-\169])", function(c)
+    local b = c:byte()
+    if b == 0xA2 then
+      return nil
+    end
+    local lower = b + 0x20
+    if lower <= 0xBF then
+      return "\206" .. string.char(lower)
+    end
+    return "\207" .. string.char(lower - 0x40)
+  end)
+  -- Cyrillic U+0400..U+040F -> U+0450..U+045F (D0 80..8F -> D1 90..9F), U+0410..U+042F -> U+0430..U+044F
+  out = out:gsub("\208([\128-\175])", function(c)
+    local b = c:byte()
+    if b <= 0x8F then
+      return "\209" .. string.char(b + 0x10)
+    elseif b <= 0x9F then
+      return "\208" .. string.char(b + 0x20)
+    end
+    return "\209" .. string.char(b - 0x20)
+  end)
+  -- U+1E9E capital sharp s -> U+00DF
+  out = out:gsub("\225\186\158", "\195\159")
+  return out
 end
 
 ---Whether this host's filesystem ignores case by default, which is what
@@ -1815,21 +1881,108 @@ local uv = {}
 ---them (does the disk fold case?), and without the numbers two sibling roots that differ only in case would read as one.
 ---@param path string
 ---@return { type: string, ino: integer?, dev: integer? }|nil
+---The stat fields beside `type` that a caller here reads, asked for on first use and then kept: `ino` and
+---`dev` (`lib.nvim.fs.read_bounded` compares them), `size` (the same module's limit) and `mtime` as `{ sec, nsec }`
+---(`rules.contract`'s cache signature). `lfs` knows whole seconds only, so `nsec` is always 0.
+---@param path string
+---@param stat table
+---@param key string
+---@return any
+local function lazy_stat_field(path, stat, key)
+  local value
+  if key == "ino" or key == "dev" or key == "size" then
+    value = lfs.attributes(path, key)
+  elseif key == "mtime" then
+    local sec = lfs.attributes(path, "modification")
+    value = sec and { sec = sec, nsec = 0 } or nil
+  else
+    return nil
+  end
+  rawset(stat, key, value)
+  return value
+end
+
 function uv.fs_stat(path)
   local mode = lfs.attributes(path, "mode")
   if not mode then
     return nil
   end
-  -- `ino` and `dev` cost one more stat each and almost nobody reads them: asked for on first use, then kept
   return setmetatable({ type = mode }, {
     __index = function(stat, key)
-      if key == "ino" or key == "dev" then
-        local value = lfs.attributes(path, key)
-        rawset(stat, key, value)
-        return value
-      end
+      return lazy_stat_field(path, stat, key)
     end,
   })
+end
+
+---The open flags `lib.nvim.fs.read_bounded` adds up: `O_RDONLY` only. `O_NONBLOCK` is left out on purpose, as
+---libuv leaves it out on Windows; a caller adds `(c.O_NONBLOCK or 0)` and gets a plain read-only open, which is all
+---`fs_open` below implements.
+uv.constants = { O_RDONLY = 0 }
+
+---Open a file for reading, as a handle `fs_fstat`, `fs_read` and `fs_close` take. Read-only: any other flag raises
+---instead of opening something the caller did not ask for. A directory is refused the way libuv refuses it
+---(`EISDIR`), because `io.open` opens one on some platforms and the read then fails somewhere else.
+---@param path string
+---@param flags integer|string
+---@param _mode integer
+---@return table|nil fd
+---@return string|nil err
+---@return string|nil code
+function uv.fs_open(path, flags, _mode)
+  if flags ~= 0 and flags ~= "r" then
+    error("standalone vim_shim: vim.uv.fs_open only opens read-only, got " .. tostring(flags), 2)
+  end
+  local mode = lfs.attributes(path, "mode")
+  if not mode then
+    return nil, "ENOENT: no such file or directory: " .. path, "ENOENT"
+  end
+  if mode == "directory" then
+    return nil, "EISDIR: illegal operation on a directory: " .. path, "EISDIR"
+  end
+  local fh = io.open(path, "rb")
+  if not fh then
+    return nil, "EACCES: permission denied: " .. path, "EACCES"
+  end
+  return { fh = fh, path = path }
+end
+
+---The stat of an open handle. `lfs` has no `fstat`, so this stats the path the handle was opened by: the same
+---answer unless the file was swapped in between, which is the one case `read_bounded`'s identity check exists for
+---and which this cannot see (disclosed here rather than claimed).
+---@param fd table
+---@return table|nil
+function uv.fs_fstat(fd)
+  if type(fd) ~= "table" or not fd.fh then
+    return nil, "EBADF: bad file descriptor", "EBADF"
+  end
+  return uv.fs_stat(fd.path)
+end
+
+---Read up to `size` bytes at `offset`; `""` at the end of the file, as libuv answers.
+---@param fd table
+---@param size integer
+---@param offset integer|nil
+---@return string|nil data
+---@return string|nil err
+function uv.fs_read(fd, size, offset)
+  if type(fd) ~= "table" or not fd.fh then
+    return nil, "EBADF: bad file descriptor", "EBADF"
+  end
+  if offset and offset >= 0 then
+    fd.fh:seek("set", offset)
+  end
+  return fd.fh:read(size) or ""
+end
+
+---@param fd table
+---@return boolean|nil
+function uv.fs_close(fd)
+  if type(fd) ~= "table" or not fd.fh then
+    return nil, "EBADF: bad file descriptor", "EBADF"
+  end
+  fd.fh:close()
+  fd.fh = nil
+  return true
 end
 
 ---@param dir string
@@ -1867,8 +2020,9 @@ end
 ---`lstat`: the entry itself, and `"link"` for a symlink or a junction.
 ---
 ---The parent directory is followed, as it is by the real call -- a caller
----that has not checked it is not a link has not asked a safe question. Only
----`type` is filled in; that is all `core/safe_fs.lua` reads.
+---that has not checked it is not a link has not asked a safe question. `type`
+---is filled in (all `core/safe_fs.lua` reads); for an entry that is not a link,
+---`size`, `mtime`, `ino` and `dev` are read on first use, as by `fs_stat`.
 ---@param path string
 ---@return { type: string }|nil
 ---@return string? err
@@ -1895,7 +2049,16 @@ function uv.fs_lstat(path)
   if not mode then
     return nil, missing, "ENOENT"
   end
-  return { type = mode }
+  if mode == "link" then
+    return { type = "link" }
+  end
+  -- The entry is not a link here, so its own stat is the followed one: `size`, `mtime`, `ino` and `dev` the same
+  -- lazy way as `fs_stat` (`read_bounded` with `follow_symlinks = false` reads `size` off this).
+  return setmetatable({ type = mode }, {
+    __index = function(stat, key)
+      return lazy_stat_field(path, stat, key)
+    end,
+  })
 end
 
 ---Where a link points, as the link says it -- not resolved, not checked.
@@ -1925,6 +2088,129 @@ function uv.fs_readlink(path)
     return nil, not_a_link, "EINVAL"
   end
   return target
+end
+
+---The name `dir` lists for `name`, compared without case: the spelling on disk, which is what the editor's
+---`fs_realpath` reports on a file system that folds case (`e:/REPOS` comes back as `E:\repos`). `nil` when the
+---listing has no such entry -- an 8.3 short name (`STEFAN~1`) is one: it opens, but no listing shows it.
+---@param dir string
+---@param name string
+---@return string|nil
+local function listed_spelling(dir, name)
+  local ok, iter_fn, dir_obj = pcall(lfs.dir, dir)
+  if not ok then
+    return nil
+  end
+  local want = name:lower()
+  for entry in iter_fn, dir_obj do
+    if entry ~= "." and entry ~= ".." and entry:lower() == want then
+      return entry
+    end
+  end
+  return nil
+end
+
+---The path with every link along it resolved, `.` and `..` gone, absolute, in the editor's separators.
+---
+---`lfs` has no `realpath`, so this walks the path one segment at a time: a segment that `fs_lstat` calls a link is
+---replaced by what `fs_readlink` says it points at (relative to the link's folder when the target is relative), and
+---the walk goes on from there, at most 40 links deep (libuv's `ELOOP`). On a file system that folds case each
+---segment takes the spelling its folder lists (`listed_spelling`).
+---
+---**What it cannot do, measured rather than claimed:** a Windows 8.3 short name (`C:/Users/STEFAN~1`) stays short,
+---where the editor answers the long name. `lib.nvim.fs.normkey` uses this to compare paths, so two spellings of
+---one folder, one of them short, compare unequal under this shim: a trusted folder named by its short name is not
+---recognised, which errs toward not trusting.
+---@param path string
+---@return string|nil resolved
+---@return string|nil err
+---@return string|nil code
+function uv.fs_realpath(path)
+  if type(path) ~= "string" or path == "" then
+    return nil, "ENOENT: no such file or directory: " .. tostring(path), "ENOENT"
+  end
+  local missing = "ENOENT: no such file or directory: " .. path
+  local ok_abs, abs = pcall(absolute_path, path)
+  if not ok_abs then
+    return nil, missing, "ENOENT"
+  end
+  abs = to_slashes(abs)
+  local root, rest = abs:match("^(//[^/]+/[^/]+)/?(.*)$")
+  if not root then
+    root, rest = abs:match("^(%a:)/?(.*)$")
+    if root then
+      root = root:upper()
+    else
+      root, rest = "", abs:match("^/*(.*)$")
+    end
+  end
+  local pending = {}
+  for seg in rest:gmatch("[^/]+") do
+    pending[#pending + 1] = seg
+  end
+  local folds = folds_case()
+  local done = {}
+  local hops = 0
+  local i = 1
+  while i <= #pending do
+    local seg = pending[i]
+    i = i + 1
+    if seg == ".." then
+      done[#done] = nil
+    elseif seg ~= "." then
+      local parent = root .. "/" .. table.concat(done, "/")
+      local candidate = (parent:gsub("/+$", "")) .. "/" .. seg
+      local st = uv.fs_lstat(candidate)
+      if not st then
+        return nil, missing, "ENOENT"
+      end
+      if st.type == "link" then
+        hops = hops + 1
+        if hops > 40 then
+          return nil, "ELOOP: too many symbolic links encountered: " .. path, "ELOOP"
+        end
+        local target = uv.fs_readlink(candidate)
+        if not target then
+          return nil, "EIO: cannot read the link " .. candidate, "EIO"
+        end
+        target = to_slashes(target):gsub("^//%?/", ""):gsub("^/%?%?/", "")
+        local t_root, t_rest = target:match("^(//[^/]+/[^/]+)/?(.*)$")
+        if not t_root then
+          t_root, t_rest = target:match("^(%a:)/?(.*)$")
+          if t_root then
+            t_root = t_root:upper()
+          elseif target:sub(1, 1) == "/" then
+            t_root, t_rest = "", target:match("^/*(.*)$")
+          end
+        end
+        local tail = {}
+        for k = i, #pending do
+          tail[#tail + 1] = pending[k]
+        end
+        pending = {}
+        for s in (t_rest or target):gmatch("[^/]+") do
+          pending[#pending + 1] = s
+        end
+        for _, s in ipairs(tail) do
+          pending[#pending + 1] = s
+        end
+        i = 1
+        if t_root then
+          root, done = t_root, {}
+        end
+      else
+        done[#done + 1] = folds and listed_spelling(parent == "" and "/" or parent, seg) or seg
+      end
+    end
+  end
+  local resolved = root .. "/" .. table.concat(done, "/")
+  if #done > 0 then
+    resolved = resolved:gsub("/+$", "")
+  end
+  if IS_WINDOWS then
+    resolved = resolved:gsub("/", "\\")
+  end
+  return resolved
 end
 
 ---@param path string

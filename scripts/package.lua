@@ -242,6 +242,12 @@ local function staged_name(p)
   if ra then
     return ra
   end
+  -- `rules.nvim`'s checkout, the same way: `lua/rules/...` stages as `rules/...`.
+  local rules = p:match(".*rules%.nvim/lua/(rules/.+)$")
+    or p:match(".*rules%.nvim/lua/(rules%.lua)$")
+  if rules then
+    return rules
+  end
   local sa = p:match(".*/(standalone/[^/]+%.lua)$") or p:match("^(standalone/[^/]+%.lua)$")
   if sa then
     return sa

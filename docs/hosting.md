@@ -60,7 +60,7 @@ binary with anything.
 
 | Field | What it says |
 |---|---|
-| `capabilities` | Coarse feature names this build has — `api`, `languages`, `schema`. A host that wants one thing can test for it without parsing the rest. |
+| `capabilities` | Coarse feature names this build has — `api`, `languages`, `schema`, and `rules` when `rules.nvim`'s engine is part of it (the `rules/*` routes are listed in `routes` either way and answer with a reason without it). A host that wants one thing can test for it without parsing the rest. |
 | `schema` | The artifact schema this build writes. The release is rolling (`standalone-latest`), so there is no version number to report that would not be fiction; the schema is what actually decides whether two artifacts are comparable, and it is bumped deliberately. |
 | `build` | Commit, commit date, and whether the tree it was built from was clean. **Present only in a bundled binary** — `scripts/package.lua` writes it at bundle time and never into the source tree, so a run from a checkout answers `null` rather than claiming a provenance it does not have. |
 | `routes` | Every `/api/*` route name this build answers, read from `core/api.routes`. A route added there is advertised here without this being told. |
@@ -113,6 +113,8 @@ instead of generating anything. Today's routes:
 | `checklist` | The hand-verified ledger and what has drifted. |
 | `commits` | Recent commits, for the History tab. |
 | `commit/<sha>` | One commit's diff. Not in `routes` because its name carries the sha. |
+| `rules/catalog` | Every rule of the project's rulesets (`.rules.json`, else the vault): id, severity, family, title, section, text, source file and line, the check type if any, the agent hint. See below. |
+| `rules/run` | The mechanical run of a selection: one result per rule, `pass`, `fail`, `error`, `manual` or `waived`, with findings. See below. |
 
 **One route per invocation, deliberately.** A request is one question, and a
 process that answered several would need a protocol to say which answer is
@@ -123,6 +125,28 @@ where it starts.
 chosen route makes of it — a snapshot name for `telemetry`/`loaded`, a commit
 count for `commits`, unused otherwise. One flag rather than one per route,
 because exactly one route reads it at a time.
+
+### `rules/catalog` and `rules/run`
+
+```bash
+docmap /path/to/project --api=rules/catalog
+docmap /path/to/project --api=rules/run --select=DEP,LUA-12,gate:release --trust=/path/to/ruleset
+```
+
+`rules.nvim`'s engine (`lua/docmap/core/rules_api.lua`), for the desktop app's Rules tab. The rulesets and gates
+come from `rules.settings`, the same resolution `:Rules check` uses: the project's `.rules.json`, else the vault
+(`$RULES_VAULT`); waivers from the project's `.rules-waivers.json`.
+
+- `--select=` (the same single parameter as `--snapshot=`) is a comma-separated list of rule ids (`DEP-01`),
+  families (`DEP`) and gates (`gate:release`). Nothing selected is an answer with a reason, never a sweep of the
+  whole catalog; items that match no rule come back in `unknown`.
+- `--trust=<folder>` (repeatable) is the host's decision, **per rule**: a `lua_predicate` runs only when its rule
+  file lies (by real path) under one of these folders. Otherwise it reports `error` with the finding
+  `predicate not trusted: ...`, visibly. No other source of trust counts here, not even a vault named by
+  `$RULES_VAULT`: a child process inherits an environment nobody looked at for this run. Grep, file and JSON
+  checks run regardless, they read files and execute nothing.
+- Absence answers `{ "available": false, "reason": ... }`: `rules.nvim` not part of this build, a `.rules.json`
+  that cannot be used, no ruleset configured, a ruleset that does not exist, a selection that matches nothing.
 
 **The join logic stays in Lua.** `docmap-desktop` runs a small HTTP server
 that forwards `/api/*` here; its Rust side is transport only. `core/api.lua`

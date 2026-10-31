@@ -454,6 +454,14 @@ M.routes = {
   ["loaded/snapshots"] = M.loaded_snapshots,
   checklist = M.checklist,
   commits = M.commits,
+  -- `rules.nvim`'s engine for the Rules tab (`core/rules_api.lua`): the catalog of the configured rulesets, and the
+  -- mechanical run of a selection (`param`, see `rules_api.parse_selection`).
+  ["rules/catalog"] = function(opts)
+    return require("docmap.core.rules_api").catalog(opts)
+  end,
+  ["rules/run"] = function(opts, param)
+    return require("docmap.core.rules_api").run(opts, param)
+  end,
 }
 
 ---Answer one route by name.

@@ -303,6 +303,8 @@ jobs:
           repository: WKDSteve/rules.nvim
           path: .deps/rules.nvim
           ref: ci-verified
+          # a read token for the private repo, when the secret is set; the gate then runs here too
+          token: ${{ secrets.RULES_NVIM_TOKEN || github.token }}
       - uses: leafo/gh-actions-lua@v13
         with:
           luaVersion: "5.4"

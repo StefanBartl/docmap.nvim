@@ -342,6 +342,76 @@ function M.evaluate(surface, case, root)
       return "error", tostring(ty)
     end
     return M.canon(ty)
+  elseif kind == "stat_fields" then
+    -- `type` and `size`, and whether `mtime` is there: `lib.nvim.fs.read_bounded`
+    -- limits by `size`, `rules.contract` keys a cache on `mtime`. The time itself
+    -- is a fact about the checkout, not about the shim.
+    local args = case_args(case, root)
+    local ok, fields = pcall(function()
+      local st = fn(args[1])
+      if not st then
+        return "nil"
+      end
+      return {
+        type = st.type,
+        size = st.size,
+        mtime = type(st.mtime) == "table" and type(st.mtime.sec),
+      }
+    end)
+    if not ok then
+      return "error", tostring(fields)
+    end
+    return M.canon(fields)
+  elseif kind == "read_fd" then
+    -- The open/fstat/read/close sequence `read_bounded` runs: read in blocks of
+    -- `case.block` bytes from offset 0 until an empty read, as it does.
+    local args = case_args(case, root)
+    local uv = resolve(surface, "uv")
+    local ok, out = pcall(function()
+      local fd, _, code = fn(args[1], 0, 438)
+      if not fd then
+        return { code = code }
+      end
+      local st = uv.fs_fstat(fd)
+      local chunks, total = {}, 0
+      while true do
+        local chunk = uv.fs_read(fd, case.block, total)
+        if not chunk or chunk == "" then
+          break
+        end
+        chunks[#chunks + 1] = chunk
+        total = total + #chunk
+      end
+      local closed = uv.fs_close(fd)
+      return {
+        type = st and st.type,
+        size = st and st.size,
+        data = table.concat(chunks),
+        closed = closed,
+      }
+    end)
+    if not ok then
+      return "error", tostring(out)
+    end
+    return M.canon(out)
+  elseif kind == "decode_islist" then
+    -- What `vim.islist` says about each field of a decoded document: an empty
+    -- object is not a list in the editor, which is how `rules.nvim`'s settings
+    -- schema tells `{}` from `[]` in a `.rules.json`.
+    local decode = resolve(surface, "json.decode")
+    local ok, out = pcall(function()
+      local doc = decode(case.args[1])
+      local answer = {}
+      for key, value in pairs(doc) do
+        answer[key] = fn(value)
+      end
+      answer["<empty_dict>"] = fn(resolve(surface, "empty_dict")())
+      return answer
+    end)
+    if not ok then
+      return "error", tostring(out)
+    end
+    return M.canon(out)
   end
 
   -- Rendered as an answer rather than raised, so the runners can report which
@@ -956,6 +1026,97 @@ M.cases = {
 
   -- ----------------------------------------------------------- fn.getcwd
   { id = "fn.getcwd/cwd", path = "fn.getcwd", args = {}, normalize = "slashes", local_only = true },
+
+  -- ------------------------------------------------- rules/* route surface
+  -- `core/rules_api.lua` resolves a `.rules.json` through `rules.settings`, which
+  -- reads it with `lib.nvim.fs.read_bounded` and compares paths through
+  -- `lib.nvim.fs.normkey` (real path, lower case on a case-folding system).
+  {
+    id = "uv.fs_stat/fields-file",
+    path = "uv.fs_stat",
+    kind = "stat_fields",
+    args = { "<ROOT>/a.txt" },
+  },
+  {
+    id = "uv.fs_lstat/fields-file",
+    path = "uv.fs_lstat",
+    kind = "stat_fields",
+    args = { "<ROOT>/a.txt" },
+    why = "read_bounded with follow_symlinks = false limits by the lstat's size; without it the compare raised",
+  },
+  {
+    id = "uv.fs_stat/fields-missing",
+    path = "uv.fs_stat",
+    kind = "stat_fields",
+    args = { "<ROOT>/nope" },
+  },
+  {
+    id = "uv.fs_open/read-blocks",
+    path = "uv.fs_open",
+    kind = "read_fd",
+    block = 3,
+    args = { "<ROOT>/README.txt" },
+    why = "blocks shorter than the file: the offset must move, and the end is an empty read, not nil",
+  },
+  {
+    id = "uv.fs_open/read-whole",
+    path = "uv.fs_open",
+    kind = "read_fd",
+    block = 4096,
+    args = { "<ROOT>/a.txt" },
+  },
+  {
+    id = "uv.fs_open/missing",
+    path = "uv.fs_open",
+    kind = "read_fd",
+    block = 8,
+    args = { "<ROOT>/nope" },
+  },
+  {
+    id = "uv.fs_realpath/file",
+    path = "uv.fs_realpath",
+    normalize = "slashes",
+    args = { "<ROOT>/a.txt" },
+  },
+  {
+    id = "uv.fs_realpath/dotdot",
+    path = "uv.fs_realpath",
+    normalize = "slashes",
+    args = { "<ROOT>/sub/../sub/./b.txt" },
+    why = "`.` and `..` are gone from the answer, as from the editor's",
+  },
+  {
+    id = "uv.fs_realpath/directory",
+    path = "uv.fs_realpath",
+    normalize = "slashes",
+    args = { "<ROOT>/sub/" },
+  },
+  {
+    id = "uv.fs_realpath/missing",
+    path = "uv.fs_realpath",
+    args = { "<ROOT>/nope/a.txt" },
+    why = "a path that is not there resolves to nothing; normkey then walks up to the deepest one that is",
+  },
+  { id = "fn.tolower/ascii", path = "fn.tolower", args = { "AbC/D_e.LUA" } },
+  {
+    id = "fn.tolower/latin1",
+    path = "fn.tolower",
+    args = { "\195\132\195\150 \195\151 \195\137" },
+  },
+  {
+    id = "fn.tolower/greek-cyrillic",
+    path = "fn.tolower",
+    args = { "\206\169\206\163 \208\175\208\129" },
+  },
+  { id = "fn.tolower/sharp-s", path = "fn.tolower", args = { "STRA\225\186\158E" } },
+  {
+    id = "islist/decoded-empty-object",
+    path = "islist",
+    kind = "decode_islist",
+    needs = "puc",
+    args = { '{"obj":{},"arr":[],"full":{"a":1},"list":[1]}' },
+    why = "`{}` from a .rules.json is an object: `gates: []` is a mistake the settings schema reports",
+  },
 
   -- --------------------------------------------------------- fn.strchars
   { id = "fn.strchars/ascii", path = "fn.strchars", args = { "abc" } },

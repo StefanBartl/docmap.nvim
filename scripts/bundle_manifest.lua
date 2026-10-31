@@ -178,6 +178,24 @@ for _, route in ipairs({
   probe(root, { "--api=" .. route, "--out-dir=.deps/bundle-manifest-probe" })
 end
 
+-- **The `rules/*` routes, over a project that has rules.** Probing them against
+-- this repository would measure nothing of `rules.nvim`: it has no `.rules.json`,
+-- so `rules.settings` answers "nothing configured" before the loader, the
+-- parser, the checks or the waivers are ever required. The fixture project of
+-- the `standalone` gate has all of it -- a `.rules.json`, a waivers file, every
+-- check type, broken blocks the parser reports -- and the run below trusts its
+-- ruleset, so the predicate path (`rules.util.sandbox`'s rebind) is reached too.
+-- Without `rules.nvim` reachable (`RULES_NVIM_DIR`, `.deps/rules.nvim`, a
+-- sibling) these answer `available = false`, nothing of it is measured, and
+-- the warning further down says so.
+local rules_fixture = repo .. "/TESTS/fixtures/rules_engine"
+probe(rules_fixture .. "/project", { "--api=rules/catalog" })
+probe(rules_fixture .. "/project", {
+  "--api=rules/run",
+  "--select=FIX,PRD,HOS",
+  "--trust=" .. rules_fixture .. "/ruleset",
+})
+
 -- `commit/<sha>` needs a real sha, unlike the fixed-name routes above: on
 -- success it requires `core.history` for the diff analysis, which
 -- measured (`nvim --headless`, package.loaded before/after) is not pulled
@@ -224,7 +242,7 @@ end
 ---Which bucket a loaded module name belongs to, or nil to ignore it (the
 ---standard library, and anything else the host happened to preload).
 ---@param name string
----@return "project"|"lib"|"runtime_analysis"|"rock"|nil
+---@return "project"|"lib"|"runtime_analysis"|"rules"|"rock"|nil
 local function bucket(name)
   if name:match("^docmap") or name:match("^standalone") then
     return "project"
@@ -262,6 +280,12 @@ local function bucket(name)
   if name:match("^runtime%-analysis") then
     return "runtime_analysis"
   end
+  -- `rules.nvim`, the engine of the `rules/*` routes: its own bucket for the
+  -- reason `runtime-analysis` has one -- soft (`ensure_soft`), and a different
+  -- repository the release workflow checks out next to `lib.nvim`.
+  if name == "rules" or name:match("^rules%.") then
+    return "rules"
+  end
   if name == "dkjson" then
     return "rock"
   end
@@ -272,7 +296,7 @@ end
 -- problem, not a file to hand the packager.
 local C_MODULES = { "lfs", "lua_tree_sitter" }
 
-local groups = { project = {}, lib = {}, runtime_analysis = {}, rock = {} }
+local groups = { project = {}, lib = {}, runtime_analysis = {}, rules = {}, rock = {} }
 local unresolved = {}
 
 for name in pairs(package.loaded) do
@@ -332,8 +356,17 @@ if not package.loaded.lua_tree_sitter then
   )
 end
 
+if #groups.rules == 0 then
+  io.stderr:write(
+    "bundle_manifest: WARNING — rules.nvim was not reached, so the rules/* routes of\n"
+      .. "  this bundle will answer that the engine is not part of it, and --capabilities\n"
+      .. "  will not list `rules`. Check rules.nvim out to .deps/rules.nvim (or set\n"
+      .. "  $RULES_NVIM_DIR) and re-run for a bundle that has it.\n"
+  )
+end
+
 if not report then
-  for _, key in ipairs({ "project", "lib", "runtime_analysis", "rock" }) do
+  for _, key in ipairs({ "project", "lib", "runtime_analysis", "rules", "rock" }) do
     for _, entry in ipairs(groups[key]) do
       print(entry.path)
     end
@@ -356,6 +389,7 @@ section(
   "runtime-analysis.nvim (soft dependency, only what is really loaded)",
   groups.runtime_analysis
 )
+section("rules.nvim (soft dependency, only what is really loaded)", groups.rules)
 section("pure-Lua rocks", groups.rock)
 
 print(
@@ -376,7 +410,7 @@ end
 
 print(
   ("-- total Lua files: %d  |  C modules: %d"):format(
-    #groups.project + #groups.lib + #groups.rock,
+    #groups.project + #groups.lib + #groups.runtime_analysis + #groups.rules + #groups.rock,
     #present_c
   )
 )

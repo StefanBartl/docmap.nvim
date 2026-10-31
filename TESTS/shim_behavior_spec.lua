@@ -78,11 +78,23 @@ return function(H)
         -- and a silently-nil answer to some future third argument would look
         -- exactly like "file not found".
         assert(
-          what == "mode" or what == "ino" or what == "dev",
-          "lfs adapter: only the `mode`, `ino` and `dev` attributes are implemented"
+          what == "mode"
+            or what == "ino"
+            or what == "dev"
+            or what == "size"
+            or what == "modification",
+          "lfs adapter: only the `mode`, `ino`, `dev`, `size` and `modification` attributes are implemented"
         )
         local st = vim.uv.fs_stat(path)
-        return st and (what == "mode" and st.type or st[what]) or nil
+        if not st then
+          return nil
+        end
+        if what == "mode" then
+          return st.type
+        elseif what == "modification" then
+          return st.mtime.sec
+        end
+        return st[what]
       end,
       -- `lstat`: what the shim's `**` asks so that a link is not entered, and
       -- (`target`) what `uv.fs_readlink` asks to read where a link points.
@@ -356,6 +368,10 @@ return function(H)
     ["treesitter"] = "deliberately inert in the parser-less build, top to bottom",
     ["loop"] = "the same table as uv, by assignment — enumerated once, as uv",
     ["NIL"] = "a sentinel, not a function",
+    ["uv.fs_fstat"] = "run by the `read_fd` cases of uv.fs_open, on the handle that opened",
+    ["uv.fs_read"] = "run by the `read_fd` cases of uv.fs_open, in blocks, to the empty read",
+    ["uv.fs_close"] = "run by the `read_fd` cases of uv.fs_open, which compare what it returns",
+    ["empty_dict"] = "run by the islist/decoded-empty-object case (PUC runner), against a decoded {}",
   }
   -- The entries above that name a *table*: the walk stops at them instead of
   -- listing what is inside.

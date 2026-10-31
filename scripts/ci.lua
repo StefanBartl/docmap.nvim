@@ -528,6 +528,180 @@ function GATES.standalone()
   end
 
   -- ------------------------------------------------------------------
+  -- The `rules/*` routes of `core/api.lua` (`core/rules_api.lua`), the entry point the desktop app's Rules tab uses:
+  -- the real binary's entry (`standalone/docmap.lua --api=...`) under PUC Lua against `standalone/rules_api.lua`
+  -- under this Neovim, over the fixture project and its `.rules.json`. The answers must be the same, except for the
+  -- wording of a Lua runtime error inside a parse error (LuaJIT and PUC phrase it differently): parse errors are
+  -- compared by count. Then each answer is held to what the fixture means, as above.
+  --
+  -- `RULES_VAULT`/`RULES_TRUST` are emptied for both: a developer's vault must not become the rulesets of a fixture
+  -- that has none (`bare`), nor a trusted folder.
+  local rules_env = { RULES_VAULT = "", RULES_TRUST = "", RULES_NVIM_DIR = rules_dir }
+  local api_project = fixture_dir .. "/project"
+  local api_ruleset = fixture_dir .. "/ruleset"
+  local api_fixtures = root .. "/TESTS/fixtures/rules_api"
+  ---@param cmd string[]
+  ---@return table|nil
+  local function api_answer(cmd)
+    local proc = vim.system(cmd, { cwd = root, text = true, env = rules_env }):wait()
+    if proc.code ~= 0 then
+      fail(
+        ("rules route failed (exit %d): %s\n%s"):format(
+          proc.code,
+          table.concat(cmd, " "),
+          proc.stderr or ""
+        )
+      )
+      return nil
+    end
+    local ok, decoded = pcall(vim.json.decode, proc.stdout or "")
+    if not ok then
+      fail("rules route printed no JSON: " .. table.concat(cmd, " ") .. "\n" .. (proc.stdout or ""))
+      return nil
+    end
+    if type(decoded.errors) == "table" then
+      decoded.errors = #decoded.errors
+    end
+    return decoded
+  end
+  ---@param result table
+  ---@return table<string, string>
+  local function statuses(result)
+    local out = {}
+    for _, r in ipairs(result.results or {}) do
+      out[r.id] = r.status
+    end
+    return out
+  end
+  local NOT_TRUSTED =
+    "predicate not trusted: the host has not trusted this ruleset (--trust=<folder>)"
+  local api_cases = {
+    {
+      label = "catalog",
+      project = api_project,
+      args = { "rules/catalog" },
+      check = function(r)
+        local fix01
+        for _, rule in ipairs(r.rules or {}) do
+          if rule.id == "FIX-01" then
+            fix01 = rule
+          end
+        end
+        return r.available == true
+          and vim.deep_equal(r.counts, { rules = 12, automated = 10, manual = 2, predicates = 5 })
+          and r.errors == 3
+          and fix01 ~= nil
+          and fix01.check == "grep"
+          and fix01.section == "Mechanical checks"
+          and fix01.source_line == 11
+          and fix01.source_file:match("/rules_engine/ruleset/RULES%.md$") ~= nil
+          and fix01.agent.question == "Is every flatten call guarded?"
+          and vim.deep_equal(r.gates.release, { "FIX", "PRD" })
+      end,
+    },
+    {
+      label = "run, predicates not trusted",
+      project = api_project,
+      args = { "rules/run", "--select=gate:release,FIX-06,ZZZ" },
+      check = function(r)
+        local untrusted = 0
+        for _, res in ipairs(r.results or {}) do
+          if res.status == "error" and res.findings[1] and res.findings[1].text == NOT_TRUSTED then
+            untrusted = untrusted + 1
+          end
+        end
+        return r.available == true
+          and vim.deep_equal(statuses(r), {
+            ["FIX-01"] = "fail",
+            ["FIX-02"] = "pass",
+            ["FIX-03"] = "pass",
+            ["FIX-04"] = "waived",
+            ["FIX-05"] = "fail",
+            ["FIX-06"] = "manual",
+            ["PRD-01"] = "error",
+            ["PRD-02"] = "error",
+            ["PRD-03"] = "error",
+            ["PRD-04"] = "error",
+            ["PRD-05"] = "error",
+          })
+          and untrusted == 5
+          and vim.deep_equal(r.unknown, { "ZZZ" })
+      end,
+    },
+    {
+      label = "run, predicates trusted by the host",
+      project = api_project,
+      args = { "rules/run", "--select=PRD", "--trust=" .. api_ruleset },
+      check = function(r)
+        return r.available == true
+          and vim.deep_equal(statuses(r), {
+            ["PRD-01"] = "pass",
+            ["PRD-02"] = "fail",
+            ["PRD-03"] = "pass",
+            ["PRD-04"] = "pass",
+            ["PRD-05"] = "pass",
+          })
+      end,
+    },
+    {
+      label = "a project without .rules.json",
+      project = api_fixtures .. "/bare",
+      args = { "rules/catalog" },
+      check = function(r)
+        return r.available == false and tostring(r.reason):match("^no ruleset is configured") ~= nil
+      end,
+    },
+    {
+      label = "a .rules.json naming a missing ruleset",
+      project = api_fixtures .. "/missing",
+      args = { "rules/run", "--select=FIX" },
+      check = function(r)
+        return r.available == false and tostring(r.reason):find("no-such-ruleset", 1, true) ~= nil
+      end,
+    },
+  }
+  for _, case in ipairs(api_cases) do
+    local route, extra = case.args[1], vim.list_slice(case.args, 2)
+    local in_nvim = api_answer(vim.list_extend({
+      vim.v.progpath,
+      "-n",
+      "--headless",
+      "-u",
+      "NONE",
+      "-l",
+      "standalone/rules_api.lua",
+      case.project,
+      route,
+    }, extra))
+    local in_binary = api_answer(
+      vim.list_extend({ lua, "standalone/docmap.lua", case.project, "--api=" .. route }, extra)
+    )
+    if not in_nvim or not in_binary then
+      return
+    end
+    if not vim.deep_equal(in_nvim, in_binary) then
+      fail(
+        ("rules route differs between Neovim and the standalone build (%s):\n--- neovim\n%s\n--- standalone\n%s"):format(
+          case.label,
+          vim.inspect(in_nvim),
+          vim.inspect(in_binary)
+        )
+      )
+      return
+    end
+    if not case.check(in_nvim) then
+      fail(
+        ("rules route does not say what the fixture means (%s):\n%s"):format(
+          case.label,
+          vim.inspect(in_nvim)
+        )
+      )
+      return
+    end
+    say(("  ok: rules route, %s: identical on both hosts and as expected"):format(case.label))
+  end
+
+  -- ------------------------------------------------------------------
   -- The agent pipeline of rules.nvim (planner, request, check of an answer,
   -- verdict reading) on both hosts, over a small fixture project: the same
   -- script once here and once under PUC Lua with the shim, the outputs

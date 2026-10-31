@@ -252,6 +252,7 @@ local specs = {
   "mcp_stdio_spec.lua",
   "checklist_spec.lua",
   "api_spec.lua",
+  "rules_api_spec.lua",
   "generate_all_spec.lua",
   "usrcmds_generate_all_spec.lua",
   "usrcmds_actions_spec.lua",
