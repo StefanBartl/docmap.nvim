@@ -122,6 +122,15 @@ jobs:
           repository: WKDSteve/runtime-analysis.nvim
           path: .deps/runtime-analysis.nvim
           ref: ci-verified
+      # rules.nvim: the real-engine half of `TESTS/rules_api_spec.lua` (the
+      # `rules/catalog` and `rules/run` routes over the fixture ruleset) finds
+      # it at `.deps/rules.nvim` and skips without it, so the checkout is what
+      # makes that half run here at all.
+      - uses: actions/checkout@v5
+        with:
+          repository: WKDSteve/rules.nvim
+          path: .deps/rules.nvim
+          ref: ci-verified
       - uses: rhysd/action-setup-vim@v1
         with:
           neovim: true
@@ -292,19 +301,14 @@ jobs:
           ref: ci-verified
       # The rules.nvim engine is run on both hosts by this gate (see
       # `GATES.standalone` in scripts/ci.lua), and CI must not skip it: the
-      # step fails when this checkout is missing -- except here: rules.nvim is
-      # private now and this public repo has no token for it, so the checkout is
-      # allowed to fail and the gate prints a skip (RULES_NVIM_OPTIONAL). Run
-      # the engine gate locally (RULES_NVIM_DIR or a sibling checkout). Pinned
-      # to `ci-verified` like the other dependencies.
+      # step fails when this checkout is missing. rules.nvim is public, so the
+      # default token clones it. Pinned to `ci-verified` like the other
+      # dependencies.
       - uses: actions/checkout@v5
-        continue-on-error: true
         with:
           repository: WKDSteve/rules.nvim
           path: .deps/rules.nvim
           ref: ci-verified
-          # a read token for the private repo, when the secret is set; the gate then runs here too
-          token: ${{ secrets.RULES_NVIM_TOKEN || github.token }}
       - uses: leafo/gh-actions-lua@v13
         with:
           luaVersion: "5.4"
@@ -317,9 +321,7 @@ jobs:
         with:
           neovim: true
           version: stable
-      - env:
-          RULES_NVIM_OPTIONAL: "1"
-        run: |
+      - run: |
           exec > >(tee -a "$RUNNER_TEMP/test-output.log") 2>&1
           scripts/ci.sh standalone
       - uses: actions/upload-artifact@v7

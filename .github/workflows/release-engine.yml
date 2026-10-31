@@ -85,20 +85,16 @@ jobs:
       # rules.nvim: the engine of the `rules/*` routes (lua/docmap/core/rules_api.lua),
       # soft like runtime-analysis.nvim (ensure_soft): scripts/bundle_manifest.lua
       # measures it over the rules fixture and scripts/package.lua stages it as
-      # `rules/...`. It is PRIVATE and this repository is public, so the checkout
-      # needs a token with read access to it (secret RULES_NVIM_TOKEN). Without
-      # one the step fails, `continue-on-error` lets the build go on, the bundle
-      # has no rules.nvim, and `--capabilities` honestly leaves `rules` out --
-      # the rules/* routes then answer "rules.nvim is not part of this engine".
+      # `rules/...`, and `--capabilities` then lists `rules`. rules.nvim is
+      # public, so the default token clones it, and a failed checkout fails the
+      # build instead of publishing an engine without the rules routes.
       # Pinned to `ci-verified` like the other dependencies, so a red push to
       # rules.nvim's main never reaches this release.
       - uses: actions/checkout@v5
-        continue-on-error: true
         with:
           repository: WKDSteve/rules.nvim
           path: .deps/rules.nvim
           ref: ci-verified
-          token: ${{ secrets.RULES_NVIM_TOKEN || github.token }}
       # tree-sitter CLI, the same way ci.yml's own `tests` job already
       # gets it for JS/TS/TSX -- not preinstalled on this image.
       - run: npm install -g tree-sitter-cli
@@ -107,6 +103,7 @@ jobs:
           TRIPLE: x86_64-unknown-linux-gnu
           EXE_EXT: ""
           OUT_DIR: release-out
+          REQUIRE_CAPABILITIES: rules
       - uses: actions/upload-artifact@v7
         with:
           name: engine-linux
@@ -138,14 +135,12 @@ jobs:
           repository: WKDSteve/runtime-analysis.nvim
           path: .deps/runtime-analysis.nvim
           ref: ci-verified
-      # rules.nvim: see the linux job (private; needs secret RULES_NVIM_TOKEN).
+      # rules.nvim: see the linux job.
       - uses: actions/checkout@v5
-        continue-on-error: true
         with:
           repository: WKDSteve/rules.nvim
           path: .deps/rules.nvim
           ref: ci-verified
-          token: ${{ secrets.RULES_NVIM_TOKEN || github.token }}
       # A dedicated MSYS2/MinGW environment rather than whatever happens
       # to already be on this runner's PATH. Found the hard way on a dev
       # machine that also has Git for Windows installed: Lua's own `mingw`
@@ -177,6 +172,7 @@ jobs:
           TRIPLE: x86_64-pc-windows-msvc
           EXE_EXT: ".exe"
           OUT_DIR: release-out
+          REQUIRE_CAPABILITIES: rules
       - uses: actions/upload-artifact@v7
         with:
           name: engine-windows

@@ -278,6 +278,27 @@ LUA_PATH="$WORK_N/?.lua;;" \
 # relative and cd-ing into $repo first sidesteps that rather than teaching
 # the script a case nothing else needs.
 
+# REQUIRE_CAPABILITIES (space-separated, e.g. "rules"): fail the build when
+# the bundled binary's `--capabilities` does not list each of them. A soft
+# dependency missing from the bundle degrades the binary quietly (rules.nvim
+# absent -> no `rules`); the release must not publish such a binary as if it
+# were complete. Only the `capabilities` array is searched, not the route list.
+if [ -n "${REQUIRE_CAPABILITIES:-}" ]; then
+  echo "== checking --capabilities for: $REQUIRE_CAPABILITIES"
+  caps_json="$("build/docmap$EXE_EXT" --capabilities)"
+  caps_list="$(printf '%s' "$caps_json" | tr -d '\r\n' | sed -n 's/.*"capabilities":\[\([^]]*\)\].*/\1/p')"
+  echo "capabilities: [$caps_list]"
+  for cap in $REQUIRE_CAPABILITIES; do
+    case ",$caps_list," in
+      *",\"$cap\","*) ;;
+      *)
+        echo "error: the bundled engine does not report capability '$cap'" >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
+
 echo "== staging release assets"
 mkdir -p "$out"
 cp "build/docmap$EXE_EXT" "$out/docmap-$TRIPLE$EXE_EXT"

@@ -10,8 +10,8 @@
 -- runs the real engine over the fixture project (`TESTS/fixtures/rules_engine/
 -- project`, whose `.rules.json` names `../ruleset`) when a `rules.nvim` checkout
 -- is reachable -- `RULES_NVIM_DIR`, `.deps/rules.nvim` or a sibling, as
--- `scripts/ci.lua` finds it -- and says it skipped otherwise: this repository is
--- public and its CI cannot clone the private `rules.nvim`. The same routes are
+-- `scripts/ci.lua` finds it -- and skips it otherwise (a developer machine
+-- without a checkout; CI's `tests` job checks it out). The same routes are
 -- compared between Neovim and PUC Lua by the `standalone` gate of `scripts/ci.lua`.
 --
 -- `$RULES_VAULT` and `$RULES_TRUST` are emptied while the engine runs, and put
@@ -98,8 +98,8 @@ return function(H)
     end
   end
   if not rules_dir then
-    -- Skipped, as `browse_rules_spec.lua` skips its real-engine half: this repository's CI cannot clone the
-    -- private `rules.nvim`. A developer machine with a sibling checkout runs it, and so does the `standalone` gate.
+    -- Skipped, as `browse_rules_spec.lua` skips its real-engine half, on a developer machine without a
+    -- `rules.nvim` checkout. CI's `tests` job checks it out, and the `standalone` gate runs the routes too.
     return
   end
 

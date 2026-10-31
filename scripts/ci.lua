@@ -424,13 +424,9 @@ function GATES.standalone()
     -- On a developer's machine a missing sibling checkout is the normal state
     -- and skipping is honest. In CI the checkout is a step of the job, so its
     -- absence is the job being wrong, and a skip there would be the silent
-    -- green this whole gate exists to prevent.
-    --
-    -- The one exception is a job that says so itself: rules.nvim is private,
-    -- and a public repo's CI cannot clone it without a token. That job sets
-    -- RULES_NVIM_OPTIONAL=1 and makes the checkout `continue-on-error`, and
-    -- the skip below is printed, not silent.
-    if vim.env.CI and not (vim.env.RULES_NVIM_OPTIONAL and vim.env.RULES_NVIM_OPTIONAL ~= "") then
+    -- green this whole gate exists to prevent. (rules.nvim is public, so the
+    -- job checks it out with the default token; no opt-out remains.)
+    if vim.env.CI then
       fail("rules.nvim was not checked out to .deps/rules.nvim, and CI must not skip this step.")
     else
       skip(
